@@ -76,9 +76,12 @@ int init(void)
           mpi_printf("INIT: Skipping Omega check since we are not doing a dynamical evolution (not all particles may be loaded)\n");
       }
 
-#if defined(COOLING)
-  IonizeParams();
-#endif /* #if defined(COOLING) */
+/* IonizeParams initalises the Treecool file and such, 
+* which we don't need when using grackle
+*/
+#if defined(COOLING) && !defined(USE_GRACKLE)
+    IonizeParams();
+#endif /* defined(COOLING) && !defined(USE_GRACKLE) */
 
   if(All.ComovingIntegrationOn)
     {
