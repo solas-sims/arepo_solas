@@ -327,6 +327,19 @@ extern hwloc_cpuset_t cpuset_thread[NUM_THREADS];
 #define IO_SLEEP_TIME 10
 #endif /* #ifdef TOLERATE_WRITE_ERROR */
 
+#ifdef METALS
+  #define METALLICITY_INDEX 0 /* Where metals sit in the scalars array */
+  #ifndef PASSIVE_SCALARS
+    #define PASSIVE_SCALARS 1 /* METALS need PASSIVE_SCALARS */
+  #else
+    /* Save the current value before redefining; 
+     * Some comppiler complain about redefining */
+    #define _OLD_PASSIVE_SCALARS PASSIVE_SCALARS
+    #undef PASSIVE_SCALARS
+    #define PASSIVE_SCALARS (_OLD_PASSIVE_SCALARS + 1)
+  #endif
+#endif /* METALS */
+
 /* calculate appropriate value of MAXSCALARS */
 
 #if defined(REFINEMENT_HIGH_RES_GAS) || defined(PASSIVE_SCALARS)
@@ -342,11 +355,6 @@ extern hwloc_cpuset_t cpuset_thread[NUM_THREADS];
 #else /* #ifdef PASSIVE_SCALARS */
 #define COUNT_PASSIVE_SCALARS 0
 #endif /* #ifdef PASSIVE_SCALARS #else */
-
-#ifdef METALS
-#undef COUNT_PASSIVE_SCALARS
-#define COUNT_PASSIVE_SCALARS (PASSIVE_SCALARS + 1)
-#endif /* METALS */
 
 #define MAXSCALARS (COUNT_REFINE + COUNT_PASSIVE_SCALARS)
 #endif /* #if defined(REFINEMENT_HIGH_RES_GAS) ||  defined(PASSIVE_SCALARS)*/
@@ -455,13 +463,13 @@ typedef unsigned long long peano1D;
 #define SEC_PER_MEGAYEAR 3.15576e13
 #define SEC_PER_YEAR 3.15576e7
 
-#ifdef METALS
+#if defined(METALS) || defined(USE_GRACKLE)
 /*! All metals (by mass). 
 * present photospheric abundances from Asplund et al. 2009 (Z=0.0134, proto-solar=0.0142)
 * Anders+Grevesse 1989 (Z=0.0201, proto-solar=0.0213)
 */
 #define SOLAR_ABUNDANCE 0.0134
-#endif // METALS
+#endif // defined(METALS) || defined(USE_GRACKLE)
 
 #ifndef FOF_PRIMARY_LINK_TYPES
 #define FOF_PRIMARY_LINK_TYPES 2
@@ -1557,10 +1565,12 @@ extern struct sph_particle_data
   MyDouble MomentumKickVector[3];
 #endif
 
+/* NOTE: This is like an alias so that I can access this field without
+ * calling it PScalars
+ * */
 #ifdef METALS
- MyFloat Metallicity;
- MyFloat MetallicityMass;
-#endif // METALS
+#define Metallicity PScalars[METALLICITY_INDEX]
+#endif /* METALS */
        
 } * SphP,          /*!< holds SPH particle data on local processor */
     *DomainSphBuf; /*!< buffer for SPH particle data in domain decomposition */

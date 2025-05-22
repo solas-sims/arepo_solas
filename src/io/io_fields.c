@@ -742,9 +742,15 @@ void init_io_fields()
   /* Scalars */
 
 #ifdef PASSIVE_SCALARS
+#ifdef METALS
+  init_field(IO_PASS, "PASS", "Metallicity", MEM_MY_FLOAT, FILE_MY_IO_FLOAT, FILE_MY_IO_FLOAT, PASSIVE_SCALARS, A_SPHP,
+             &SphP[0].Metallicity, 0, GAS_ONLY);
+  init_units(IO_PASS, 0., -1., 0., 1., 0., All.UnitMass_in_g);
+#else /* infdef METALS; TODO: */
   init_field(IO_PASS, "PASS", "PassiveScalars", MEM_MY_FLOAT, FILE_MY_IO_FLOAT, FILE_MY_IO_FLOAT, PASSIVE_SCALARS, A_SPHP,
              &SphP[0].PScalars[0], 0, GAS_ONLY);
   init_units(IO_PASS, 0., -1., 0., 1., 0., All.UnitMass_in_g);
+#endif /* METALS */
 #endif /* #ifdef PASSIVE_SCALARS */
 
   /* OTHER */

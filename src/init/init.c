@@ -79,7 +79,7 @@ int init(void)
 /* IonizeParams initalises the Treecool file and such, 
 * which we don't need when using grackle
 */
-#if defined(COOLING) && !defined(USE_GRACKLE)
+#if defined(COOLING) // TODO: && !defined(USE_GRACKLE)
     IonizeParams();
 #endif /* defined(COOLING) && !defined(USE_GRACKLE) */
 
@@ -526,6 +526,16 @@ int init(void)
       mass += P[i].Mass;
     }
 
+/* NOTE: The metals have to be initialised before the PASSIVE_SCALARS.
+ * The value in the PScalars are set to zero during reading ICs. If PConservedScalars are set to zero,
+ * this the same as no advection!
+ * */
+#ifdef METALS
+  for(i=0; i<NumGas; i++){
+    SphP[i].Metallicity = All.InitMetallicityinSolar * SOLAR_ABUNDANCE;
+}
+#endif /* ifdef METALS */
+
 #ifdef PASSIVE_SCALARS
   for(i = 0; i < NumGas; i++)
     {
@@ -604,13 +614,6 @@ int init(void)
   #endif //* #ifdef STAR_CLUSTER */
 #endif /* #ifdef STARS*/
 
-#ifdef METALS
-if (RestartFlag == 0){
-  for(i=0; i<NumGas; i++){
-    SphP[i].Metallicity = All.InitMetallicityinSolar * SOLAR_ABUNDANCE;
-    }
-  }
-#endif /* ifdef METALS */
 
   return -1;  // return -1 means we ran to completion, i.e. not an endrun code
 }

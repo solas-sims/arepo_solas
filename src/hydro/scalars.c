@@ -63,15 +63,13 @@ void init_scalars()
     terminate("ScalarIndex.HighResMass initialized incorrectly\n");
 #endif /* #if defined(REFINEMENT_HIGH_RES_GAS) */
 
-#ifdef METALS
-  ScalarIndex.MetallicityMass = scalar_init(&SphP[0].Metallicity, &SphP[0].MetallicityMass, SCALAR_TYPE_PASSIVE);
-  if(ScalarIndex.MetallicityMass == -1)
-    terminate("ScalarIndex.Metallicity initialized incorrectly\n");
-#endif /* ifdef METALS */
-
 #ifdef PASSIVE_SCALARS
   for(int i = 0; i < PASSIVE_SCALARS; i++)
     {
+#ifdef METALS
+      if(i == METALLICITY_INDEX)
+        mpi_printf("Initializing passive scalar: Total Metallicity\n");
+#endif /* METALS */
       scalar_init(&SphP[0].PScalars[i], &SphP[0].PConservedScalars[i], SCALAR_TYPE_PASSIVE);
     }
 #endif /* #ifdef PASSIVE_SCALARS */

@@ -91,14 +91,20 @@ static DoCoolData DoCool;     /*!< cooling data */
 double DoCooling(double u_old, double rho, double dt, double *ne_guess, int i)
 {
   double u, du;
-
+  
 #ifdef USE_GRACKLE
+  
+  if (dt == 0.){
+    return u_old;
+  }
+  else {
   double *ne = &SphP[i].Ne;
   u = CallGrackle(u_old, rho, dt, ne, i, 0);
   return u;
-#endif /* ifdef USE_GRACKLE */
+  }
 
-#ifndef USE_GRACKLE
+#else /* ifndef USE_GRACKLE */
+
   double u_lower, u_upper;
   double ratefact;
   double LambdaNet;
@@ -798,8 +804,8 @@ void InitCool(void)
 {
 #ifdef USE_GRACKLE
    InitGrackle();
-#else /* ifndef  USE_GRACKLE*/
-
+// TODO: #else /* ifndef  USE_GRACKLE*/
+#endif
   /* set default hydrogen mass fraction */
   gs.XH = HYDROGEN_MASSFRAC;
 
@@ -819,7 +825,7 @@ void InitCool(void)
   set_cosmo_factors_for_current_time();
 
   IonizeParams();
-#endif /* USE_GRACKLE */
+// #endif /* TODO: USE_GRACKLE */
 }
 
 /*! \brief Apply the isochoric cooling to all the active gas cells.

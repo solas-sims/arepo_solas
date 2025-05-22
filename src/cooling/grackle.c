@@ -60,7 +60,7 @@ double CallGrackle(double u_old, double rho, double dt, double *ne_guess, int ta
 #ifdef METALS //TODO:
     *All.GrackleFieldData.metal_density                 = *All.GrackleFieldData.density * SphP[target].Metallicity;
 #else
-    *All.GrackleFieldData.metal_density                 = *All.GrackleFieldData.density * 0.02;
+    *All.GrackleFieldData.metal_density                 = *All.GrackleFieldData.density * SOLAR_ABUNDANCE;
 #endif
 
     /* UNDEFINED MEMBERS OF THE STRUCT (USEFUL ONLY FOR UNUSED FLAGS)

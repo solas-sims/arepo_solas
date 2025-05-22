@@ -363,9 +363,9 @@ void do_second_order_source_terms_second_half(void)
  */
 void set_non_standard_physics_for_current_time(void)
 {
-#if defined(COOLING)
+#if defined(COOLING) // TODO: && !defined(USE_GRACKLE)
   IonizeParams(); /* set UV background for the current time */
-#endif            /* #if defined(COOLING) */
+#endif            /* #if defined(COOLING) && !defined(USE_GRACKLE) */
 }
 
 /*! \brief calls extra modules after the gravitational force is recomputed.
