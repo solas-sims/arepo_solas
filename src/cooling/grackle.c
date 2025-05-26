@@ -58,7 +58,7 @@ double CallGrackle(double u_old, double rho, double dt, double *ne_guess, int ta
     *All.GrackleFieldData.internal_energy               = u_old;
 
 #ifdef METALS //TODO:
-    *All.GrackleFieldData.metal_density                 = *All.GrackleFieldData.density * SphP[target].Metallicity;
+    *All.GrackleFieldData.metal_density                 = *All.GrackleFieldData.density * SphP[target].Metals;
 #else
     *All.GrackleFieldData.metal_density                 = *All.GrackleFieldData.density * SOLAR_ABUNDANCE;
 #endif
