@@ -1613,6 +1613,7 @@ extern struct star_particle_data
   MyDouble SNIIMassFeed;
   MyDouble SNIIRemnantMass;
   int SNIIFlag; //=0 before SNII, =1 during SNII (do supernova feedback), =2 after SNII (pause winds)
+  double Metals;
 }  *SP;
 
 #define SPP(i) SP[P[i].SID]
