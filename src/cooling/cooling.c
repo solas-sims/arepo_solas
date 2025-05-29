@@ -85,6 +85,7 @@ static DoCoolData DoCool;     /*!< cooling data */
  *  \param[in] dt    the duration of the time step.
  *  \param[in] ne_guess electron number density relative to hydrogen number
  *             density (for molecular weight computation).
+ *  \param[in] i index of the gas cell in the SphP struct
  *
  *  \return The new internal energy per unit mass of the gas cell.
  */
@@ -99,8 +100,8 @@ double DoCooling(double u_old, double rho, double dt, double *ne_guess, int i)
     return u_old;
   }
   else {
-  double *ne = &SphP[i].Ne;
-  u = CallGrackle(u_old, rho, dt, ne, i, 0);
+  // double *ne = &SphP[i].Ne;
+  u = CallGrackle(u_old, rho, dt, ne_guess, i, 0);
   return u;
   }
 
