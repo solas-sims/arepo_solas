@@ -43,7 +43,7 @@ double convert_u_to_temp(double u, double rho, double *ne_guess);
 double CoolingRate(double logT, double rho, double *nelec);
 double CoolingRateFromU(double u, double rho, double *ne_guess);
 double DoCooling(double u_old, double rho, double dt, double *ne_guess, int i);
-double GetCoolingTime(double u_old, double rho, double *ne_guess);
+double GetCoolingTime(double u_old, double rho, double *ne_guess, int i);
 
 void find_abundances_and_rates(double logT, double rho, double *ne_guess);
 void InitCool(void);

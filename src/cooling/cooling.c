@@ -205,14 +205,21 @@ double DoCooling(double u_old, double rho, double dt, double *ne_guess, int i)
  *  \param[in] rho The proper density of the gas cell.
  *  \param[in] ne_guess Electron number density relative to hydrogen number
  *             density (for molecular weight computation).
+ *  \param[in] i index of the gas cell in the SphP struct
  *
  *  \return Cooling time; 0 if heating.
  */
-double GetCoolingTime(double u_old, double rho, double *ne_guess)
+double GetCoolingTime(double u_old, double rho, double *ne_guess, int i)
 {
+  double LambdaNet, coolingtime;
+  
+#ifdef USE_GRACKLE
+    LambdaNet = CallGrackle(u_old, rho, 0.0, ne_guess, i, 1);
+    if(LambdaNet >= 0) LambdaNet = 0.0;
+    coolingtime =  LambdaNet / All.UnitTime_in_s;
+#else  /* ifndef USE_GRACKLE */
   double u;
   double ratefact;
-  double LambdaNet, coolingtime;
 
   DoCool.u_old_input    = u_old;
   DoCool.rho_input      = rho;
@@ -234,7 +241,8 @@ double GetCoolingTime(double u_old, double rho, double *ne_guess)
   coolingtime = u_old / (-ratefact * LambdaNet);
 
   coolingtime *= All.HubbleParam / All.UnitTime_in_s;
-
+}
+#endif /* ifndef USE_GRACKLE */
   return coolingtime;
 }
 
