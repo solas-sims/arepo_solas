@@ -838,6 +838,10 @@ void init_io_fields()
   init_units(IO_STAR_NGBMASS, 0., 0., 0., 0., 0., All.UnitMass_in_g);
   init_snapshot_type(IO_STAR_NGBMASS, SN_MINI);
  
+  init_field(IO_STAR_METALS, "SZ ", "Metallicity", MEM_MY_FLOAT, FILE_MY_IO_FLOAT, FILE_NONE, 1, A_S, &SP[0].Metals, 0, STARS_ONLY);
+  init_units(IO_STAR_METALS, 0., 0., 0., 0., 0., 0);
+  init_snapshot_type(IO_STAR_METALS, SN_MINI);
+ 
 #ifdef OUTPUT_TIMEBIN_STAR
   init_field(IO_TIMEBIN_STAR, "TBS", "TimebinStar", MEM_INT, FILE_INT, FILE_NONE, 1, A_S, &SP[0].TimeBinStar, 0, STARS_ONLY);
   init_units(IO_TIMEBIN_STAR, 0., 0., 0., 0., 0., 0.0);
