@@ -244,6 +244,10 @@ if (AREPO_ENABLE_STARS)
     )
 endif()
 
+if (AREPO_ENABLE_USE_CELIB)
+    include_directories(${CMAKE_CURRENT_SOURCE_DIR}/celib/src ${CMAKE_CURRENT_SOURCE_DIR}/celib/data)
+endif()
+
 
 # ifeq (MYIBARRIER,$(findstring MYIBARRIER,$(CONFIGVARS)))
 # OBJS    += mpi_utils/myIBarrier.o

@@ -4,6 +4,7 @@ star_by_star: ON
 winds: ON
 supernovae: ON
 use_celib: ON
+
 #--------------------------------------- Star Formation parameters
 eeos_sf: ON # Default SF scheme in Arepo
 agora_sf: ON # Agora based SF

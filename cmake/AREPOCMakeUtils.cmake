@@ -190,7 +190,6 @@ macro(arepo_find_cuda)
     endif()
 endmacro()
 
-
 macro(arepo_hip)
     set(AREPO_HAS_HIP No)
     if (AREPO_ENABLE_HIP)
@@ -205,7 +204,7 @@ macro(arepo_cuda)
     endif()
 endmacro()
 
-
+# report if a feature is enabled or not
 macro(arepo_report feature)
 
     # Output feature name and underscore it in the next line
@@ -423,7 +422,7 @@ macro(arepo_configure_from_yaml)
     endif()
     # Read config.yaml and set variables
     read_yaml("${AREPO_YAML_CONFIG}")
-    include(${CMAKE_CURRENT_BINARY_DIR}/generated_options.cmake)
+    message(STATUS "Configuration from ${AREPO_YAML_CONFIG} completed.")
 endmacro()
 
 

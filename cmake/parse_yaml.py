@@ -18,7 +18,7 @@ def yaml_to_cmake(config_file: str, build_dir: str)-> None:
                     else: 
                         v = "OFF"
                         add_definitions = ""
-                    cmake_option = f"option(AREPO_ENABLE_{k.upper()} {v})"
+                    cmake_option = f"set(AREPO_ENABLE_{k.upper()} {v})"
                 else:
                     cmake_option = f"set(AREPO_{k.upper()} {v})"
                     add_definitions = f"add_definitions(-D{k.upper()}={v})"
