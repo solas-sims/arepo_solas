@@ -96,6 +96,7 @@ arepo_compilation_summary()
 # set the paths for building
 # set(AREPO_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/include")
 set(AREPO_SOURCE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/src")
+include_directories(${CMAKE_CURRENT_BINARY_DIR})
 # include_directories(${AREPO_INCLUDE_DIRS})
 include_directories(${AREPO_SOURCE_DIRS})
 add_subdirectory(${AREPO_SOURCE_DIRS})

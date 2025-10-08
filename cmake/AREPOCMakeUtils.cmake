@@ -248,6 +248,9 @@ macro(arepo_compilation_summary)
             "OpenMP support" ENABLE_OPENMP
             "OpenMP GPU offloading support" ENABLE_OPENMPGPU
             )
+    arepo_report("GPU-specifics"
+            "CUDA support" ENABLE_CUDA
+            "HIP support" ENABLE_HIP)
     arepo_report("Particle-specifics"
             "Use stars" ENABLE_STARS
             "Use black holes" ENABLE_BLACKHOLES
@@ -409,7 +412,7 @@ function(read_yaml FILE)
   find_package(PythonInterp REQUIRED)
   message(STATUS "Reading ${FILE}")
   execute_process(
-    COMMAND ${CMAKE_CURRENT_LIST_DIR}/cmake/parse_yaml.py ${FILE} ${CMAKE_CURRENT_BINARY_DIR}/generated_options.cmake
+    COMMAND ${CMAKE_CURRENT_LIST_DIR}/cmake/parse_yaml.py ${FILE} ${CMAKE_CURRENT_BINARY_DIR} 
   )
 endfunction()
 

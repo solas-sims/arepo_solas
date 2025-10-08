@@ -25,7 +25,7 @@ bh_jet_refinement: ON
 output_refbhcounter: ON
 output_timebin_star: ON
 #--------------------------------------- Cooling parameters
-use_grackle: ON
+use_grackle: OFF
 grackle_chemistry: 0
 #--------------------------------------- Metal parameters
 metals: ON
