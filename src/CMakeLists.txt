@@ -68,6 +68,7 @@ set(AREPO_SOURCES
     main/allvars.c
     main/main.c
     main/run.c
+    main/update.c
     mesh/criterion_derefinement.c
     mesh/criterion_refinement.c
     mesh/refinement.c
@@ -96,8 +97,8 @@ set(AREPO_SOURCES
     ngbtree/ngbtree_walk.c
     star_formation/sfr_eEOS.c
     star_formation/starformation.c
-    star_formation//sfr_AGORA.c
-    star_formation//sfr_JEANS.c
+    star_formation/sfr_AGORA.c
+    star_formation/sfr_JEANS.c
     time_integration/darkenergy.c
     time_integration/do_gravity_hydro.c
     time_integration/driftfac.c
@@ -248,6 +249,10 @@ if (AREPO_ENABLE_USE_CELIB)
     include_directories(${CMAKE_CURRENT_SOURCE_DIR}/celib/src ${CMAKE_CURRENT_SOURCE_DIR}/celib/data)
 endif()
 
+list(APPEND AREPO_SOURCES
+    ${CMAKE_CURRENT_BINARY_DIR}/../compile_time_info.c
+    ${CMAKE_CURRENT_BINARY_DIR}/../compile_time_info_hdf5.c
+)
 
 # ifeq (MYIBARRIER,$(findstring MYIBARRIER,$(CONFIGVARS)))
 # OBJS    += mpi_utils/myIBarrier.o
@@ -375,11 +380,17 @@ sanitizer_options(arepolib)
 
 add_executable(arepo main/main.c)
 target_link_libraries(arepo arepolib ${AREPO_LIBS})
-
+if (AREPO_ENABLE_USE_CELIB)
+    target_link_libraries(arepo celib)
+endif()
+if (AREPO_ENABLE_PROFILE_UTIL)
+    target_link_libraries(arepo profile_util)
+endif()
 if (AREPO_LINK_FLAGS)
 	set_target_properties(arepo PROPERTIES LINK_FLAGS ${AREPO_LINK_FLAGS})
 endif()
 set_target_properties(arepo PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
+target_compile_definitions(arepo PUBLIC ${AREPO_DEFINES})
 
 if (BUILD_TESTING)
 	add_subdirectory(tests)

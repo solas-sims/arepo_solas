@@ -1,6 +1,6 @@
 #--------------------------------------- SOLAS additions
 stars: ON
-star_by_star: ON
+star_by_star: OFF # this flag is broken
 winds: ON
 supernovae: ON
 use_celib: ON
@@ -17,13 +17,13 @@ burst_mode: ON
 bondi_accretion: ON
 infall_accretion: ON
 output_timebin_bh: ON
-refinement_around_bh: ON
+# refinement_around_bh: 0 # what are the vaules?!
 min_refinement_bh_mass: ON
 refinement_around_bh_fixed: ON
 refinement_around_bh_hybrid: ON
 bh_jet_feedback: ON
 bh_jet_refinement: ON
-output_refbhcounter: ON
+output_refbhcounter: OFF # this is not working, missing relevant code in arepo
 output_timebin_star: ON
 #--------------------------------------- Cooling parameters
 use_grackle: OFF
@@ -75,7 +75,7 @@ regularize_mesh_face_angle: ON    # Use maximum face angle as roundness criterio
 refinement_split_cells: ON        # Refinement
 refinement_merge_cells: ON        # Derefinement
 refinement_volume_limit: OFF       # Limit the volume of cells and the maximum volume difference between
-jeans_refinement: ON              # Refinement criterion to ensure Jeans stability of cells
+# jeans_refinement: 1.0              # Refinement criterion to ensure Jeans stability of cells
 refinement_high_res_gas: OFF       # Refinement criterion for high-resolution region in zoom
 noderefine_background_grid: OFF    # Do not de-refine low-res gas cells in zoom simulations
 optimize_mesh_memory_for_refinement: OFF  # deletes the mesh structures not needed for refinement/derefinemet to lower the peak memory consumption

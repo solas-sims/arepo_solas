@@ -204,6 +204,100 @@ macro(arepo_cuda)
     endif()
 endmacro()
 
+macro(arepo_profile_util)
+    if (AREPO_ENABLE_PROFILE_UTIL)
+        message(STATUS "Adding profile_util to report profling information")
+        set(PU_ENABLE_CUDA ${AREPO_ENABLE_CUDA})
+        set(PU_ENABLE_HIP ${AREPO_ENABLE_HIP})
+        set(PU_ENABLE_OPENMP ${AREPO_ENABLE_OPENMP})
+        set(PU_ENABLE_MPI ${AREPO_ENABLE_MPI})
+        set(PU_ENABLE_TESTS OFF)
+        add_subdirectory(profile_util)
+        add_compile_definitions(ENABLE_PROFILE_UTIL)
+    endif()
+endmacro()
+
+macro(arepo_gpu_math)
+    if (ENABLE_GPU_NATIVE_MATH)
+        if (AREPO_HAS_CUDA MATCHES "Yes")
+            # cuBlas located in math_libs directory (different from CUDA Toolkit)
+            # extract the all digits from cuda version. 
+            string(REGEX MATCHALL "[0-9]+" numbers "${CMAKE_CUDA_COMPILER_VERSION}")
+            list(GET numbers 0 CUDA_MAJOR_VERSION)
+            list(GET numbers 1 CUDA_MINOR_VERSION)
+            set(CUDA_VERSION "${CUDA_MAJOR_VERSION}.${CUDA_MINOR_VERSION}")
+            set(CUDA_MATH_LIB_DIR "${CUDA_TOOLKIT_ROOT_DIR}/../../math_libs/${CUDA_VERSION}/targets/${CUDA_ARCH_DIR}/lib")
+            set(CUDA_MATH_INCLUDE_DIR "${CUDA_TOOLKIT_ROOT_DIR}/../../math_libs/${CUDA_VERSION}/targets/${CUDA_ARCH_DIR}/include")
+            # find cuBLAS .so 
+            find_library(CUDA_CUBLAS_LIBRARIES
+                NAMES libcublas.so
+                PATHS ${CUDA_MATH_LIB_DIR}
+                NO_DEFAULT_PATH
+            )
+
+            # find the blasLt library
+            find_library(CUDA_CUBLASLT_LIBRARIES
+                NAMES libcublasLt.so
+                PATHS ${CUDA_MATH_LIB_DIR}
+                NO_DEFAULT_PATH
+            )
+
+            # if not found then throw error
+            if(NOT CUDA_CUBLAS_LIBRARIES OR NOT CUDA_CUBLASLT_LIBRARIES)
+                message(FATAL_ERROR "Could not find dynamic cuBLAS or cuBLASLt libraries in ${CUDA_MATH_LIB_DIR}")
+            endif()
+
+            message(STATUS "Found cuBLAS: ${CUDA_CUBLAS_LIBRARIES}")
+            message(STATUS "Found cuBLASLt: ${CUDA_CUBLASLT_LIBRARIES}")
+
+            # include_directories(${CUDA_INCLUDE_DIRS})
+            # link_directories(${CUDA_MATH_LIB_DIR})
+            # link_directories(${CUDA_TOOLKIT_ROOT_DIR}/targets/${CUDA_ARCH_DIR}/lib)
+
+            # # link CUDA runtime and cuBLAS
+            # link_libraries(${CUDA_LIBRARIES} ${CUDA_CUBLASLT_LIBRARIES} ${CUDA_CUBLAS_LIBRARIES})
+            # # link additional system libraries that are needed by cublas but not pulled in
+            # # this seems to be based on https://forums.developer.nvidia.com/t/missing-lib-files-culibos-dl-rt-for-cublas/276707/9
+            # link_libraries(rt culibos pthread dl)
+
+        elseif(AREPO_HAS_HIP MATCHES "Yes")
+            # find hipBLAS and hipBLASLT 
+            find_path(HIPBLAS_INCLUDE_DIR hipblas.h
+                        HINTS ${hip_INCLUDE_DIR}
+                            PATH_SUFFIXES hipblas
+                            NO_DEFAULT_PATH
+                        )
+            find_library(HIPBLAS_LIB hipblas
+            HINTS ${hip_LIB_INSTALL_DIR}
+            NO_DEFAULT_PATH
+            )
+            find_path(HIPBLASLT_INCLUDE_DIR hipblaslt.h
+                        HINTS ${hip_INCLUDE_DIR}
+                            PATH_SUFFIXES hipblaslt
+                            NO_DEFAULT_PATH
+                        )
+            find_library(HIPBLASLT_LIB hipblaslt
+            HINTS ${hip_LIB_INSTALL_DIR}
+            NO_DEFAULT_PATH
+            )
+            message(STATUS "Found hipBLAS: ${HIPBLAS_LIB}")
+            message(STATUS "Found hipBLAS headers: ${HIPBLAS_INCLUDE_DIR}")
+            message(STATUS "Found hipBLASLT: ${HIPBLASLT_LIB}")
+            message(STATUS "Found hipBLASLT headers: ${HIPBLASLT_INCLUDE_DIR}")
+            # include_directories(${HIPBLAS_INCLUDE_DIR})
+            # link_libraries(${HIPBLAS_LIB})
+            # include_directories(${HIPBLASLT_INCLUDE_DIR})
+            # link_libraries(${HIPBLASLT_LIB})
+        else()
+            message(FATAL_ERROR "Have requested native GPU math libraries but not found")
+        endif()
+    else()
+        # message(FATAL_ERROR "Still working on magma and slate integrations")
+    endif()
+
+endmacro()
+
+
 # report if a feature is enabled or not
 macro(arepo_report feature)
 

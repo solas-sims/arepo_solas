@@ -1,0 +1,3 @@
+[submodule "profile_util"]
+	path = profile_util
+	url = https://github.com/pelahi/profile_util

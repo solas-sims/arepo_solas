@@ -69,11 +69,18 @@ add_compile_options(-Wall -Wextra -Wpedantic -fPIC)
 arepo_configure_from_yaml()
 include(${CMAKE_CURRENT_BINARY_DIR}/generated_options.cmake)
 
-
 if (AREPO_ENABLE_USE_CELIB)
    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/celib/src)
    include_directories(${CMAKE_CURRENT_SOURCE_DIR}/celib/src ${CMAKE_CURRENT_SOURCE_DIR}/celib/data)
 endif()
+
+# GPU math libraries 
+# may want magma for single gpu accelerated blas 
+# and slate for multi-gpu, multi-node
+arepo_gpu_math()
+
+# Ensure code reports profiling information
+arepo_profile_util()
 
 # weird error for cmake on arm it seems 
 # see https://github.com/alicevision/geogram/issues/2 
