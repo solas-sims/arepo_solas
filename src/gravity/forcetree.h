@@ -89,9 +89,14 @@ typedef struct
 
 #define EN 64
 
-#define ENX (DBX * STRETCHX * EN)
-#define ENY (DBY * STRETCHY * EN)
-#define ENZ (DBZ * STRETCHZ * EN)
+// this is not a good idea since it will often default to a float
+// #define ENX (DBX * STRETCHX * EN)
+// #define ENY (DBY * STRETCHY * EN)
+// #define ENZ (DBZ * STRETCHZ * EN)
+
+static const int ENX = (DBX * STRETCHX * EN);
+static const int ENY = (DBY * STRETCHY * EN);
+static const int ENZ = (DBZ * STRETCHZ * EN);
 
 extern MyFloat Ewd_fcorrx[ENX + 1][ENY + 1][ENZ + 1];
 extern MyFloat Ewd_fcorry[ENX + 1][ENY + 1][ENZ + 1];

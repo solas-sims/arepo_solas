@@ -26,8 +26,11 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "../main/allvars.h"
-#include "../main/proto.h"
+// #include "../main/allvars.h"
+// #include "../main/proto.h"
+
+#include <allvars.h>
+#include <proto.h>
 
 #if defined(BLACKHOLES) && defined(REFINEMENT_AROUND_BH)
 
@@ -151,14 +154,16 @@ void blackhole_mark_cells_for_refinement(void)
     if(SphP[i].RefBHFlag)
       {
         refcount++;
-#if(REFINEMENT_AROUND_BH == 0)
+#ifdef REFINEMENT_AROUND_BH
+#if (REFINEMENT_AROUND_BH == 0)
         if(can_this_cell_be_split(i))
           refcount_can++;
 #endif
-#if(REFINEMENT_AROUND_BH == 1)
+#if (REFINEMENT_AROUND_BH == 1)
         refcount_can++;
 #endif
-      }
+#endif
+  }
 
   sumup_large_ints(1, &refcount, &totrefcount);
   sumup_large_ints(1, &refcount_can, &totrefcount_can);

@@ -274,6 +274,8 @@ void determine_compute_nodes(void)
 
   MPI_Allgather(&loc_node, sizeof(struct node_data), MPI_BYTE, list_of_nodes, sizeof(struct node_data), MPI_BYTE, MPI_COMM_WORLD);
 
+  #ifdef ENABLE_PROFILE_UTIL
+  #else
   if(ThisTask == 0)
     {
       FILE *fd;
@@ -283,6 +285,7 @@ void determine_compute_nodes(void)
         fprintf(fd, "%5d  %s\n", list_of_nodes[i].task, list_of_nodes[i].name);
       fclose(fd);
     }
+  #endif /* #ifdef ENABLE_PROFILE_UTIL #else */
 
   qsort(list_of_nodes, NTask, sizeof(struct node_data), system_compare_hostname);
 

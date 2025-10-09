@@ -4,6 +4,8 @@
 extern "C" {
 #endif
 
+#include <stdbool.h>
+
 /*! \file CELib.h
  * \brief This file has all prototype declarations.
  */

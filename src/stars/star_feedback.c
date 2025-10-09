@@ -223,6 +223,7 @@ static int star_ngb_feedback_evaluate(int target, int mode, int threadid)
 double massloss = interpolate_stellar_mass(star_mass, All.Time);
 #endif
     
+    // this is broken as there is no energyfeed declared!
 #ifdef STAR_BY_STAR
   if(snIIflag > 0)
     energyfeed = 0;
