@@ -97,11 +97,21 @@ typedef struct
 static const int ENX = (DBX * STRETCHX * EN);
 static const int ENY = (DBY * STRETCHY * EN);
 static const int ENZ = (DBZ * STRETCHZ * EN);
+static const uint ENsize = (ENX + 1)*(ENY + 1)*(ENZ + 1);
 
-extern MyFloat Ewd_fcorrx[ENX + 1][ENY + 1][ENZ + 1];
-extern MyFloat Ewd_fcorry[ENX + 1][ENY + 1][ENZ + 1];
-extern MyFloat Ewd_fcorrz[ENX + 1][ENY + 1][ENZ + 1];
-extern MyFloat Ewd_potcorr[ENX + 1][ENY + 1][ENZ + 1];
+/// this also seems a bad idea as this could get large in principle. 
+/// also why use a 3d array at all?
+/// better use a 1d array and index it properly
+// extern MyFloat Ewd_fcorrx[ENX + 1][ENY + 1][ENZ + 1];
+// extern MyFloat Ewd_fcorry[ENX + 1][ENY + 1][ENZ + 1];
+// extern MyFloat Ewd_fcorrz[ENX + 1][ENY + 1][ENZ + 1];
+// extern MyFloat Ewd_potcorr[ENX + 1][ENY + 1][ENZ + 1];
+
+extern MyFloat* Ewd_fcorrx;
+extern MyFloat* Ewd_fcorry;
+extern MyFloat* Ewd_fcorrz;
+extern MyFloat* Ewd_potcorr;
+
 extern double Ewd_fac_intp;
 
 extern int NTreeInsert;

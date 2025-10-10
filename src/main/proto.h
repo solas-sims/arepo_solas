@@ -420,6 +420,7 @@ int my_fls(int x);
 void ewald_init(void);
 double ewald_psi(double x, double y, double z);
 double ewald_pot_corr(double dx, double dy, double dz);
+void ewald_clean(void);
 
 integertime find_next_outputtime(integertime time);
 void minimum_large_ints(int n, long long *src, long long *res);
