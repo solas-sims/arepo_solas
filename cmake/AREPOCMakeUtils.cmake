@@ -505,7 +505,7 @@ function(read_yaml FILE)
   find_package(PythonInterp REQUIRED)
   message(STATUS "Reading ${FILE}")
   execute_process(
-    COMMAND ${CMAKE_CURRENT_LIST_DIR}/cmake/parse_yaml.py ${FILE} ${CMAKE_CURRENT_BINARY_DIR} 
+    COMMAND python3 ${CMAKE_CURRENT_LIST_DIR}/cmake/parse_yaml.py ${FILE} ${CMAKE_CURRENT_BINARY_DIR} 
   )
 endfunction()
 
