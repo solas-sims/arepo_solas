@@ -8,7 +8,7 @@ Details of the physical models implemented can be found in this [high level desc
 How to contribute
 =================
 
-1. Fork the [official repository](https://github.com/solas-sims/arepo_solas)
+1. Fork from or create a `new branch` at the [official repository](https://github.com/solas-sims/arepo_solas).
 2. Make your changes in a new, appropriately named branch (e.g. `starformation` or `bh_feedback`).
     * All git commit messages should loosely follow the [standard format outlined here](http://tbaggery.com/2008/04/19/a-note-about-git-commit-messages.html).
     * Ensure your new code is commented enough so that others can understand what it's doing. If possible, update the [wiki](https://github.com/solas-sims/arepo_solas/wiki) as well.
