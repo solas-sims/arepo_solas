@@ -94,7 +94,7 @@ endmacro()
 macro(arepo_gsl)
 	find_package(GSL REQUIRED)
 	include_directories(${GSL_INCLUDE_DIRS})
-    link_libraries(${GSL_LIBRARIES} ${GSL_CBLAS_LIBRARIES})
+    link_libraries(${GSL_LIBRARIES} ${GSL_CBLAS_LIBRARIES} m)
 	#target_link_libraries(${PROJECT_NAME} ${GSL_LIBRARIES} ${GSL_CBLAS_LIBRARIES})
 endmacro()
 
