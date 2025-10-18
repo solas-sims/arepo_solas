@@ -26,7 +26,7 @@ arepo_option(ENABLE_SHARED_LIB "Enable shared library" ON)
 arepo_option(ENABLE_TESTS "Enable testing" ON)
 arepo_option(ENABLE_CMAKE_PTHREADS_FIX "Enable CMake pthreads fix for ARM" OFF)
 
-set(AREPO_YAML_CONFIG ${CMAKE_CURRENT_SOURCE_DIR}/template_config.yaml)
+set(AREPO_YAML_CONFIG "${CMAKE_CURRENT_SOURCE_DIR}/template_config.yaml" CACHE FILEPATH "YAML config file for AREPO")
 
 # arepo_option(ENABLE_TWODIMS "Enable 2D simulations" OFF)
 # arepo_option(ENABLE_MYIBARRIER "Enable custom MPI barrier" OFF)
