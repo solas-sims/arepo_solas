@@ -32,6 +32,7 @@ set(AREPO_SOURCES
     domain/domain_toplevel.c
     domain/domain_vars.c
     domain/peano.c
+    # gitversion/version.c
     gravity/accel.c
     gravity/forcetree.c
     gravity/forcetree_ewald.c
@@ -256,6 +257,7 @@ endif()
 list(APPEND AREPO_SOURCES
     ${CMAKE_CURRENT_BINARY_DIR}/../compile_time_info.c
     ${CMAKE_CURRENT_BINARY_DIR}/../compile_time_info_hdf5.c
+    ${CMAKE_CURRENT_BINARY_DIR}/../gitversion.c
 )
 
 # ifeq (MYIBARRIER,$(findstring MYIBARRIER,$(CONFIGVARS)))

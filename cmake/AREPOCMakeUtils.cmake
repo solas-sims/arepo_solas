@@ -538,7 +538,6 @@ function(read_yaml FILE)
   )
 endfunction()
 
-
 macro(arepo_configure_from_yaml)
     if (NOT EXISTS "${AREPO_YAML_CONFIG}")
         message(FATAL_ERROR "Configuration file ${AREPO_YAML_CONFIG} not found.")
@@ -548,6 +547,35 @@ macro(arepo_configure_from_yaml)
     message(STATUS "Configuration from ${AREPO_YAML_CONFIG} completed.")
 endmacro()
 
+macro(get_git_version)
+    execute_process(
+        COMMAND git rev-parse HEAD 
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        OUTPUT_VARIABLE GIT_SHA1
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+    execute_process(
+        COMMAND "git diff | wc -l"  
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        OUTPUT_VARIABLE GIT_HAS_LOCAL_CHANGES
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+    if (NOT GIT_HAS_LOCAL_CHANGES STREQUAL "0")
+        set(GIT_SHA1 "${GIT_SHA1}-modified")
+    endif()
+    execute_process(
+        COMMAND git log -1 --format=%ci 
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        OUTPUT_VARIABLE GIT_DATE
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+    file(COPY "${CMAKE_CURRENT_LIST_DIR}/src/gitversion/version.c.in" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}/")
+    file(RENAME "${CMAKE_CURRENT_BINARY_DIR}/version.c.in" "${CMAKE_CURRENT_BINARY_DIR}/gitversion.c")
+    file(READ "${CMAKE_CURRENT_BINARY_DIR}/gitversion.c" SOURCE_CONTENT)
+    string(REGEX REPLACE "\_COMMIT\_" "${GIT_SHA1}" SOURCE_CONTENT "${SOURCE_CONTENT}")
+    string(REGEX REPLACE "\_DATE\_" "${GIT_DATE}" SOURCE_CONTENT "${SOURCE_CONTENT}")
+    file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/gitversion.c" "${SOURCE_CONTENT}")
+endmacro()
 
 #run some macros automatically
 prevent_in_source_builds()
