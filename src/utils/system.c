@@ -80,6 +80,10 @@
 #include "../main/allvars.h"
 #include "../main/proto.h"
 
+#ifdef ENABLE_PROFILE_UTIL
+#include <profile_util_api_c.h>
+#endif /* #ifdef ENABLE_PROFILE_UTIL */
+
 /*! \brief  Divides N elements evenly on pieces chunks, writes in first and
  *          count arrays.
  *
@@ -275,7 +279,12 @@ void determine_compute_nodes(void)
   MPI_Allgather(&loc_node, sizeof(struct node_data), MPI_BYTE, list_of_nodes, sizeof(struct node_data), MPI_BYTE, MPI_COMM_WORLD);
 
   #ifdef ENABLE_PROFILE_UTIL
-  #else
+  LogParallelAPI_c("determine_compute_nodes");
+  LogBinding_c("determine_compute_nodes");
+  #ifdef _MPI
+  LogNodeSystemMem_c("determine_compute_nodes");
+  #endif
+  #endif
   if(ThisTask == 0)
     {
       FILE *fd;
@@ -285,7 +294,6 @@ void determine_compute_nodes(void)
         fprintf(fd, "%5d  %s\n", list_of_nodes[i].task, list_of_nodes[i].name);
       fclose(fd);
     }
-  #endif /* #ifdef ENABLE_PROFILE_UTIL #else */
 
   qsort(list_of_nodes, NTask, sizeof(struct node_data), system_compare_hostname);
 

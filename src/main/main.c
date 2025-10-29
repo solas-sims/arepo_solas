@@ -39,6 +39,9 @@
 
 #include "../main/allvars.h"
 #include "../main/proto.h"
+#ifdef ENABLE_PROFILE_UTIL
+#include <profile_util_api_c.h>
+#endif /* #ifdef ENABLE_PROFILE_UTIL */
 
 #ifdef HAVE_HDF5
 #include <hdf5.h>
@@ -68,10 +71,18 @@ int main(int argc, char **argv)
   MPI_Init(&argc, &argv);
   MPI_Comm_rank(MPI_COMM_WORLD, &ThisTask);
   MPI_Comm_size(MPI_COMM_WORLD, &NTask);
+  #ifdef ENABLE_PROFILE_UTIL
+  #ifdef _MPI
+  {
+  MPI_Comm comm = MPI_COMM_WORLD;
+  pu_mpi_set_logging_comm(comm);
+  }
+  #endif
+  #endif /* #ifdef ENABLE_PROFILE_UTIL */
 
   /* output a welcome message */
   hello();
-
+    
   /* initialize CPU-time/Wallclock-time measurement */
   init_cpu_log();
 
