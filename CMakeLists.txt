@@ -26,6 +26,7 @@ arepo_option(ENABLE_HDF5 "Enable HDF5" ON)
 arepo_option(ENABLE_SHARED_LIB "Enable shared library" ON)
 arepo_option(ENABLE_TESTS "Enable testing" ON)
 arepo_option(ENABLE_CMAKE_PTHREADS_FIX "Enable CMake pthreads fix for ARM" OFF)
+arepo_option(ENABLE_PROFILE_UTIL "Enable profiling utility" OFF)
 
 set(AREPO_YAML_CONFIG "${CMAKE_CURRENT_SOURCE_DIR}/template_config.yaml" CACHE FILEPATH "YAML config file for AREPO")
 
@@ -64,6 +65,12 @@ arepo_fftw()
 arepo_cuda()
 # check for hip
 arepo_hip()
+# Ensure code reports profiling information
+arepo_profile_util()
+# GPU math libraries 
+# may want magma for single gpu accelerated blas 
+# and slate for multi-gpu, multi-node
+arepo_gpu_math()
 
 add_compile_options(-Wall -Wextra -Wpedantic -fPIC)
 
@@ -75,13 +82,7 @@ if (AREPO_ENABLE_USE_CELIB)
    include_directories(${CMAKE_CURRENT_SOURCE_DIR}/celib/src ${CMAKE_CURRENT_SOURCE_DIR}/celib/data)
 endif()
 
-# GPU math libraries 
-# may want magma for single gpu accelerated blas 
-# and slate for multi-gpu, multi-node
-arepo_gpu_math()
 
-# Ensure code reports profiling information
-arepo_profile_util()
 
 # weird error for cmake on arm it seems 
 # see https://github.com/alicevision/geogram/issues/2 
