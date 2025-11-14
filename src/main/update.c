@@ -131,7 +131,7 @@ void update_SNII(void)
             .Mass = (PPS(i).Mass * All.UnitMass_in_g / SOLAR_MASS),
             .MassConversionFactor = 1,
             .Elements = elements,
-            .Metallicity = All.ConstantMetallicityYield,
+            .Metallicity = SPP(i).Metals,
         };
 
 //          struct CELibStructFeedbackInput Input =
@@ -400,7 +400,7 @@ void perform_end_of_step_physics(void)
     }
 #endif
     
-#endif
+#endif // BLACKHOLES
     
     struct pv_update_data pvd;
     if(All.ComovingIntegrationOn)
@@ -423,7 +423,7 @@ void perform_end_of_step_physics(void)
                 if(i < 0)
                     continue;
                 
-#ifdef BLACKHOLES
+#ifdef BH_WITH_FEEDBACK
                 /* dump mass, momentum and energy injected by bh */
                 if(SphP[i].ThermalFeed > 0 || SphP[i].KineticFeed > 0)
                 {

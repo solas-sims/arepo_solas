@@ -537,7 +537,7 @@ int init(void)
 
   free_mesh();
 
-#if defined(STARS) || defined(BLACKHOLES)
+#if defined(STARS) || defined(BH_WITH_FEEDBACK)
   /* initialize feedback variables */
   All.FeedbackFlag = 1;
   All.EnergyExchange[0] = All.EnergyExchange[1] = 0;

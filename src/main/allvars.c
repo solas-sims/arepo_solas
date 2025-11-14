@@ -206,6 +206,9 @@ FILE *FdRestartTest;
 FILE *FdSfr; /*!< file handle for sfr.txt log-file. */
 #endif
 
+#ifdef BLACKHOLES   
+FILE *FdBlackHoles; /*!< file handle for blackholes.txt log-file. */
+#endif
 struct pair_data *Pairlist;
 
 #ifdef FORCETEST

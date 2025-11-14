@@ -1301,10 +1301,15 @@ extern struct global_data_all_processes
   /* for parameter file */
   double BhDesNgb;
   double BhDesDev;
+  double Epsilon_r;  // radiative efficiency, need for accretion rate
+#ifdef BLACKHOLES_FEEDBACK
+#define BH_WITH_FEEDBACK 1
   double JetFeedback;
-  double Epsilon_r;
   double Epsilon_f;
   double Mload;
+#else
+#define BH_WITH_FEEDBACK 0
+#endif
 #endif
 
 #ifdef STARS

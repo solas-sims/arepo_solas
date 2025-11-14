@@ -10,6 +10,8 @@
 
 #include "../domain/domain.h"
 
+#if defined(BLACKHOLES) && defined(BLACKHOLES_FEEDBACK)
+
 #define DEG_TO_RAD(deg) ((deg) * M_PI / 180.0)
 
 static int bh_density_evaluate(int target, int mode, int threadid);
@@ -427,3 +429,5 @@ int bh_density_isactive(int n)
 
   return 1;
 }
+
+#endif /* #if defined(BLACKHOLES) && defined(BLACKHOLES_FEEDBACK) */

@@ -60,3 +60,4 @@ DEBUG                                    # enables core-dumps
 ENFORCE_JEANS_STABILITY_OF_CELLS         # this imposes an adaptive floor for the temperature
 COOLING                                  # Simple primordial cooling
 USE_SFR                                  # Star formation model, turning dense gas into collisionless partices
+EEOS_SF

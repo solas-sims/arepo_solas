@@ -183,6 +183,15 @@ void open_logfiles(void)
     }
 #endif /* #ifdef USE_SFR */
 
+#ifdef BLACKHOLES
+  sprintf(buf, "%s%s", All.OutputDir, "blackholes.txt");
+  if(!(FdBlackHoles = fopen(buf, mode)))
+    {
+      sprintf(msg, "error in opening file '%s'\n", buf);
+      terminate(msg);
+    }
+#endif /* #ifdef BLACKHOLES */
+ 
   int i = 0;
   fprintf(FdBalance, "\n");
 

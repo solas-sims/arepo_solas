@@ -23,6 +23,8 @@
 
 #--------------------------------------- Black Hole options
 #BLACKHOLES
+#BLACKHOLES_FEEDBACK
+#BH_WITH_FEEDBACK
 #BURST_MODE
 #BONDI_ACCRETION
 #INFALL_ACCRETION

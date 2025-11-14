@@ -10,6 +10,8 @@
 
 #include "../domain/domain.h"
 
+#ifdef BLACKHOLES
+
 static int bh_density_evaluate(int target, int mode, int threadid);
 static int bh_density_isactive(int n);
 
@@ -539,3 +541,5 @@ int bh_density_isactive(int n)
 
   return 1;
 }
+
+#endif /* #ifdef BLACKHOLES */

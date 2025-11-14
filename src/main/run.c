@@ -408,7 +408,7 @@ void calculate_non_standard_physics_prior_mesh_construction(void)
   star_density();
 #endif
 
-#ifdef BLACKHOLES
+#ifdef BLACKHOLES_FEEDBACK
    if(All.Time >= All.FeedbackTime)
     {   
       if(All.JetFeedback)

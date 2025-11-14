@@ -483,10 +483,6 @@ void read_parameter_file(char *fname)
         addr[nt] = &All.TemperatureThresh;
         id[nt++] = REAL;
         
-        strcpy(tag[nt], "CritPhysDensity");
-        addr[nt] = &All.CritPhysDensity;
-        id[nt++] = REAL;
-        
         strcpy(tag[nt], "FactorSN");
         addr[nt] = &All.FactorSN;
         id[nt++] = REAL;
@@ -541,7 +537,7 @@ void read_parameter_file(char *fname)
         id[nt++] = REAL;
 #endif
         
-#if defined(STARS) || defined(BLACKHOLES)
+#if defined(STARS) || (defined(BLACKHOLES) && defined(BLACKHOLES_FEEDBACK))
       strcpy(tag[nt], "FeedbackTime");
       addr[nt] = &All.FeedbackTime;
       id[nt++] = REAL;
@@ -555,22 +551,23 @@ void read_parameter_file(char *fname)
       strcpy(tag[nt], "BhDesDev");
       addr[nt] = &All.BhDesDev;
       id[nt++] = REAL;
-
+ 
+      strcpy(tag[nt], "Epsilon_r"); // Radiative efficiency for accretion rate
+      addr[nt] = &All.Epsilon_r;
+      id[nt++] = REAL;
+#ifdef BLACKHOLES_FEEDBACK
       strcpy(tag[nt], "JetFeedback");
       addr[nt] = &All.JetFeedback;
       id[nt++] = INT;
 
-      strcpy(tag[nt], "Epsilon_r");
-      addr[nt] = &All.Epsilon_r;
-      id[nt++] = REAL;
-            
-      strcpy(tag[nt], "Epsilon_f");
+      strcpy(tag[nt], "Epsilon_f"); // Feedback efficiency
       addr[nt] = &All.Epsilon_f;
       id[nt++] = REAL;
 
       strcpy(tag[nt], "Mload");
       addr[nt] = &All.Mload;
       id[nt++] = REAL;
+#endif
 #endif
 
 #ifdef STARS
