@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.25)
 
 project(arepo,
-  VERSION 0.5
-  DESCRIPTION "Utility to report parallel API related information and also timing."
+  VERSION 0.314
+  DESCRIPTION "Modified Arepo for the Solas project."
   LANGUAGES C CXX
 )
 

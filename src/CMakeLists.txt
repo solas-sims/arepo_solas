@@ -406,6 +406,7 @@ if (AREPO_ENABLE_FFTW)
 endif()
 set_target_properties(arepo PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 target_compile_definitions(arepo PUBLIC ${AREPO_DEFINES})
+set_target_properties(arepo PROPERTIES OUTPUT_NAME Arepo)
 
 if (BUILD_TESTING)
 	add_subdirectory(tests)
