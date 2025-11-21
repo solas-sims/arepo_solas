@@ -33,12 +33,14 @@ def print_hdf5_attribute(k, v) -> str:
         if v is True:
             outstring += f"hdf5_attribute = my_H5Acreate(handle, \"{k.upper()}\" , atype, hdf5_dataspace, H5P_DEFAULT);\n"
             outstring += f"my_H5Awrite(hdf5_attribute, atype, \"\", \"$subfields[0]\");\n"
+            outstring += f"my_H5Aclose(hdf5_attribute, \"{k.upper()}\");\n"
+            outstring += f"my_H5Sclose(hdf5_dataspace, H5S_SCALAR);\n\n"
     else:
         outstring += f"hdf5_attribute = my_H5Acreate(handle, \"{k.upper()}\" , H5T_NATIVE_DOUBLE, hdf5_dataspace, H5P_DEFAULT);\n"
         outstring += f"val = {v};\n"
         outstring += f"my_H5Awrite(hdf5_attribute, H5T_NATIVE_DOUBLE, &val, \"$subfields[0]\");\n"
-    outstring += f"my_H5Aclose(hdf5_attribute, \"{k.upper()}\");\n"
-    outstring += f"my_H5Sclose(hdf5_dataspace, H5S_SCALAR);\n\n"
+        outstring += f"my_H5Aclose(hdf5_attribute, \"{k.upper()}\");\n"
+        outstring += f"my_H5Sclose(hdf5_dataspace, H5S_SCALAR);\n\n"
     return outstring
 
 
@@ -83,14 +85,15 @@ H5Tset_size(atype, 1);
 
         print("Processing configuration options...")
         for k,v in result.items():
-            compile_time_info_hdf5_file.write(print_hdf5_attribute(k, v))
             if v is True or v is False:
                 if v is True:
                     arepoconfig_file.write(f"#define {k.upper()}\n")
                     compile_time_info_file.write(f"\"   {k.upper()} \\n\"\n")
+                    compile_time_info_hdf5_file.write(print_hdf5_attribute(k, v))
             else:
                 arepoconfig_file.write(f"#define {k.upper()} {v}\n")
                 compile_time_info_file.write(f"\"   {k.upper()}={v} \\n\"\n")
+                compile_time_info_hdf5_file.write(print_hdf5_attribute(k, v))
         arepoconfig_file.write("#endif\n")
         compile_time_info_file.write(");\n")
         compile_time_info_file.write("}\n")

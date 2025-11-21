@@ -317,6 +317,10 @@ void run(void)
 
   restart(0); /* write a restart file at final time - can be used to continue simulation beyond final time */
 
+#if !defined(PMGRID) && defined(SELFGRAVITY) && !defined(GRAVITY_NOT_PERIODIC) && !defined(ONEDIMS_SPHERICAL)
+  ewald_clean();
+#endif /* #if !defined(PMGRID) && defined(SELFGRAVITY) && !defined(GRAVITY_NOT_PERIODIC) && !defined(ONEDIMS_SPHERICAL) */
+
   write_cpu_log(); /* output final cpu measurements */
 }
 

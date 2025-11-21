@@ -49,6 +49,7 @@
 
 #include "../main/allvars.h"
 #include "../main/proto.h"
+#include "../gitversion/version.h"
 
 #include "../domain/domain.h"
 #include "../mesh/voronoi/voronoi.h"
@@ -75,6 +76,7 @@ void hello(void)
   mpi_printf(
       "\n   __    ____  ____  ____  _____\n  /__\\  (  _ \\( ___)(  _ \\(  _  )\n /(__)\\  )   / )__)  )___/ "
       ")(_)(\n(__)(__)(_)\\_)(____)(__)  (_____)\n\n");
+  mpi_printf("This is Arepo_Solas, version %s, last commit date %s.\n\n", GIT_COMMIT, GIT_DATE);
 }
 
 /*! \brief Prints used compile options.

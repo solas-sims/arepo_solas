@@ -32,6 +32,7 @@ set(AREPO_SOURCES
     domain/domain_toplevel.c
     domain/domain_vars.c
     domain/peano.c
+    # gitversion/version.c
     gravity/accel.c
     gravity/forcetree.c
     gravity/forcetree_ewald.c
@@ -249,9 +250,14 @@ if (AREPO_ENABLE_USE_CELIB)
     include_directories(${CMAKE_CURRENT_SOURCE_DIR}/celib/src ${CMAKE_CURRENT_SOURCE_DIR}/celib/data)
 endif()
 
+if (AREPO_ENABLE_PROFILE_UTIL)
+    include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../profile_util/include)
+endif()
+
 list(APPEND AREPO_SOURCES
     ${CMAKE_CURRENT_BINARY_DIR}/../compile_time_info.c
     ${CMAKE_CURRENT_BINARY_DIR}/../compile_time_info_hdf5.c
+    ${CMAKE_CURRENT_BINARY_DIR}/../gitversion.c
 )
 
 # ifeq (MYIBARRIER,$(findstring MYIBARRIER,$(CONFIGVARS)))
@@ -371,6 +377,7 @@ list(APPEND AREPO_SOURCES
 include_directories(${AREPO_INCLUDES_DIRS})
 add_library(arepolib STATIC ${AREPO_SOURCES})
 target_compile_definitions(arepolib PUBLIC ${AREPO_DEFINES})
+
 # if (AREPO_CXX_FLAGS)
 # 	target_compile_options(arepolib PUBLIC ${AREPO_CXX_FLAGS})
 # endif()
@@ -385,9 +392,17 @@ if (AREPO_ENABLE_USE_CELIB)
 endif()
 if (AREPO_ENABLE_PROFILE_UTIL)
     target_link_libraries(arepo profile_util)
+    add_compile_definitions(arepo PUBLIC "-DENABLE_PROFILE_UTIL")
 endif()
 if (AREPO_LINK_FLAGS)
 	set_target_properties(arepo PROPERTIES LINK_FLAGS ${AREPO_LINK_FLAGS})
+endif()
+if (AREPO_ENABLE_FFTW)
+    if (AREPO_DOUBLEPRECISION_FFTW)
+       target_link_libraries(arepo fftw3 fftw3_mpi)
+    else()
+         target_link_libraries(arepo fftw3f fftw3f_mpi)
+    endif()
 endif()
 set_target_properties(arepo PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 target_compile_definitions(arepo PUBLIC ${AREPO_DEFINES})

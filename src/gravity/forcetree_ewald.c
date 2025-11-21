@@ -52,10 +52,16 @@
 #include <gsl/gsl_sf_bessel.h>
 
 /* variables for Ewald correction lookup table */
-MyFloat Ewd_fcorrx[ENX + 1][ENY + 1][ENZ + 1];
-MyFloat Ewd_fcorry[ENX + 1][ENY + 1][ENZ + 1];
-MyFloat Ewd_fcorrz[ENX + 1][ENY + 1][ENZ + 1];
-MyFloat Ewd_potcorr[ENX + 1][ENY + 1][ENZ + 1];
+// MyFloat Ewd_fcorrx[ENX + 1][ENY + 1][ENZ + 1];
+// MyFloat Ewd_fcorry[ENX + 1][ENY + 1][ENZ + 1];
+// MyFloat Ewd_fcorrz[ENX + 1][ENY + 1][ENZ + 1];
+// MyFloat Ewd_potcorr[ENX + 1][ENY + 1][ENZ + 1];
+
+MyFloat *Ewd_fcorrx;
+MyFloat *Ewd_fcorry;
+MyFloat *Ewd_fcorrz;
+MyFloat *Ewd_potcorr;
+
 double Ewd_fac_intp;
 
 /*! \brief Structure that holds information of Ewald correction table.
@@ -94,6 +100,10 @@ void ewald_init(void)
   FILE *fd;
 
   mpi_printf("EWALD: initialize Ewald correction...\n");
+  Ewd_fcorrx = malloc(ENsize * sizeof(MyFloat));
+  Ewd_fcorry = malloc(ENsize * sizeof(MyFloat));
+  Ewd_fcorrz = malloc(ENsize * sizeof(MyFloat));
+  Ewd_potcorr = malloc(ENsize * sizeof(MyFloat));
 
 #ifdef LONG_X
   if(LONG_X != (int)(LONG_X))
@@ -131,10 +141,15 @@ void ewald_init(void)
             }
           else
             {
-              my_fread(Ewd_fcorrx, sizeof(MyFloat), (ENX + 1) * (ENY + 1) * (ENZ + 1), fd);
-              my_fread(Ewd_fcorry, sizeof(MyFloat), (ENX + 1) * (ENY + 1) * (ENZ + 1), fd);
-              my_fread(Ewd_fcorrz, sizeof(MyFloat), (ENX + 1) * (ENY + 1) * (ENZ + 1), fd);
-              my_fread(Ewd_potcorr, sizeof(MyFloat), (ENX + 1) * (ENY + 1) * (ENZ + 1), fd);
+              // my_fread(Ewd_fcorrx, sizeof(MyFloat), (ENX + 1) * (ENY + 1) * (ENZ + 1), fd);
+              // my_fread(Ewd_fcorry, sizeof(MyFloat), (ENX + 1) * (ENY + 1) * (ENZ + 1), fd);
+              // my_fread(Ewd_fcorrz, sizeof(MyFloat), (ENX + 1) * (ENY + 1) * (ENZ + 1), fd);
+              // my_fread(Ewd_potcorr, sizeof(MyFloat), (ENX + 1) * (ENY + 1) * (ENZ + 1), fd);
+
+              my_fread(Ewd_fcorrx, sizeof(MyFloat), ENsize, fd);
+              my_fread(Ewd_fcorry, sizeof(MyFloat), ENsize, fd);
+              my_fread(Ewd_fcorrz, sizeof(MyFloat), ENsize, fd);
+              my_fread(Ewd_potcorr, sizeof(MyFloat), ENsize, fd);
 
               recomputeflag = 0;
             }
@@ -151,10 +166,9 @@ void ewald_init(void)
       mpi_printf("\nEWALD: No usable Ewald tables in file `%s' found. Recomputing them...\n", buf);
 
       /* ok, let's recompute things. Actually, we do that in parallel. */
-      int size = (ENX + 1) * (ENY + 1) * (ENZ + 1);
       int first, count;
 
-      subdivide_evenly(size, NTask, ThisTask, &first, &count);
+      subdivide_evenly(ENsize, NTask, ThisTask, &first, &count);
 
       for(int n = first; n < first + count; n++)
         {
@@ -175,13 +189,18 @@ void ewald_init(void)
           double yy = 0.5 * DBY * STRETCHY * ((double)j) / ENY;
           double zz = 0.5 * DBZ * STRETCHZ * ((double)k) / ENZ;
 
-          Ewd_potcorr[i][j][k] = ewald_psi(xx, yy, zz);
+          // Ewd_potcorr[i][j][k] = ewald_psi(xx, yy, zz);
+          Ewd_potcorr[n] = ewald_psi(xx, yy, zz);
 
           ewald_force(xx, yy, zz, force);
 
-          Ewd_fcorrx[i][j][k] = force[0];
-          Ewd_fcorry[i][j][k] = force[1];
-          Ewd_fcorrz[i][j][k] = force[2];
+          // Ewd_fcorrx[i][j][k] = force[0];
+          // Ewd_fcorry[i][j][k] = force[1];
+          // Ewd_fcorrz[i][j][k] = force[2];
+
+          Ewd_fcorrx[n] = force[0];
+          Ewd_fcorry[n] = force[1];
+          Ewd_fcorrz[n] = force[2];
         }
 
       int *recvcnts = (int *)mymalloc("recvcnts", NTask * sizeof(int));
@@ -190,15 +209,15 @@ void ewald_init(void)
       for(int i = 0; i < NTask; i++)
         {
           int off, cnt;
-          subdivide_evenly(size, NTask, i, &off, &cnt);
+          subdivide_evenly(ENsize, NTask, i, &off, &cnt);
           recvcnts[i] = cnt * sizeof(MyFloat);
           recvoffs[i] = off * sizeof(MyFloat);
         }
 
-      MPI_Allgatherv(MPI_IN_PLACE, size * sizeof(MyFloat), MPI_BYTE, Ewd_fcorrx, recvcnts, recvoffs, MPI_BYTE, MPI_COMM_WORLD);
-      MPI_Allgatherv(MPI_IN_PLACE, size * sizeof(MyFloat), MPI_BYTE, Ewd_fcorry, recvcnts, recvoffs, MPI_BYTE, MPI_COMM_WORLD);
-      MPI_Allgatherv(MPI_IN_PLACE, size * sizeof(MyFloat), MPI_BYTE, Ewd_fcorrz, recvcnts, recvoffs, MPI_BYTE, MPI_COMM_WORLD);
-      MPI_Allgatherv(MPI_IN_PLACE, size * sizeof(MyFloat), MPI_BYTE, Ewd_potcorr, recvcnts, recvoffs, MPI_BYTE, MPI_COMM_WORLD);
+      MPI_Allgatherv(MPI_IN_PLACE, ENsize * sizeof(MyFloat), MPI_BYTE, Ewd_fcorrx, recvcnts, recvoffs, MPI_BYTE, MPI_COMM_WORLD);
+      MPI_Allgatherv(MPI_IN_PLACE, ENsize * sizeof(MyFloat), MPI_BYTE, Ewd_fcorry, recvcnts, recvoffs, MPI_BYTE, MPI_COMM_WORLD);
+      MPI_Allgatherv(MPI_IN_PLACE, ENsize * sizeof(MyFloat), MPI_BYTE, Ewd_fcorrz, recvcnts, recvoffs, MPI_BYTE, MPI_COMM_WORLD);
+      MPI_Allgatherv(MPI_IN_PLACE, ENsize * sizeof(MyFloat), MPI_BYTE, Ewd_potcorr, recvcnts, recvoffs, MPI_BYTE, MPI_COMM_WORLD);
 
       myfree(recvoffs);
       myfree(recvcnts);
@@ -216,10 +235,14 @@ void ewald_init(void)
               tabh.ewaldtype = -1;
 
               my_fwrite(&tabh, sizeof(ewald_header), 1, fd);
-              my_fwrite(Ewd_fcorrx, sizeof(MyFloat), (ENX + 1) * (ENY + 1) * (ENZ + 1), fd);
-              my_fwrite(Ewd_fcorry, sizeof(MyFloat), (ENX + 1) * (ENY + 1) * (ENZ + 1), fd);
-              my_fwrite(Ewd_fcorrz, sizeof(MyFloat), (ENX + 1) * (ENY + 1) * (ENZ + 1), fd);
-              my_fwrite(Ewd_potcorr, sizeof(MyFloat), (ENX + 1) * (ENY + 1) * (ENZ + 1), fd);
+              // my_fwrite(Ewd_fcorrx, sizeof(MyFloat), (ENX + 1) * (ENY + 1) * (ENZ + 1), fd);
+              // my_fwrite(Ewd_fcorry, sizeof(MyFloat), (ENX + 1) * (ENY + 1) * (ENZ + 1), fd);
+              // my_fwrite(Ewd_fcorrz, sizeof(MyFloat), (ENX + 1) * (ENY + 1) * (ENZ + 1), fd);
+              // my_fwrite(Ewd_potcorr, sizeof(MyFloat), (ENX + 1) * (ENY + 1) * (ENZ + 1), fd);
+              my_fwrite(Ewd_fcorrx, sizeof(MyFloat), ENsize, fd);
+              my_fwrite(Ewd_fcorry, sizeof(MyFloat), ENsize, fd);
+              my_fwrite(Ewd_fcorrz, sizeof(MyFloat), ENsize, fd);
+              my_fwrite(Ewd_potcorr, sizeof(MyFloat), ENsize, fd);
               fclose(fd);
             }
         }
@@ -227,7 +250,8 @@ void ewald_init(void)
   else
     {
       /* here we got them from disk */
-      int len = (ENX + 1) * (ENY + 1) * (ENZ + 1) * sizeof(MyFloat);
+      // int len = (ENX + 1) * (ENY + 1) * (ENZ + 1) * sizeof(MyFloat);
+      int len = ENsize * sizeof(MyFloat);
 
       MPI_Bcast(Ewd_fcorrx, len, MPI_BYTE, 0, MPI_COMM_WORLD);
       MPI_Bcast(Ewd_fcorry, len, MPI_BYTE, 0, MPI_COMM_WORLD);
@@ -238,15 +262,22 @@ void ewald_init(void)
   /* now scale things to the boxsize that is actually used */
   Ewd_fac_intp = 2 * EN / All.BoxSize;
 
-  for(int i = 0; i <= ENX; i++)
-    for(int j = 0; j <= ENY; j++)
-      for(int k = 0; k <= ENZ; k++)
-        {
-          Ewd_potcorr[i][j][k] /= All.BoxSize;
-          Ewd_fcorrx[i][j][k] /= All.BoxSize * All.BoxSize;
-          Ewd_fcorry[i][j][k] /= All.BoxSize * All.BoxSize;
-          Ewd_fcorrz[i][j][k] /= All.BoxSize * All.BoxSize;
-        }
+  // for(int i = 0; i <= ENX; i++)
+  //   for(int j = 0; j <= ENY; j++)
+  //     for(int k = 0; k <= ENZ; k++)
+  //       {
+  //         Ewd_potcorr[i][j][k] /= All.BoxSize;
+  //         Ewd_fcorrx[i][j][k] /= All.BoxSize * All.BoxSize;
+  //         Ewd_fcorry[i][j][k] /= All.BoxSize * All.BoxSize;
+  //         Ewd_fcorrz[i][j][k] /= All.BoxSize * All.BoxSize;
+  //       }
+  for(int n = 0; n < ENsize; n++)
+    {
+      Ewd_potcorr[n] /= All.BoxSize;
+      Ewd_fcorrx[n] /= All.BoxSize * All.BoxSize;
+      Ewd_fcorry[n] /= All.BoxSize * All.BoxSize;
+      Ewd_fcorrz[n] /= All.BoxSize * All.BoxSize;
+    }
 
   mpi_printf("EWALD: Initialization of periodic boundaries finished.\n");
 }
@@ -316,16 +347,36 @@ void ewald_corr(double dx, double dy, double dz, double *fper)
   f6      = (u) * (1 - v) * (w);
   f7      = (u) * (v) * (1 - w);
   f8      = (u) * (v) * (w);
-  fper[0] = signx * (Ewd_fcorrx[i][j][k] * f1 + Ewd_fcorrx[i][j][k + 1] * f2 + Ewd_fcorrx[i][j + 1][k] * f3 +
-                     Ewd_fcorrx[i][j + 1][k + 1] * f4 + Ewd_fcorrx[i + 1][j][k] * f5 + Ewd_fcorrx[i + 1][j][k + 1] * f6 +
-                     Ewd_fcorrx[i + 1][j + 1][k] * f7 + Ewd_fcorrx[i + 1][j + 1][k + 1] * f8);
-  fper[1] = signy * (Ewd_fcorry[i][j][k] * f1 + Ewd_fcorry[i][j][k + 1] * f2 + Ewd_fcorry[i][j + 1][k] * f3 +
-                     Ewd_fcorry[i][j + 1][k + 1] * f4 + Ewd_fcorry[i + 1][j][k] * f5 + Ewd_fcorry[i + 1][j][k + 1] * f6 +
-                     Ewd_fcorry[i + 1][j + 1][k] * f7 + Ewd_fcorry[i + 1][j + 1][k + 1] * f8);
-  fper[2] = signz * (Ewd_fcorrz[i][j][k] * f1 + Ewd_fcorrz[i][j][k + 1] * f2 + Ewd_fcorrz[i][j + 1][k] * f3 +
-                     Ewd_fcorrz[i][j + 1][k + 1] * f4 + Ewd_fcorrz[i + 1][j][k] * f5 + Ewd_fcorrz[i + 1][j][k + 1] * f6 +
-                     Ewd_fcorrz[i + 1][j + 1][k] * f7 + Ewd_fcorrz[i + 1][j + 1][k + 1] * f8);
-}
+
+  int n = i * (ENZ+1)*(ENY+1) + j *(ENZ+1) + k;
+  int ni = (i+1) * (ENZ+1)*(ENY+1) + j *(ENZ+1) + k;
+  int nj = i * (ENZ+1)*(ENY+1) + (j+1) *(ENZ+1) + k;
+  int nk = i * (ENZ+1)*(ENY+1) + j *(ENZ+1) + k+1;
+  int nij = (i+1) * (ENZ+1)*(ENY+1) + (j+1) *(ENZ+1) + k;
+  int nik = (i+1) * (ENZ+1)*(ENY+1) + j *(ENZ+1) + (k+1);
+  int njk = (i) * (ENZ+1)*(ENY+1) + (j+1) *(ENZ+1) + (k+1);
+  int nijk = (i+1) * (ENZ+1)*(ENY+1) + (j+1) *(ENZ+1) + (k+1);
+
+  // fper[0] = signx * (Ewd_fcorrx[i][j][k] * f1 + Ewd_fcorrx[i][j][k + 1] * f2 + Ewd_fcorrx[i][j + 1][k] * f3 +
+  //                    Ewd_fcorrx[i][j + 1][k + 1] * f4 + Ewd_fcorrx[i + 1][j][k] * f5 + Ewd_fcorrx[i + 1][j][k + 1] * f6 +
+  //                    Ewd_fcorrx[i + 1][j + 1][k] * f7 + Ewd_fcorrx[i + 1][j + 1][k + 1] * f8);
+  // fper[1] = signy * (Ewd_fcorry[i][j][k] * f1 + Ewd_fcorry[i][j][k + 1] * f2 + Ewd_fcorry[i][j + 1][k] * f3 +
+  //                    Ewd_fcorry[i][j + 1][k + 1] * f4 + Ewd_fcorry[i + 1][j][k] * f5 + Ewd_fcorry[i + 1][j][k + 1] * f6 +
+  //                    Ewd_fcorry[i + 1][j + 1][k] * f7 + Ewd_fcorry[i + 1][j + 1][k + 1] * f8);
+  // fper[2] = signz * (Ewd_fcorrz[i][j][k] * f1 + Ewd_fcorrz[i][j][k + 1] * f2 + Ewd_fcorrz[i][j + 1][k] * f3 +
+  //                    Ewd_fcorrz[i][j + 1][k + 1] * f4 + Ewd_fcorrz[i + 1][j][k] * f5 + Ewd_fcorrz[i + 1][j][k + 1] * f6 +
+  //                    Ewd_fcorrz[i + 1][j + 1][k] * f7 + Ewd_fcorrz[i + 1][j + 1][k + 1] * f8);
+
+  fper[0] = signx * (Ewd_fcorrx[n] * f1 + Ewd_fcorrx[nk] * f2 + Ewd_fcorrx[nj] * f3 +
+                     Ewd_fcorrx[njk] * f4 + Ewd_fcorrx[ni] * f5 + Ewd_fcorrx[nik] * f6 +
+                     Ewd_fcorrx[nij] * f7 + Ewd_fcorrx[nijk] * f8);
+  fper[1] = signy * (Ewd_fcorry[n] * f1 + Ewd_fcorry[nk] * f2 + Ewd_fcorry[nj] * f3 +
+                     Ewd_fcorry[njk] * f4 + Ewd_fcorry[ni] * f5 + Ewd_fcorry[nik] * f6 +
+                     Ewd_fcorry[nij] * f7 + Ewd_fcorry[nijk] * f8);
+  fper[2] = signz * (Ewd_fcorrz[n] * f1 + Ewd_fcorrz[nk] * f2 + Ewd_fcorrz[nj] * f3 +
+                     Ewd_fcorrz[njk] * f4 + Ewd_fcorrz[ni] * f5 + Ewd_fcorrz[nik] * f6 +
+                     Ewd_fcorrz[nij] * f7 + Ewd_fcorrz[nijk] * f8);
+                    }
 
 /*! \brief This function looks up the correction potential due to the infinite
  *  number of periodic particle/node images.
@@ -376,9 +427,22 @@ double ewald_pot_corr(double dx, double dy, double dz)
   f6 = (u) * (1 - v) * (w);
   f7 = (u) * (v) * (1 - w);
   f8 = (u) * (v) * (w);
-  return Ewd_potcorr[i][j][k] * f1 + Ewd_potcorr[i][j][k + 1] * f2 + Ewd_potcorr[i][j + 1][k] * f3 +
-         Ewd_potcorr[i][j + 1][k + 1] * f4 + Ewd_potcorr[i + 1][j][k] * f5 + Ewd_potcorr[i + 1][j][k + 1] * f6 +
-         Ewd_potcorr[i + 1][j + 1][k] * f7 + Ewd_potcorr[i + 1][j + 1][k + 1] * f8;
+
+  int n = i * (ENZ+1)*(ENY+1) + j *(ENZ+1) + k;
+  int ni = (i+1) * (ENZ+1)*(ENY+1) + j *(ENZ+1) + k;
+  int nj = i * (ENZ+1)*(ENY+1) + (j+1) *(ENZ+1) + k;
+  int nk = i * (ENZ+1)*(ENY+1) + j *(ENZ+1) + k+1;
+  int nij = (i+1) * (ENZ+1)*(ENY+1) + (j+1) *(ENZ+1) + k;
+  int nik = (i+1) * (ENZ+1)*(ENY+1) + j *(ENZ+1) + (k+1);
+  int njk = (i) * (ENZ+1)*(ENY+1) + (j+1) *(ENZ+1) + (k+1);
+  int nijk = (i+1) * (ENZ+1)*(ENY+1) + (j+1) *(ENZ+1) + (k+1);
+
+  // return Ewd_potcorr[i][j][k] * f1 + Ewd_potcorr[i][j][k + 1] * f2 + Ewd_potcorr[i][j + 1][k] * f3 +
+  //        Ewd_potcorr[i][j + 1][k + 1] * f4 + Ewd_potcorr[i + 1][j][k] * f5 + Ewd_potcorr[i + 1][j][k + 1] * f6 +
+  //        Ewd_potcorr[i + 1][j + 1][k] * f7 + Ewd_potcorr[i + 1][j + 1][k + 1] * f8;
+  return Ewd_potcorr[n] * f1 + Ewd_potcorr[nk] * f2 + Ewd_potcorr[nj] * f3 +
+         Ewd_potcorr[njk] * f4 + Ewd_potcorr[ni] * f5 + Ewd_potcorr[nik] * f6 +
+         Ewd_potcorr[nij] * f7 + Ewd_potcorr[nijk] * f8;
 }
 
 /*! \brief This function computes the potential correction term by means of
@@ -524,6 +588,15 @@ void ewald_force(double x, double y, double z, double force[3])
               force[2] -= hz * val;
             }
         }
+}
+
+
+void ewald_clean(void)
+{
+  free(Ewd_fcorrx);
+  free(Ewd_fcorry);
+  free(Ewd_fcorrz);
+  free(Ewd_potcorr);
 }
 
 #endif /* #if !defined(PMGRID) && defined(SELFGRAVITY) && !defined(GRAVITY_NOT_PERIODIC) && !defined(ONEDIMS_SPHERICAL) */

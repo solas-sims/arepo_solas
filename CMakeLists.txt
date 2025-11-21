@@ -22,11 +22,13 @@ arepo_option(ENABLE_OPENMP "Enable OpenMP" ON)
 arepo_option(ENABLE_CUDA "Enable CUDA" OFF)
 arepo_option(ENABLE_HIP "Enable HIP" OFF)
 arepo_option(ENABLE_HIP_AMD "Enable HIP with AMD (ROCM)" ON)
+arepo_option(ENABLE_HDF5 "Enable HDF5" ON)
 arepo_option(ENABLE_SHARED_LIB "Enable shared library" ON)
 arepo_option(ENABLE_TESTS "Enable testing" ON)
 arepo_option(ENABLE_CMAKE_PTHREADS_FIX "Enable CMake pthreads fix for ARM" OFF)
+arepo_option(ENABLE_PROFILE_UTIL "Enable profiling utility" OFF)
 
-set(AREPO_YAML_CONFIG ${CMAKE_CURRENT_SOURCE_DIR}/template_config.yaml)
+set(AREPO_YAML_CONFIG "${CMAKE_CURRENT_SOURCE_DIR}/template_config.yaml" CACHE FILEPATH "YAML config file for AREPO")
 
 # arepo_option(ENABLE_TWODIMS "Enable 2D simulations" OFF)
 # arepo_option(ENABLE_MYIBARRIER "Enable custom MPI barrier" OFF)
@@ -63,6 +65,12 @@ arepo_fftw()
 arepo_cuda()
 # check for hip
 arepo_hip()
+# Ensure code reports profiling information
+arepo_profile_util()
+# GPU math libraries 
+# may want magma for single gpu accelerated blas 
+# and slate for multi-gpu, multi-node
+arepo_gpu_math()
 
 add_compile_options(-Wall -Wextra -Wpedantic -fPIC)
 
@@ -74,13 +82,7 @@ if (AREPO_ENABLE_USE_CELIB)
    include_directories(${CMAKE_CURRENT_SOURCE_DIR}/celib/src ${CMAKE_CURRENT_SOURCE_DIR}/celib/data)
 endif()
 
-# GPU math libraries 
-# may want magma for single gpu accelerated blas 
-# and slate for multi-gpu, multi-node
-arepo_gpu_math()
 
-# Ensure code reports profiling information
-arepo_profile_util()
 
 # weird error for cmake on arm it seems 
 # see https://github.com/alicevision/geogram/issues/2 
@@ -97,15 +99,7 @@ endif()
 
 arepo_compilation_summary()
 
-#
-# Add git revision information in a generated .cpp file, which we then include
-# as part of the library
-#
-# include(cmake/GetGitRevisionDescription.cmake)
-# get_git_head_revision(GIT_REFSPEC GIT_SHA1)
-# git_local_changes(GIT_HAS_LOCAL_CHANGES)
-# set(git_revision_cpp "${CMAKE_CURRENT_BINARY_DIR}/git_revision.cpp")
-# configure_file("src/git_revision.cpp.in" "${git_revision_cpp}" @ONLY)
+get_git_version()
 
 # set the paths for building
 # set(AREPO_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/include")
