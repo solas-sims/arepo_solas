@@ -1,0 +1,4 @@
+#!/bin/bash
+
+# example cmake build 
+cmake -DCMAKE_C_COMPILER=cc -DGMP_ROOT=$PAWSEY_GMP_HOME -DAREPO_ENABLE_PROFILE_UTIL=ON -DAREPO_ENABLE_FFTW=ON ..
