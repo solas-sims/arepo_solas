@@ -146,10 +146,10 @@ endmacro()
 
 # this might require an update to deal with cufft and hipfft
 macro(arepo_find_fftw)
-	find_package(FFTW REQUIRED)
-	include_directories(${FFTW_INCLUDE_DIRS})
-	link_libraries(${FFTW_LIBRARIES})
-	# target_link_libraries(${PROJECT_NAME} ${FFTW_LIBRARIES})
+	find_package(FFTW3 REQUIRED)
+	include_directories(${FFTW3_INCLUDE_DIRS})
+    message(STATUS "FFTW Libraries: ${FFTW3_LIBRARIES}")
+	link_libraries(${FFTW3_LIBRARIES})
 endmacro()
 
 macro(arepo_fftw)
