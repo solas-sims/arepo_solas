@@ -97,7 +97,7 @@ typedef struct
 static const int ENX = (DBX * STRETCHX * EN);
 static const int ENY = (DBY * STRETCHY * EN);
 static const int ENZ = (DBZ * STRETCHZ * EN);
-static const uint ENsize = (ENX + 1)*(ENY + 1)*(ENZ + 1);
+static const unsigned int ENsize = (ENX + 1)*(ENY + 1)*(ENZ + 1);
 
 /// this also seems a bad idea as this could get large in principle. 
 /// also why use a 3d array at all?

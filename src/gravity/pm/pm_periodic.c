@@ -98,15 +98,21 @@
 
 #if defined(PMGRID)
 
-#define GRIDX (PMGRID * STRETCHX * DBX + DBX_EXTRA)
-#define GRIDY (PMGRID * STRETCHY * DBY + DBY_EXTRA)
-#define GRIDZ (PMGRID * STRETCHZ * DBZ + DBZ_EXTRA)
+// #define GRIDX (PMGRID * STRETCHX * DBX + DBX_EXTRA)
+// #define GRIDY (PMGRID * STRETCHY * DBY + DBY_EXTRA)
+// #define GRIDZ (PMGRID * STRETCHZ * DBZ + DBZ_EXTRA)
 
-#define GRIDz (GRIDZ / 2 + 1)
-#define GRID2 (2 * GRIDz)
+// #define GRIDz (GRIDZ / 2 + 1)
+// #define GRID2 (2 * GRIDz)
 
+static const unsigned int GRIDX = (PMGRID * STRETCHX * DBX + DBX_EXTRA);
+static const unsigned int GRIDY = (PMGRID * STRETCHY * DBY + DBY_EXTRA);
+static const unsigned int GRIDZ = (PMGRID * STRETCHZ * DBZ + DBZ_EXTRA);
+
+static const unsigned int  GRIDz=(GRIDZ / 2 + 1);
+static const unsigned int  GRID2=(2 * GRIDz);
 #if(GRIDX > 1024) || (GRIDY > 1024) || (GRIDZ > 1024)
-typedef long long large_array_offset; /* use a larger data type in this case so that we can always address all cells of the 3D grid
+typedef unsigned long long large_array_offset; /* use a larger data type in this case so that we can always address all cells of the 3D grid
                                          with a single index */
 #else                                 /* #if (GRIDX > 1024) || (GRIDY > 1024) || (GRIDZ > 1024) */
 typedef unsigned int large_array_offset;
