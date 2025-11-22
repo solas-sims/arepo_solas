@@ -68,7 +68,7 @@ riemann_hlld: OFF               # HLLD approximate Riemann solver (required to u
 voronic_static: OFF            # static mesh
 voronic_static_mesh_do_domain_decomposition: OFF  # for VORONOI_STATIC_MESH force domain decomposition if there exist non-gas particles
 regularize_mesh_cm_drift: ON   # Mesh regularization; Move mesh generating point towards center of mass to make cells rounder.
-regularize_mesh_cm_drift_use_soundspeed: OFF  # Limit mesh regularization speed by local sound speed
+regularize_mesh_cm_drift_use_soundspeed: ON  # Limit mesh regularization speed by local sound speed
 regularize_mesh_face_angle: ON    # Use maximum face angle as roundness criterion in mesh regularization
 
 #--------------------------------------- Refinement and derefinement; default: no refinement/derefinement; criterion: target mass
@@ -87,11 +87,10 @@ enforce_jeans_stability_of_cells: OFF  # this imposes an adaptive floor for the 
 use_sfr: OFF                       # Star formation model, turning dense gas into collisionless partices
 sfr_keep_cells: OFF                # Do not destroy cell out of which a star has formed
 
-
 #--------------------------------------- Gravity treatment; default: no gravity
 selfgravity: ON              # gravitational intraction between simulation particles/cells
 hierarchical_gravity: ON     # use hierarchical splitting of the time integration of the gravity
-cell_center_gravity: OFF     # uses geometric centers to calculate gravity of cells, only possible with HIERARCHICAL_GRAVITY
+cell_center_gravity: ON     # uses geometric centers to calculate gravity of cells, only possible with HIERARCHICAL_GRAVITY
 no_gas_selfgravity: OFF      # switch off gas self-gravity in tree
 gravity_not_periodic: OFF    # gravity is not treated periodically
 allow_direct_summation: OFF  # Performed direct summation instead of tree-based gravity if number of active particles < DIRECT_SUMMATION_THRESHOLD (= 3000 unless specified differently here)
@@ -100,6 +99,8 @@ exact_gravity_for_particle_type: 4  #N-squared fashion gravity for a small numbe
 evalpotential: OFF           # computes gravitational potential
 
 #--------------------------------------- TreePM Options; default: no Particle-Mesh
+pmgrid: 512
+
 #PMGRID=512                    # Enables particle mesh; number of cells used for grid in each dimension
 #ASMTH=1.25                    # This can be used to override the value assumed for the scale that defines the long-range/short-range force-split in the TreePM algorithm. The default value is 1.25, in mesh-cells.
 #RCUT=6.0                      # This can be used to override the maximum radius in which the short-range tree-force is evaluated (in case the TreePM algorithm is used). The default value is 4.5, given in mesh-cells.
@@ -110,6 +111,9 @@ evalpotential: OFF           # computes gravitational potential
 #FFT_COLUMN_BASED              # Use column-based FFT; slightly slower, but necessary to achieve good load-balancing if number of tasks larger than PMGRID (usually the case for very large runs)
 
 #--------------------------------------- Gravity softening
+nsofttypes: 2 
+multiple_node_softening: ON
+adaptive_hydro_softening: ON
 #NSOFTTYPES=4                  # Number of different softening values to which particle types can be mapped.
 #MULTIPLE_NODE_SOFTENING       # If a tree node is to be used which is softened, this is done with the softenings of its different mass components
 #INDIVIDUAL_GRAVITY_SOFTENING=2+4  # bitmask with particle types where the softenig type should be chosen with that of parttype 1 as a reference type
@@ -141,6 +145,10 @@ evalpotential: OFF           # computes gravitational potential
 #HQ_DARKFRACTION=0.9           # fraction in dark matter in Hernquist potential
 
 #--------------------------------------- Time integration options
+tree_based_timesteps: ON
+force_equal_timesteps: OFF
+
+
 #FORCE_EQUAL_TIMESTEPS         # variable but global timestep
 #TREE_BASED_TIMESTEPS          # non-local timestep criterion (take 'signal speed' into account)
 #PM_TIMESTEP_BASED_ON_TYPES=2+4  # particle types that should be considered in setting the PM timestep
@@ -152,6 +160,8 @@ evalpotential: OFF           # computes gravitational potential
 #IMPOSE_PINNING_OVERRIDE_MODE  # Override MPI pinning, if present
 
 #--------------------------------------- Single/Double Precision
+doubleprecision: 1
+
 #DOUBLEPRECISION=1             # Mode of double precision: not defined: single; 1: full double precision 2: mixed, 3: mixed, fewer single precisions; unless short of memory, use 1.
 #DOUBLEPRECISION_FFTW          # FFTW calculation in double precision
 #OUTPUT_IN_DOUBLEPRECISION     # snapshot files will be written in double precision
@@ -235,6 +245,9 @@ evalpotential: OFF           # computes gravitational potential
 #OUTPUT_CSND                   # output sound speed. This one is only used for tree-based timesteps! Calculate from hydro quantities in postprocessing if required for science applications.
 
 #--------------------------------------- output options
+process_times_of_outputlist: ON
+have_hdf5: ON
+
 #PROCESS_TIMES_OF_OUTPUTLIST   # goes through times of output list prior to starting the simulaiton to ensure that outputs are written as close to the desired time as possible (as opposed to at next possible time if this flag is not active)
 #REDUCE_FLUSH                  # only flush output to log-files in predefined intervals
 #OUTPUT_EVERY_STEP             # Create snapshot on every (global) synchronization point, independent of parameters choosen or output list.
