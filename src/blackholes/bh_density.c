@@ -52,6 +52,11 @@ static void particle2in(data_in *in, int i, int firstnode)
   in->Vel[1]        = PPB(i).Vel[1];
   in->Vel[2]        = PPB(i).Vel[2];
 #endif
+#ifdef TORQUE_ACCRETION
+  in->Vel[0]        = PPB(i).Vel[0];
+  in->Vel[1]        = PPB(i).Vel[1];
+  in->Vel[2]        = PPB(i).Vel[2];
+#endif
   in->Hsml          = BhP[i].Hsml;
   in->Firstnode     = firstnode;
 }  
@@ -73,6 +78,15 @@ typedef struct
 #endif
 #ifdef INFALL_ACCRETION
   MyDouble Accretion;
+#endif
+#ifdef TORQUE_ACCRETION
+  MyDouble TorqueMgas;
+  MyDouble TorqueMstar;
+  MyDouble TorqueMgasDisk;      /* Disk component gas mass */
+  MyDouble TorqueMstarDisk;     /* Disk component stellar mass */ 
+  MyDouble TorqueR0;
+  MyDouble TorqueFd;
+  MyDouble VelocityGasCircular[3];
 #endif
 } data_out;
 
@@ -109,6 +123,17 @@ static void out2particle(data_out *out, int i, int mode)
 #ifdef INFALL_ACCRETION
       BhP[i].Accretion                += out->Accretion;
 #endif
+#ifdef TORQUE_ACCRETION
+      BhP[i].TorqueMgas                = out->TorqueMgas;
+      BhP[i].TorqueMstar               = out->TorqueMstar;
+      BhP[i].TorqueMgasDisk            = out->TorqueMgasDisk;
+      BhP[i].TorqueMstarDisk           = out->TorqueMstarDisk;
+      BhP[i].TorqueR0                  = out->TorqueR0;
+      BhP[i].TorqueFd                  = out->TorqueFd;
+      BhP[i].VelocityGasCircular[0]    = out->VelocityGasCircular[0];
+      BhP[i].VelocityGasCircular[1]    = out->VelocityGasCircular[1];
+      BhP[i].VelocityGasCircular[2]    = out->VelocityGasCircular[2];
+#endif
     }
   else /* combine */
     {
@@ -128,6 +153,18 @@ static void out2particle(data_out *out, int i, int mode)
 #endif
 #ifdef INFALL_ACCRETION
       BhP[i].Accretion                 += out->Accretion; 
+#endif
+#ifdef TORQUE_ACCRETION
+      BhP[i].TorqueMgas                += out->TorqueMgas;
+      BhP[i].TorqueMstar               += out->TorqueMstar;
+      BhP[i].TorqueMgasDisk            += out->TorqueMgasDisk;
+      BhP[i].TorqueMstarDisk           += out->TorqueMstarDisk;
+      if(out->TorqueR0 > BhP[i].TorqueR0)
+        BhP[i].TorqueR0                 = out->TorqueR0;
+      BhP[i].TorqueFd                  += out->TorqueFd;
+      BhP[i].VelocityGasCircular[0]    += out->VelocityGasCircular[0];
+      BhP[i].VelocityGasCircular[1]    += out->VelocityGasCircular[1];
+      BhP[i].VelocityGasCircular[2]    += out->VelocityGasCircular[2];
 #endif
     }
 }
@@ -396,6 +433,23 @@ static int bh_density_evaluate(int target, int mode, int threadid)
   double rbh  = h;
   double rbh2 = rbh * rbh;
 #endif 
+#ifdef TORQUE_ACCRETION
+  /* Torque accretion model from Angles-Alcazar et al. 2016 */
+  MyDouble torque_Mgas       = 0.0;  /* Total gas mass within R0 */
+  MyDouble torque_Mstar      = 0.0;  /* Total stellar mass within R0 */
+  MyDouble torque_Mgas_disk  = 0.0;  /* Disk component gas mass */
+  MyDouble torque_Mstar_disk = 0.0;  /* Disk component stellar mass */
+  
+  /* Angular momentum for disk decomposition */
+  MyDouble ang_mom[3]        = {0.0, 0.0, 0.0};
+  MyDouble ang_mom_norm      = 0.0;
+  MyDouble total_mass_for_angmom = 0.0;
+  
+  /* For angular momentum accretion tracking */
+  MyDouble velocity_gas_circular[3] = {0.0, 0.0, 0.0};
+  MyDouble *vel = target_data->Vel;
+  double dvx, dvy, dvz;
+#endif
 
   h2   = h * h;
   hinv = 1.0 / h;
@@ -409,6 +463,58 @@ static int bh_density_evaluate(int target, int mode, int threadid)
   numngb = rho = mass = 0;
 
   int nfound = ngb_treefind_variable_threads(pos, h, target, mode, threadid, numnodes, firstnode);
+#ifdef TORQUE_ACCRETION
+  for(n = 0; n < nfound; n++)
+    {
+      j = Thread[threadid].Ngblist[n];
+
+      dx = pos[0] - P[j].Pos[0];
+      dy = pos[1] - P[j].Pos[1];
+      dz = pos[2] - P[j].Pos[2];
+
+#ifndef REFLECTIVE_X
+      if(dx > boxHalf_X) dx -= boxSize_X;
+      if(dx < -boxHalf_X) dx += boxSize_X;
+#endif
+#ifndef REFLECTIVE_Y
+      if(dy > boxHalf_Y) dy -= boxSize_Y;
+      if(dy < -boxHalf_Y) dy += boxSize_Y;
+#endif
+#ifndef REFLECTIVE_Z
+      if(dz > boxHalf_Z) dz -= boxSize_Z;
+      if(dz < -boxHalf_Z) dz += boxSize_Z;
+#endif
+
+
+      r2 = dx * dx + dy * dy + dz * dz;
+
+      if(r2 < h2)
+        {
+          mass_j = P[j].Mass;
+          
+          /* Calculate angular momentum: L = r × (m*v) */
+          dvx = P[j].Vel[0] - vel[0];
+          dvy = P[j].Vel[1] - vel[1];
+          dvz = P[j].Vel[2] - vel[2];
+          
+          /* Cross product: r × v, weighted by mass */
+          ang_mom[0] += mass_j * (dy * dvz - dz * dvy);
+          ang_mom[1] += mass_j * (dz * dvx - dx * dvz);
+          ang_mom[2] += mass_j * (dx * dvy - dy * dvx);
+          
+          total_mass_for_angmom += mass_j;
+        }
+    }
+  
+  /* Normalize angular momentum vector */
+  ang_mom_norm = sqrt(ang_mom[0]*ang_mom[0] + ang_mom[1]*ang_mom[1] + ang_mom[2]*ang_mom[2]);
+  if(ang_mom_norm > 0)
+    {
+      ang_mom[0] /= ang_mom_norm;
+      ang_mom[1] /= ang_mom_norm;
+      ang_mom[2] /= ang_mom_norm;
+    }
+#endif
 
   for(n = 0; n < nfound; n++)
     {
@@ -492,10 +598,54 @@ static int bh_density_evaluate(int target, int mode, int threadid)
               P[j].Mass -= P[j].Mass * exp(-r2/(2*rbh2));  
             }
 #endif
-
+#ifdef TORQUE_ACCRETION
+          dvx = P[j].Vel[0] - vel[0];
+          dvy = P[j].Vel[1] - vel[1];
+          dvz = P[j].Vel[2] - vel[2];
+          
+          double v_cross[3];
+          v_cross[0] = dy * dvz - dz * dvy;
+          v_cross[1] = dz * dvx - dx * dvz;
+          v_cross[2] = dx * dvy - dy * dvx;
+          
+          double v_phi = 0.0;
+          if(ang_mom_norm > 0 && r > 0)
+            v_phi = (v_cross[0]*ang_mom[0] + v_cross[1]*ang_mom[1] + v_cross[2]*ang_mom[2]) / r;
+          
+          int is_disk = (v_phi > 0.0);
+          
+          /* Accumulate total masses */
+          if(P[j].Type == 0)  /* Gas */
+            {
+              torque_Mgas += mass_j * wk;
+              if(is_disk)
+                torque_Mgas_disk += mass_j * wk;
+              
+              /* Accumulate circular velocity for angular momentum tracking */
+              double rho_j = (SphP[j].Density > 0) ? SphP[j].Density : 1.0;
+              velocity_gas_circular[0] += v_cross[0] * mass_j / rho_j * wk;
+              velocity_gas_circular[1] += v_cross[1] * mass_j / rho_j * wk;
+              velocity_gas_circular[2] += v_cross[2] * mass_j / rho_j * wk;
+            }
+          else if(P[j].Type == 4)  /* Stars */
+            {
+              torque_Mstar += mass_j * wk;
+              if(is_disk)
+                torque_Mstar_disk += mass_j * wk;
+            }
+#endif
         }
     }
-
+#ifdef TORQUE_ACCRETION
+  MyDouble M_disk = torque_Mgas_disk + torque_Mstar_disk;
+  MyDouble M_total = torque_Mgas + torque_Mstar;
+  MyDouble f_d = 0.0;
+  
+  if(M_total > 0)
+    f_d = M_disk / M_total;
+  else
+    f_d = 0.0;
+#endif
   /* compute bh timestep based on min ngb timestep */
   if(bin == 0)
     ngb_min_step = 0;
@@ -517,6 +667,17 @@ static int bh_density_evaluate(int target, int mode, int threadid)
 #endif
 #ifdef INFALL_ACCRETION
   out.Accretion               = accretion;
+#endif
+#ifdef TORQUE_ACCRETION
+  out.TorqueMgas              = torque_Mgas;
+  out.TorqueMstar             = torque_Mstar;
+  out.TorqueMgasDisk          = torque_Mgas_disk;
+  out.TorqueMstarDisk         = torque_Mstar_disk;
+  out.TorqueR0                = h;  
+  out.TorqueFd                = f_d;
+  out.VelocityGasCircular[0]  = velocity_gas_circular[0];
+  out.VelocityGasCircular[1]  = velocity_gas_circular[1];
+  out.VelocityGasCircular[2]  = velocity_gas_circular[2];
 #endif
 
   /* now collect the result at the right place */

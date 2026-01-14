@@ -95,6 +95,114 @@ void update_bh_accretion_rate(void)
   mpi_printf("BLACK_HOLES: Black hole accretion rate: %e \n", acc_rate_for_print);
 }
 #endif
+#ifdef TORQUE_ACCRETION
+void update_bh_accretion_rate(void)
+{
+  /* Calculate Torque-limited accretion rate */
+  
+  int i;
+  double M_BH, M_gas, M_star, M_enc, M_gas_disk, M_star_disk, M_disk;
+  double R0, f_d, f_gas, f0;
+  double torque_rate, EddingtonRate;
+  double accretion_rate, acc_rate_for_print;
+  
+  accretion_rate = acc_rate_for_print = 0;
+  
+  for(i = 0; i < NumBhs; i++)
+    {
+      M_BH        = PPB(i).Mass;
+      M_gas       = BhP[i].TorqueMgas;       // Total gas mass within R0
+      M_star      = BhP[i].TorqueMstar;      // Total stellar mass within R0
+      M_gas_disk  = BhP[i].TorqueMgasDisk;   // Disk component gas mass 
+      M_star_disk = BhP[i].TorqueMstarDisk;  // Disk component stellar mass 
+      R0          = BhP[i].TorqueR0;         // Aperture radius
+      f_d         = BhP[i].TorqueFd;         // Disk fraction
+
+      if(R0 <= 0 || (M_gas + M_star) <= 0)
+        {
+          BhP[i].AccretionRateTorque = 0;
+          continue;
+        }
+
+      /* Disk mass (gas + stars in disk component) */
+      M_disk = M_gas_disk + M_star_disk;
+      
+      /* Total enclosed mass */
+      M_enc = M_gas + M_star;
+      
+      /* Recompute disk fraction  */
+      if(M_enc > 0)
+        f_d = M_disk / M_enc;
+      else
+        f_d = 0.0;
+        
+      /* Gas fraction within disk */
+      if(M_disk > 0)
+        f_gas = M_gas_disk / M_disk;  // Only disk gas / disk mass
+      else
+        f_gas = 1.0;  // Default to pure gas if no disk
+
+      /* Ensure physical values */
+      if(f_d < 0.0) f_d = 0.0;
+      if(f_d > 1.0) f_d = 1.0;
+      if(f_gas < 0.0) f_gas = 0.0;
+      if(f_gas > 1.0) f_gas = 1.0;
+      
+      /* If no disk, no torque-driven accretion */
+      if(f_d < 1e-6 || M_disk < 1e-6)
+        {
+          BhP[i].AccretionRateTorque = 0;
+          continue;
+        }
+
+      /* Computing f0 */
+      /* f0 ≈ 0.31 * f_d^2 * (M_disk / 10^9 Msun)^(-1/3) */
+      f0 = 0.31 * f_d * f_d * pow(M_disk * All.UnitMass_in_g / 1e9 / SOLAR_MASS, -1.0/3.0);
+
+      /* Suppression factor */
+      double suppression = 1.0;
+      if(f_gas > 0)
+        suppression = 1.0 / (1.0 + f0 / f_gas);
+      else
+        suppression = 0.0;  // No gas, no accretion
+
+      /* Torque-limited accretion rate (Angles-Alcazar et al. 2016, Equation 2) */
+
+      torque_rate = All.Epsilon_T                                      /* Normalization */
+                  * pow(f_d, 2.5)                                      /* f_d^(5/2) */
+                  * pow(M_BH * All.UnitMass_in_g / 1e8 / SOLAR_MASS, 1.0/6.0)  /* (M_BH/1e8 Msun)^(1/6) */
+                  * (M_disk * All.UnitMass_in_g / 1e9 / SOLAR_MASS)   /* (M_disk/1e9 Msun) */
+                  * pow(R0 * All.UnitLength_in_cm / (100.0 * PARSEC), -1.5)    /* (R0/100pc)^(-3/2) */
+                  * suppression;                                       /* 1/(1 + f0/f_gas) */
+
+      /* Convert from Msun/yr to code units (code mass / code time) */
+      torque_rate *= SOLAR_MASS / All.UnitMass_in_g;         
+      torque_rate *= All.UnitTime_in_s / SEC_PER_YEAR;       
+
+      /* Eddington limit (can allow up to 10× super-Eddington as in paper) */
+      EddingtonRate = 4.0 * M_PI * GRAVITY * (M_BH * All.UnitMass_in_g) * PROTONMASS
+                      / (All.Epsilon_r * CLIGHT * THOMPSON);
+      EddingtonRate *= (All.UnitTime_in_s / All.UnitMass_in_g);
+      
+      /* Allow up to 10× Eddington (Angles-Alcazar et al. 2016, Section 2.3) */
+      double max_accretion = 10.0 * EddingtonRate;
+
+      /* Apply Eddington limit */
+      accretion_rate = fmin(torque_rate, max_accretion);
+
+      /* Store the accretion rate */
+      BhP[i].AccretionRateTorque = accretion_rate;
+      
+      /* Track maximum for output */
+      if(accretion_rate > acc_rate_for_print)
+        acc_rate_for_print = accretion_rate;
+    }
+
+  MPI_Allreduce(&acc_rate_for_print, &accretion_rate, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+  MPI_Barrier(MPI_COMM_WORLD); 
+  mpi_printf("BLACK_HOLES: Black hole torque-limited accretion rate: %e (code units)\n", accretion_rate);
+}
+#endif
 #endif
 
 #ifdef STARS
