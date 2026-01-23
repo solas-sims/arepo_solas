@@ -1945,6 +1945,9 @@ enum iofields
 #ifdef BONDI_ACCRETION
   IO_ACCRETION_RATE,
 #endif
+#ifdef TORQUE_ACCRETION
+  IO_ACCRETION_RATE,
+#endif
 #ifdef OUTPUT_TIMEBIN_BH
   IO_TIMEBIN_BH,
 #endif
