@@ -1610,6 +1610,15 @@ extern struct bh_particle_data
 #ifdef INFALL_ACCRETION
   MyDouble Accretion;
 #endif
+#ifdef TORQUE_ACCRETION
+  MyDouble TorqueMgas;
+  MyDouble TorqueMstar;
+  MyDouble TorqueMgasDisk;
+  MyDouble TorqueMstarDisk;
+  MyDouble TorqueR0;
+  MyDouble TorqueFd;
+  MyDouble VelocityGasCircular[3];
+#endif
   integertime NgbMinStep;
   int DensityFlag;
   signed char TimeBinBh;
