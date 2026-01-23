@@ -412,6 +412,9 @@ void calculate_non_standard_physics_prior_mesh_construction(void)
 #ifdef BONDI_ACCRETION
   update_bh_accretion_rate();
 #endif
+#ifdef TORQUE_ACCRETION
+  update_bh_accretion_rate();
+#endif
   update_bh_timesteps();
 #endif
 
