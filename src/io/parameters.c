@@ -555,6 +555,11 @@ void read_parameter_file(char *fname)
       strcpy(tag[nt], "Epsilon_r"); // Radiative efficiency for accretion rate
       addr[nt] = &All.Epsilon_r;
       id[nt++] = REAL;
+#ifdef TORQUE_ACCRETION
+      strcpy(tag[nt], "Epsilon_T"); // NORMALIZATION FOR TORQUE_ACCRETION
+      addr[nt] = &All.Epsilon_T;
+      id[nt++] = REAL;
+#endif
 #ifdef BLACKHOLES_FEEDBACK
       strcpy(tag[nt], "JetFeedback");
       addr[nt] = &All.JetFeedback;
