@@ -120,7 +120,7 @@ void update_bh_accretion_rate(void)
 
       if(R0 <= 0 || (M_gas + M_star) <= 0)
         {
-          BhP[i].AccretionRateTorque = 0;
+          BhP[i].AccretionRate = 0;
           continue;
         }
 
@@ -151,7 +151,7 @@ void update_bh_accretion_rate(void)
       /* If no disk, no torque-driven accretion */
       if(f_d < 1e-6 || M_disk < 1e-6)
         {
-          BhP[i].AccretionRateTorque = 0;
+          BhP[i].AccretionRate = 0;
           continue;
         }
 
@@ -191,7 +191,7 @@ void update_bh_accretion_rate(void)
       accretion_rate = fmin(torque_rate, max_accretion);
 
       /* Store the accretion rate */
-      BhP[i].AccretionRateTorque = accretion_rate;
+      BhP[i].AccretionRate = accretion_rate;
       
       /* Track maximum for output */
       if(accretion_rate > acc_rate_for_print)
