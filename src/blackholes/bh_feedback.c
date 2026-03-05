@@ -37,9 +37,17 @@ typedef struct
   MyDouble Accretion;
 #endif
 #ifdef TORQUE_ACCRETION
-  MyDouble AccretionRateTorque;
-  MyDouble MassToDrainTorque;
+  MyDouble accretion_rate, mass_to_drain;
+  accretion_rate = target_data->AccretionRate;
+  mass_to_drain  = target_data->MassToDrain;
 #endif
+#ifdef ADP_ACCRETION
+  MyDouble accretion_rate, mass_to_drain;
+
+  accretion_rate = target_data->AccretionRate;
+  mass_to_drain  = target_data->MassToDrain;  
+#endif
+
   int Firstnode;
 } data_in;
 
@@ -73,8 +81,12 @@ static void particle2in(data_in *in, int i, int firstnode)
   in->Accretion     = BhP[i].Accretion;
 #endif
 #ifdef TORQUE_ACCRETION
-  in->AccretionRateTorque = BhP[i].AccretionRateTorque;
-  in->MassToDrainTorque = BhP[i].MassToDrainTorque;
+  in->AccretionRate = BhP[i].AccretionRate;
+  in->MassToDrain   = BhP[i].MassToDrain;
+#endif
+#ifdef ADP_ACCRETION
+  in->AccretionRate = BhP[i].AccretionRate;
+  in->MassToDrain   = BhP[i].MassToDrain;
 #endif
   in->Firstnode     = firstnode;
 }
@@ -223,8 +235,14 @@ static int bh_ngb_feedback_evaluate(int target, int mode, int threadid)
 #endif
 #ifdef TORQUE_ACCRETION
   MyDouble accretion_rate, mass_to_drain;
-  accretion_rate =target_data->AccretionRateTorque;
-  mass_to_drain= target_data->MassToDrainTorque;
+  accretion_rate = target_data->AccretionRate;
+  mass_to_drain  = target_data->MassToDrain;
+#endif
+#ifdef ADP_ACCRETION
+  MyDouble accretion_rate, mass_to_drain;
+
+  accretion_rate = target_data->AccretionRate;
+  mass_to_drain  = target_data->MassToDrain;   
 #endif
 
   h2   = h * h;
@@ -252,7 +270,10 @@ static int bh_ngb_feedback_evaluate(int target, int mode, int threadid)
   massloading = All.Mload * accretion_rate * dt;
   energyfeed= All.Epsilon_f * All.Epsilon_r * accretion_rate * dt * (CLIGHT * CLIGHT / (All.UnitVelocity_in_cm_per_s * All.UnitVelocity_in_cm_per_s));
 #endif
-
+#ifdef ADP_ACCRETION
+  massloading = All.Mload * accretion_rate * dt;
+  energyfeed= All.Epsilon_f * All.Epsilon_r * accretion_rate * dt * (CLIGHT * CLIGHT / (All.UnitVelocity_in_cm_per_s * All.UnitVelocity_in_cm_per_s));
+#endif
   /* jet axis and opening angle */    
 
   /* positive and negative jet axes */
@@ -347,7 +368,9 @@ static int bh_ngb_feedback_evaluate(int target, int mode, int threadid)
 #ifdef TORQUE_ACCRETION
           SphP[j].MassDrain = accretion_rate*dt/ngbmass*P[j].Mass + mass_to_drain/ngbmass*P[j].Mass;
 #endif
- 
+#ifdef ADP_ACCRETION
+          SphP[j].MassDrain = accretion_rate*dt/ngbmass*P[j].Mass + mass_to_drain/ngbmass*P[j].Mass;
+#endif
         }
     }
 
