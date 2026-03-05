@@ -1308,6 +1308,17 @@ extern struct global_data_all_processes
   double BhDesNgb;
   double BhDesDev;
   double Epsilon_r;  // radiative efficiency, need for accretion rate
+#ifdef TORQUE_ACCRETION
+  /* for parameter file */
+  double Epsilon_T;
+  double TorqueR0;
+#endif
+#ifdef ADP_ACCRETION
+  double ADP_Racc;        /* capture radius (code length units) */
+  double ADP_tcap;        /* reservoir to disc transfer timescale (code time units); 0 = instant */
+  double ADP_tvisc;       /* disc viscous timescale (code time units) */
+  double ADP_EddFactor;   /* multiplier on Eddington cap (default 1) */
+#endif
 #ifdef BLACKHOLES_FEEDBACK
 #define BH_WITH_FEEDBACK 1
   double JetFeedback;
@@ -1618,7 +1629,26 @@ extern struct bh_particle_data
   MyDouble TorqueR0;
   MyDouble TorqueFd;
   MyDouble VelocityGasCircular[3];
+  MyDouble AccretionRate;
+  MyDouble Epsilon_T;
+  MyDouble MassToDrain;
+  MyDouble AngularMomentum[3];
+  MyDouble InternalEnergyGas;
 #endif
+#ifdef ADP_ACCRETION
+  MyDouble ADP_Racc;
+  MyDouble ADP_CapturedMass;   /* mass captured since last update (code mass) */
+  MyDouble ADP_ReservoirMass;  /* reservoir mass waiting to enter disc (code mass) */
+  MyDouble ADP_DiscMass;       /* disc mass available to accrete (code mass) */
+  MyDouble AccretionRate;      /* code mass / code time */
+  MyDouble MassToDrain;
+  MyDouble ADP_tcap;
+  MyDouble ADP_tvisc; 
+  MyDouble VelocityGas[3];
+  MyDouble VelocityGasCircular[3];
+  MyDouble ADP_EddFactor;
+#endif
+
   integertime NgbMinStep;
   int DensityFlag;
   signed char TimeBinBh;
@@ -1946,6 +1976,9 @@ enum iofields
   IO_ACCRETION_RATE,
 #endif
 #ifdef TORQUE_ACCRETION
+  IO_ACCRETION_RATE,
+#endif
+#ifdef ADP_ACCRETION
   IO_ACCRETION_RATE,
 #endif
 #ifdef OUTPUT_TIMEBIN_BH
