@@ -519,84 +519,116 @@ static int bh_density_evaluate(int target, int mode, int threadid)
   int nfound = ngb_treefind_variable_threads(pos, h, target, mode, threadid, numnodes, firstnode);
 
 #ifdef ADP_ACCRETION
+for(n = 0; n < nfound; n++)
+  {
+    j = Thread[threadid].Ngblist[n];
 
-  for(n = 0; n < nfound; n++)
-    {
-      j = Thread[threadid].Ngblist[n];
-      dx = P[j].Pos[0] - pos[0];
-      dy = P[j].Pos[1] - pos[1];
-      dz = P[j].Pos[2] - pos[2];
+    dx = pos[0] - P[j].Pos[0];
+    dy = pos[1] - P[j].Pos[1];
+    dz = pos[2] - P[j].Pos[2];
 
-#ifndef REFLECTIVE_X
-      if(dx > boxHalf_X) dx -= boxSize_X;
+    
+    #ifndef REFLECTIVE_X
+      if(dx >  boxHalf_X) dx -= boxSize_X;
       if(dx < -boxHalf_X) dx += boxSize_X;
-#endif
-#ifndef REFLECTIVE_Y
-      if(dy > boxHalf_Y) dy -= boxSize_Y;
+    #endif
+    #ifndef REFLECTIVE_Y
+      if(dy >  boxHalf_Y) dy -= boxSize_Y;
       if(dy < -boxHalf_Y) dy += boxSize_Y;
-#endif
-#ifndef REFLECTIVE_Z
-      if(dz > boxHalf_Z) dz -= boxSize_Z;
+    #endif
+    #ifndef REFLECTIVE_Z
+      if(dz >  boxHalf_Z) dz -= boxSize_Z;
       if(dz < -boxHalf_Z) dz += boxSize_Z;
-#endif
+    #endif
 
-      r2 = dx*dx + dy*dy + dz*dz;
+    r2 = dx*dx + dy*dy + dz*dz;
 
-      /* Only gas particles within Racc are candidates for capture */
-      if(r2 < Racc2)
-        {
-          mass_j = P[j].Mass;
-          adp_captured_mass += mass_j;
+    if(r2 < Racc2 && P[j].Type == 0)   /* only gas within Racc */
+      {
+        mass_j = P[j].Mass;
 
-          /* Calculate Angular Momentum: L = r × (m*v) */
-          dvx = P[j].Vel[0] - vel[0];
-          dvy = P[j].Vel[1] - vel[1];
-          dvz = P[j].Vel[2] - vel[2];
-          dv2 = dvx*dvx + dvy*dvy + dvz*dvz;
+        dvx = P[j].Vel[0] - vel[0];
+        dvy = P[j].Vel[1] - vel[1];
+        dvz = P[j].Vel[2] - vel[2];
 
-          ang_mom[0] += mass_j * (dy * dvz - dz * dvy);
-          ang_mom[1] += mass_j * (dz * dvx - dx * dvz);
-          ang_mom[2] += mass_j * (dx * dvy - dy * dvx);
-  	  total_mass_for_angmom += mass_j;
-        }
+        /* accumulate angular momentum: L = r × mv */
+        ang_mom[0] += mass_j * (dy*dvz - dz*dvy);
+        ang_mom[1] += mass_j * (dz*dvx - dx*dvz);
+        ang_mom[2] += mass_j * (dx*dvy - dy*dvx);
+        total_mass_for_angmom += mass_j;
 
-          double v_cross[3];
-          v_cross[0] = dy * dvz - dz * dvy;
-          v_cross[1] = dz * dvx - dx * dvz;
-          v_cross[2] = dx * dvy - dy * dvx;
-          
-          double v_phi = 0.0;
-          if(ang_mom_norm > 0 && r > 0)
-            v_phi = (v_cross[0]*ang_mom[0] + v_cross[1]*ang_mom[1] + v_cross[2]*ang_mom[2]) / Racc;
-          
-          int is_disk = (v_phi > 0.0);
-          
-          /* Accumulate total masses */
-          if(P[j].Type == 0)  /* Gas */
-            {
-              adp_captured_mass += mass_j; /* * wk; */
-              if(is_disk)
-                adp_captured_mass += mass_j; /* * wk; */
-              
-              /* Accumulate circular velocity for angular momentum tracking */
-              double rho_j = (SphP[j].Density > 0) ? SphP[j].Density : 1.0;
-              velocity_gas_circular[0] += v_cross[0] * mass_j / rho_j;/* * wk;*/
-              velocity_gas_circular[1] += v_cross[1] * mass_j / rho_j;/* * wk;*/
-              velocity_gas_circular[2] += v_cross[2] * mass_j / rho_j;/* * wk;*/
-            }
-
-
-
-  /* Normalise accumulated angular momentum vector */
-   ang_mom_norm = sqrt(ang_mom[0]*ang_mom[0] + ang_mom[1]*ang_mom[1] + ang_mom[2]*ang_mom[2]);
-    if(ang_mom_norm > 0)
-    {
-      ang_mom[0] /= ang_mom_norm;
-      ang_mom[1] /= ang_mom_norm;
-      ang_mom[2] /= ang_mom_norm;
-    }
+        
+        adp_captured_mass += mass_j;
+      }
   }
-#endif /* ADP_ACCRETION */
+
+
+ang_mom_norm = sqrt(ang_mom[0]*ang_mom[0] +
+                    ang_mom[1]*ang_mom[1] +
+                    ang_mom[2]*ang_mom[2]);
+if(ang_mom_norm > 0)
+  {
+    ang_mom[0] /= ang_mom_norm;
+    ang_mom[1] /= ang_mom_norm;
+    ang_mom[2] /= ang_mom_norm;
+  }
+#endif
+#ifdef ADP_ACCRETION
+/* ── ADP PASS 2: Disk classification + circular velocity ── */
+for(n = 0; n < nfound; n++)
+  {
+    j = Thread[threadid].Ngblist[n];
+
+    dx = pos[0] - P[j].Pos[0];
+    dy = pos[1] - P[j].Pos[1];
+    dz = pos[2] - P[j].Pos[2];
+
+    /* periodic wrapping */
+    #ifndef REFLECTIVE_X
+      if(dx >  boxHalf_X) dx -= boxSize_X;
+      if(dx < -boxHalf_X) dx += boxSize_X;
+    #endif
+    #ifndef REFLECTIVE_Y
+      if(dy >  boxHalf_Y) dy -= boxSize_Y;
+      if(dy < -boxHalf_Y) dy += boxSize_Y;
+    #endif
+    #ifndef REFLECTIVE_Z
+      if(dz >  boxHalf_Z) dz -= boxSize_Z;
+      if(dz < -boxHalf_Z) dz += boxSize_Z;
+    #endif
+
+    r2 = dx*dx + dy*dy + dz*dz;
+
+    if(r2 < Racc2 && P[j].Type == 0)   /* only gas within Racc */
+      {
+        mass_j = P[j].Mass;
+        r = sqrt(r2);
+
+        dvx = P[j].Vel[0] - vel[0];
+        dvy = P[j].Vel[1] - vel[1];
+        dvz = P[j].Vel[2] - vel[2];
+
+        double v_cross[3];
+        v_cross[0] = dy*dvz - dz*dvy;
+        v_cross[1] = dz*dvx - dx*dvz;
+        v_cross[2] = dx*dvy - dy*dvx;
+
+        double v_phi = 0.0;
+        if(ang_mom_norm > 0 && r > 0)
+          v_phi = (v_cross[0]*ang_mom[0] +
+                   v_cross[1]*ang_mom[1] +
+                   v_cross[2]*ang_mom[2]) / r;
+
+        int is_disk = (v_phi > 0.0);
+
+        double rho_j = (SphP[j].Density > 0) ? SphP[j].Density : 1.0;
+        velocity_gas_circular[0] += v_cross[0] * mass_j / rho_j;
+        velocity_gas_circular[1] += v_cross[1] * mass_j / rho_j;
+        velocity_gas_circular[2] += v_cross[2] * mass_j / rho_j;
+      }
+  }
+#endif
+/* ── PASS 1: Angular momentum axis ── */
 #ifdef TORQUE_ACCRETION
   for(n = 0; n < nfound; n++)
     {
@@ -606,48 +638,119 @@ static int bh_density_evaluate(int target, int mode, int threadid)
       dy = pos[1] - P[j].Pos[1];
       dz = pos[2] - P[j].Pos[2];
 
-#ifndef REFLECTIVE_X
-      if(dx > boxHalf_X) dx -= boxSize_X;
-      if(dx < -boxHalf_X) dx += boxSize_X;
-#endif
-#ifndef REFLECTIVE_Y
-      if(dy > boxHalf_Y) dy -= boxSize_Y;
-      if(dy < -boxHalf_Y) dy += boxSize_Y;
-#endif
-#ifndef REFLECTIVE_Z
-      if(dz > boxHalf_Z) dz -= boxSize_Z;
-      if(dz < -boxHalf_Z) dz += boxSize_Z;
-#endif
+      /* periodic wrapping */
+      #ifndef REFLECTIVE_X
+        if(dx >  boxHalf_X) dx -= boxSize_X;
+        if(dx < -boxHalf_X) dx += boxSize_X;
+      #endif
+      #ifndef REFLECTIVE_Y
+        if(dy >  boxHalf_Y) dy -= boxSize_Y;
+        if(dy < -boxHalf_Y) dy += boxSize_Y;
+      #endif
+      #ifndef REFLECTIVE_Z
+        if(dz >  boxHalf_Z) dz -= boxSize_Z;
+        if(dz < -boxHalf_Z) dz += boxSize_Z;
+      #endif
 
+      r2 = dx*dx + dy*dy + dz*dz;
 
-      r2 = dx * dx + dy * dy + dz * dz;
-
-      if(r2 < R0_torque2) /*Disk angular momentum is fixed with R0
+      if(r2 < R0_torque2)
         {
           mass_j = P[j].Mass;
-          
-          /* Calculate angular momentum: L = r × (m*v) */
           dvx = P[j].Vel[0] - vel[0];
           dvy = P[j].Vel[1] - vel[1];
           dvz = P[j].Vel[2] - vel[2];
-          
-          /* Cross product: r × v, weighted by mass */
-          ang_mom[0] += mass_j * (dy * dvz - dz * dvy);
-          ang_mom[1] += mass_j * (dz * dvx - dx * dvz);
-          ang_mom[2] += mass_j * (dx * dvy - dy * dvx);
-          
+
+          ang_mom[0] += mass_j * (dy*dvz - dz*dvy);
+          ang_mom[1] += mass_j * (dz*dvx - dx*dvz);
+          ang_mom[2] += mass_j * (dx*dvy - dy*dvx);
           total_mass_for_angmom += mass_j;
         }
     }
-  
-  /* Normalize angular momentum vector */
-  ang_mom_norm = sqrt(ang_mom[0]*ang_mom[0] + ang_mom[1]*ang_mom[1] + ang_mom[2]*ang_mom[2]);
+
+  /* Normalise BEFORE Pass 2 */
+  ang_mom_norm = sqrt(ang_mom[0]*ang_mom[0] +
+                      ang_mom[1]*ang_mom[1] +
+                      ang_mom[2]*ang_mom[2]);
   if(ang_mom_norm > 0)
     {
       ang_mom[0] /= ang_mom_norm;
       ang_mom[1] /= ang_mom_norm;
       ang_mom[2] /= ang_mom_norm;
     }
+#endif
+
+
+/* ── PASS 2: Disk decomposition ── */
+#ifdef TORQUE_ACCRETION
+  for(n = 0; n < nfound; n++)        
+    {
+      j = Thread[threadid].Ngblist[n];
+
+      dx = pos[0] - P[j].Pos[0];
+      dy = pos[1] - P[j].Pos[1];
+      dz = pos[2] - P[j].Pos[2];
+
+      /* periodic wrapping */
+      #ifndef REFLECTIVE_X
+        if(dx >  boxHalf_X) dx -= boxSize_X;
+        if(dx < -boxHalf_X) dx += boxSize_X;
+      #endif
+      #ifndef REFLECTIVE_Y
+        if(dy >  boxHalf_Y) dy -= boxSize_Y;
+        if(dy < -boxHalf_Y) dy += boxSize_Y;
+      #endif
+      #ifndef REFLECTIVE_Z
+        if(dz >  boxHalf_Z) dz -= boxSize_Z;
+        if(dz < -boxHalf_Z) dz += boxSize_Z;
+      #endif
+
+      r2 = dx*dx + dy*dy + dz*dz;
+
+      if(r2 < R0_torque2)            
+        {
+          mass_j = P[j].Mass;
+          r = sqrt(r2);
+
+          dvx = P[j].Vel[0] - vel[0];
+          dvy = P[j].Vel[1] - vel[1];
+          dvz = P[j].Vel[2] - vel[2];
+
+          double v_cross[3];
+          v_cross[0] = dy*dvz - dz*dvy;
+          v_cross[1] = dz*dvx - dx*dvz;
+          v_cross[2] = dx*dvy - dy*dvx;
+
+          double v_phi = 0.0;
+          if(ang_mom_norm > 0 && r > 0)   
+            v_phi = (v_cross[0]*ang_mom[0] +
+                     v_cross[1]*ang_mom[1] +
+                     v_cross[2]*ang_mom[2]) / r;
+
+          int is_disk = (v_phi > 0.0);
+
+          if(P[j].Type == 0)   /* Gas */
+            {
+              torque_Mgas += mass_j;
+              if(is_disk) torque_Mgas_disk += mass_j;
+
+              double rho_j = (SphP[j].Density > 0) ? SphP[j].Density : 1.0;
+              velocity_gas_circular[0] += v_cross[0] * mass_j / rho_j;
+              velocity_gas_circular[1] += v_cross[1] * mass_j / rho_j;
+              velocity_gas_circular[2] += v_cross[2] * mass_j / rho_j;
+            }
+          else if(P[j].Type == 4)   /* Stars */
+            {
+              torque_Mstar += mass_j;
+              if(is_disk) torque_Mstar_disk += mass_j;
+            }
+        }
+    }
+#endif
+#ifdef TORQUE_ACCRETION
+  MyDouble M_disk  = torque_Mgas_disk + torque_Mstar_disk;
+  MyDouble M_total = torque_Mgas + torque_Mstar;
+  MyDouble f_d     = (M_total > 0) ? M_disk / M_total : 0.0;
 #endif
 
   for(n = 0; n < nfound; n++)
@@ -732,57 +835,10 @@ static int bh_density_evaluate(int target, int mode, int threadid)
               P[j].Mass -= P[j].Mass * exp(-r2/(2*rbh2));  
             }
 #endif
-#ifdef TORQUE_ACCRETION
-if(r2<R0_torque2)
-{
-          dvx = P[j].Vel[0] - vel[0];
-          dvy = P[j].Vel[1] - vel[1];
-          dvz = P[j].Vel[2] - vel[2];
-          
-          double v_cross[3];
-          v_cross[0] = dy * dvz - dz * dvy;
-          v_cross[1] = dz * dvx - dx * dvz;
-          v_cross[2] = dx * dvy - dy * dvx;
-          
-          double v_phi = 0.0;
-          if(ang_mom_norm > 0 && r > 0)
-            v_phi = (v_cross[0]*ang_mom[0] + v_cross[1]*ang_mom[1] + v_cross[2]*ang_mom[2]) / r;
-          
-          int is_disk = (v_phi > 0.0);
-          
-          /* Accumulate total masses */
-          if(P[j].Type == 0)  /* Gas */
-            {
-              torque_Mgas += mass_j; /* * wk; */
-              if(is_disk)
-                torque_Mgas_disk += mass_j; /* * wk; */
-              
-              /* Accumulate circular velocity for angular momentum tracking */
-              double rho_j = (SphP[j].Density > 0) ? SphP[j].Density : 1.0;
-              velocity_gas_circular[0] += v_cross[0] * mass_j / rho_j;/* * wk;*/
-              velocity_gas_circular[1] += v_cross[1] * mass_j / rho_j;/* * wk;*/
-              velocity_gas_circular[2] += v_cross[2] * mass_j / rho_j;/* * wk;*/
-            }
-          else if(P[j].Type == 4)  /* Stars */
-            {
-              torque_Mstar += mass_j; /** wk;*/
-              if(is_disk)
-                torque_Mstar_disk += mass_j; /** wk;*/
-            }
-}
-#endif 
         } // if(r2 < h2)
     } // for(n = 0; n < nfound; n++)
-#ifdef TORQUE_ACCRETION
-  MyDouble M_disk = torque_Mgas_disk + torque_Mstar_disk;
-  MyDouble M_total = torque_Mgas + torque_Mstar;
-  MyDouble f_d = 0.0;
+
   
-  if(M_total > 0)
-    f_d = M_disk / M_total;
-  else
-    f_d = 0.0;
-#endif
   /* compute bh timestep based on min ngb timestep */
   if(bin == 0)
     ngb_min_step = 0;
