@@ -998,10 +998,17 @@ extern struct global_data_all_processes
   double ErrTolThetaSubfind;
 #endif /* #ifdef SUBFIND */
 
-#ifdef FIND_HALOS
+#ifdef HALO_SEEDING 
+#ifndef FOF
+#error "HALO_SEEDING requires FOF to be defined"
+#endif /* #ifndef FOF */
   double TimeOfFirstHaloFinding;
   double NextTimeOfHaloFinding;
   double TimeBetweenHaloFinding;
+  double MinHaloMassForFOFSeeding;
+#ifdef BLACKHOLE_SEEDING
+  double BlackHoleSeedMass;
+#endif    
 #endif
     
   double TotCountReducedFluxes;

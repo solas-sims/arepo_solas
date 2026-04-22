@@ -21,15 +21,13 @@
  * \date        20/10/2025
  * \brief       Parallel friend of friends (FoF) group finder.
  * \details     contains functions:
- *                void fof_seeding(int num)
+ *                int fof_seeding_list(MyIDType *halo_ids, int max_ids)
  *
  * \par Major modifications and contributions:
  *
  * - DD.MM.YYYY Description
  * - 24.05.2018 Prepared file for public release -- Rainer Weinberger
  */
-
-#include "fof.h"
 
 #include <gsl/gsl_math.h>
 #include <inttypes.h>
@@ -44,27 +42,28 @@
 #include "../domain/domain.h"
 #include "../main/allvars.h"
 #include "../main/proto.h"
-#include "../subfind/subfind.h"
+#include "../blackholes/bh_proto.h"
+// #include "../subfind/subfind.h"
 
-#if defined(FIND_HALOS) && defined(FOF)
+#ifdef HALO_SEEDING 
+#ifndef FOF // Ensure that FOF is enabled if HALO_SEEDING is enabled.
+#error "HALO_SEEDING requires FOF to be defined"
+#endif /* #ifndef FOF */
 
-static MyIDType *MinID;
-static int *Head, *Len, *Next, *Tail, *MinIDTask;
+#include "fof.h"
+#include "fof_seeding.h"
+
+static MyIDType *MinID=NULL;
+static int *Head=NULL, *Len=NULL, *Next=NULL, *Tail=NULL, *MinIDTask=NULL;
 
 /*! \brief Main routine to execute the friend of friends group finder.
  *
- *  If called with num == -1 as argument, only FOF is carried out and no group
- *  catalogs are saved to disk. If num >= 0, the code will store the
- *  group/subgroup catalogs, and bring the particles into output order.
- *  In this case, the calling routine (which is normally savepositions()) will
- *  need to free PS[] and bring the particles back into the original order,
- *  as well as reestablished the mesh.
+ *  Does a FOF search to find halos and seed them provided they satisfy the 
+ *  seeding criteria.
  *
- *  \param[in] num Index of output; if negative, no output written.
- *
- *  \return void
+ *  \return list of halos to be seeded
  */
-void fof_seeding(void)
+int fof_seeding_list(MyIDType *halo_ids, int max_ids)
 {
   int i, start, lenloc, largestgroup;
   double t0, t1, cputime;
@@ -73,20 +72,9 @@ void fof_seeding(void)
 
   mpi_printf("FOF_SEEDING: Begin to compute FoF group catalogue...  (presently allocated=%g MB)\n", AllocatedBytes / (1024.0 * 1024.0));
 
-  free_mesh();
-
-  ngb_treefree();
-
-  domain_free();
-
-  domain_Decomposition();
-
-  ngb_treeallocate();
-  ngb_treebuild(NumGas);
-
   /* check */
   for(i = 0; i < NumPart; i++)
-    if((P[i].Mass == 0 && P[i].ID == 0) || (P[i].Type == 4 && P[i].Mass == 0) || (P[i].Type == 5 && P[i].Mass == 0))
+    if((P[i].Mass == 0 && P[i].ID == 0))
       terminate("this should not happen");
 
   /* this structure will hold auxiliary information for each particle, needed only during group finding */
@@ -104,7 +92,7 @@ void fof_seeding(void)
   fof_OldMaxPart    = All.MaxPart;
   fof_OldMaxPartSph = All.MaxPartSph;
 
-  LinkL = fof_get_comoving_linking_length(); // in fof.c
+  LinkL = fof_get_comoving_linking_length(); 
 
   mpi_printf("FOF_SEEDING: Comoving linking length: %g    (presently allocated=%g MB)\n", LinkL, AllocatedBytes / (1024.0 * 1024.0));
 
@@ -116,15 +104,10 @@ void fof_seeding(void)
   Next = (int *)mymalloc("Next", NumPart * sizeof(int));
   Tail = (int *)mymalloc("Tail", NumPart * sizeof(int));
 
-#ifdef HIERARCHICAL_GRAVITY
+  // timebin_make_list_of_active_particles_up_to_timebin(&TimeBinsGravity, All.HighestActiveTimeBin);
   timebin_make_list_of_active_particles_up_to_timebin(&TimeBinsGravity, All.HighestOccupiedTimeBin);
-#endif /* #ifdef HIERARCHICAL_GRAVITY */
 
   construct_forcetree(0, 0, 1, All.HighestOccupiedTimeBin); /* build tree for all particles */
-//**
-//#if defined(SUBFIND)
-//  subfind_density_hsml_guess();
-//#endif /* #if defined(SUBFIND) */
 
   /* initialize link-lists */
   for(i = 0; i < NumPart; i++)
@@ -140,24 +123,6 @@ void fof_seeding(void)
   cputime = fof_find_groups(MinID, Head, Len, Next, Tail, MinIDTask);
   mpi_printf("FOF_SEEDING: group finding took = %g sec\n", cputime);
 
-//#ifdef FOF_SECONDARY_LINK_TARGET_TYPES
-//  myfree(Father);
-//  myfree(Nextnode);
-//  myfree(Tree_Points);
-//
-//  /* now rebuild the tree with all the types selected as secondary link targets */
-//  construct_forcetree(0, 0, 2, All.HighestOccupiedTimeBin);
-//#endif /* #ifdef FOF_SECONDARY_LINK_TARGET_TYPES */
-
-//#ifdef HIERARCHICAL_GRAVITY
-//  timebin_make_list_of_active_particles_up_to_timebin(&TimeBinsGravity, All.HighestActiveTimeBin);
-//#endif /* #ifdef HIERARCHICAL_GRAVITY */
-//
-//  /* call routine to attach secondary particles/cells to primary groups */
-//  cputime = fof_find_nearest_dmparticle(MinID, Head, Len, Next, Tail, MinIDTask);
-//
-//  mpi_printf("FOF_SEEDING: attaching gas and star particles to nearest dm particles took = %g sec\n", cputime);
-
   myfree(Father);
   myfree(Nextnode);
   myfree(Tree_Points);
@@ -167,9 +132,6 @@ void fof_seeding(void)
   myfree(Tail);
   myfree(Next);
   myfree(Len);
-//  myfree(Head);
-//  myfree(MinIDTask);
-//  myfree(MinID);
 
   t0 = second();
 
@@ -188,7 +150,7 @@ void fof_seeding(void)
     
   FOF_GList = (struct fof_group_list *)mymalloc_movable(&FOF_GList, "FOF_GList", sizeof(struct fof_group_list) * NumPart);
 
-  fof_compile_catalogue(); // in fof.c
+  fof_compile_catalogue(); 
 
   t1 = second();
   mpi_printf("FOF_SEEDING: compiling local group data and catalogue took = %g sec\n", timediff(t0, t1));
@@ -252,64 +214,35 @@ void fof_seeding(void)
 
   t1 = second();
   mpi_printf("FOF_SEEDING: computation of group properties took = %g sec\n", timediff(t0, t1));
-//
-//  fof_assign_group_numbers();
-//
+
   mpi_printf("FOF_SEEDING: Finished computing FoF groups.  (presently allocated=%g MB)\n", AllocatedBytes / (1024.0 * 1024.0));
-//
+
+  /* Collect groups needing seeding on this task */
+  int n_to_seed = 0;
+  
+  for(int n = 0; n < Ngroups; n++)
+    {
+      if(Group[n].Mass < All.MinHaloMassForFOFSeeding) continue;
+      if(halo_is_seeded(&HaloSeeds, Group[n].MinID)) continue;
+      halo_mark_seeded(&HaloSeeds, Group[n].MinID);
+
+      if (n_to_seed >= max_ids) 
+        terminate("Too many halos to seed on this task! Increase max_ids or reduce the number of halos being seeded.");
+      
+      halo_ids[n_to_seed++] = Group[n].MinID;
+    }
+
   myfree_movable(FOF_GList);
   myfree_movable(FOF_PList);
 
-//#ifdef SUBFIND
-//  TIMER_STOP(CPU_FOF);
-//
-//  subfind(0);
-//
-//  TIMER_START(CPU_FOF);
-//#else  /* #ifdef SUBFIND */
-//**  Nsubgroups    = 0;
-//**  TotNsubgroups = 0;
-  TIMER_STOP(CPU_FOF);
-  TIMER_START(CPU_SNAPSHOT);
-
-//  fof_save_groups(num);
-
-  TIMER_STOP(CPU_SNAPSHOT);
-  TIMER_START(CPU_FOF);
-//#endif /* #ifdef SUBFIND #else */
-
-  myfree_movable(Group);
-
-  mpi_printf("FOF_SEEDING: All FOF related work finished.  (presently allocated=%g MB)\n", AllocatedBytes / (1024.0 * 1024.0));
+  myfree_movable(Group);   
+  myfree_movable(PS);              
 
   TIMER_STOP(CPU_FOF);
-  TIMER_START(CPU_SNAPSHOT);
+  mpi_printf("FOF_SEEDING: All FOF related work finished...\n");
 
-  /* now distribute the particles into output order */
-//  t0 = second();
-//  fof_prepare_output_order();
-//  fof_subfind_exchange(MPI_COMM_WORLD); /* distribute particles such that FOF groups will appear in coherent way in snapshot files */
-//  t1 = second();
-//  mpi_printf("FOF_SEEDING: preparing output order of particles took %g sec\n", timediff(t0, t1));
-//
-  TIMER_STOP(CPU_SNAPSHOT);
-  TIMER_START(CPU_FOF);
-  myfree(PS);
+  return n_to_seed; // Return the number of halos to seed on this task
 
-  TIMER_STOP(CPU_FOF);
-    
-    for(int n=0; n<Ngroups;n++)
-        fprintf(stderr,"Group mass[%d]: %d (ThisTask:%d) \n",n,Group[n].Len,ThisTask);
 }
 
-/*! \brief Calculate dynamical time at a given epoch.
- *
- *  \return Increment in expansion factor
- */
-double fof_seeding_get_time_increment(void)
-{
-    double hubble=hubble_function(All.Time);
-    return 2./hubble/sqrtf(200.);
-}
-
-#endif /* of FOF */
+#endif // #ifdef(HALO_SEEDING)

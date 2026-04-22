@@ -173,17 +173,8 @@ void run(void)
 
           flush_everything();
 
-/*Create snapshots after feedback injections*/ 
-#if defined(STARS) || defined(BLACKHOLES)
-
-          if(All.Time >= All.FeedbackTime)
-            create_snapshot_if_desired();
-
-#endif
-
-#ifndef FEEDBACK_TESTING_RESTRICT_SNAPSHOTS
           create_snapshot_if_desired();
-#endif
+
           if(All.Ti_Current >= TIMEBASE) /* we reached the final time */
             {
               mpi_printf("\nFinal time=%g reached. Simulation ends.\n", All.TimeMax);
@@ -243,7 +234,7 @@ void run(void)
 
           output_log_messages(); /* write some info to log-files */
 
-#if !defined(VORONOI_STATIC_MESH)
+#if !defined(VORONOI_STATIC_MESH) 
 #ifdef OPTIMIZE_MESH_MEMORY_FOR_REFINEMENT
           free_all_remaining_mesh_structures();
 #else  /* #ifdef OPTIMIZE_MESH_MEMORY_FOR_REFINEMENT */
@@ -394,12 +385,18 @@ void calculate_non_standard_physics_with_valid_gravity_tree_always(void) {}
  */
 void calculate_non_standard_physics_prior_mesh_construction(void)
 {
-#ifdef FIND_HALOS
-    if(All.Time>=All.NextTimeOfHaloFinding)
+#ifdef HALO_SEEDING
+#ifndef FOF
+#error "HALO_SEEDING requires FOF to be defined"
+#endif /* #ifndef FOF */
+#define MAX_HALO_SEED 10000
+  MyIDType halo_ids[MAX_HALO_SEED];
+  int num_halos_to_seed;
+  if(All.Time>=All.NextTimeOfHaloFinding)
     {
-        fof_seeding();
-        mpi_printf("FOF_SEEDING: Found %d FOF groups at %g...\n",TotNgroups,All.Time);
-        All.NextTimeOfHaloFinding*=All.TimeBetweenHaloFinding;
+      num_halos_to_seed = fof_seeding_list(halo_ids, MAX_HALO_SEED);
+      mpi_printf("FOF_SEEDING: Found %d FOF seed candidates at %g...\n",num_halos_to_seed,All.Time);
+      All.NextTimeOfHaloFinding*=All.TimeBetweenHaloFinding;
     }
 #endif
     

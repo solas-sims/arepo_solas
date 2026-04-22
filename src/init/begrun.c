@@ -275,10 +275,6 @@ void begrun2(void)
   All.FlushLast = CPUThisRun;
 #endif /* #ifdef REDUCE_FLUSH */
 
-#ifdef FIND_HALOS
-  All.NextTimeOfHaloFinding=All.TimeOfFirstHaloFinding;
-#endif
-
 #if defined(FORCETEST) && defined(FORCETEST_TESTFORCELAW)
   gravity_forcetest_testforcelaw();
 #endif /* #if defined(FORCETEST) && defined(FORCETEST_TESTFORCELAW) */

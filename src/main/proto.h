@@ -75,9 +75,13 @@ double get_jeans_length(int i);
 double get_jeans_mass(int i);
 #endif
 
-#if defined(FIND_HALOS) && defined(FOF)
-void fof_seeding(void);
-double fof_seeding_get_time_increment(void);
+#ifdef HALO_SEEDING
+#ifndef FOF
+#error "HALO_SEEDING requires FOF to be defined"
+#endif /* #ifndef FOF */
+int fof_seeding_list(MyIDType *, int);
+void mark_halo_seeded(MyIDType);
+int is_halo_seeded(MyIDType);
 #endif
 
 void sfr_init();

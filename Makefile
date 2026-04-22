@@ -36,7 +36,7 @@ MATH_LIB   = -lm -lstdc++
 HWLOC_LIB  = -lhwloc
 
 #Mac OS using MacPorts modules for openmpi, fftw, gsl, hdf5 and hwloc
-ifeq ($(SYSTYPE),"Darwin")
+ifeq ($(filter Darwin,$(SYSTYPE)),Darwin)
 # compiler and its optimization options
 CC        =  mpicc   # sets the C-compiler
 OPTIMIZE  =  -std=c11 -ggdb -O3 -Wall -Wno-format-security -Wno-unknown-pragmas -Wno-unused-function
@@ -56,7 +56,7 @@ endif
 # end of Darwin
 
 #Mac OS using MacPorts modules for openmpi, fftw, gsl, hdf5 and hwloc
-ifeq ($(SYSTYPE),"MACOSX")
+ifeq ($(filter MACOSX,$(SYSTYPE)),MACOSX)
 BREW := /opt/homebrew/bin/brew
 $(info BREW: $(BREW))
 
@@ -82,7 +82,7 @@ endif
 # end of Darwin
 
 #Linux
-ifeq ($(SYSTYPE),"LINUX")
+ifeq ($(filter LINUX,$(SYSTYPE)),"LINUX")
 # compiler and its optimization options
 CC        =  mpicc
 OPTIMIZE  =  -std=c11 -ggdb -O3 -Wall -Wno-format-security -Wno-unknown-pragmas -Wno-unused-function
@@ -101,6 +101,27 @@ HDF5_LIB  = -L/usr/lib/x86_64-linux-gnu/hdf5/serial/ -lhdf5 -lz
 HWLOC_INCL=
 endif
 # end of Linux
+
+#Ngarrgu Tindebeek
+ifeq ($(filter NT,$(SYSTYPE)),"NT")
+# compiler and its optimization options
+CC        =  mpicc
+OPTIMIZE  =  -std=c11 -ggdb -O3 -Wall -Wno-format-security -Wno-unknown-pragmas -Wno-unused-function
+
+MPICH_INCL=
+MPICH_LIB = -lmpi
+GSL_INCL  = -I$(EBROOTGSL)/include
+GSL_LIB   = -L$(EBROOTGSL)/lib -lgsl -lgslcblas
+HWLOC_LIB =
+
+# libraries that are included on demand, depending on Config.sh options
+FFTW_INCL = -I$(EBROOTFFTW)/include
+FFTW_LIBS = -L$(EBROOTFFTW)/lib
+HDF5_INCL = -I$(EBROOTHDF5)/include -DH5_USE_16_API
+HDF5_LIB  = -L$(EBROOTHDF5)/lib -lhdf5 -lz
+HWLOC_INCL=
+endif
+# end of NT
 
 ifndef LINKER
 LINKER = $(CC)
@@ -277,8 +298,10 @@ OBJS    += fof/fof.o \
            fof/fof_vars.o
 INCL    += fof/fof.h
 SUBDIRS += fof
-ifeq (FIND_HALOS,$(findstring FIND_HALOS,$(CONFIGVARS)))
-OBJS    += fof/fof_seeding.o 
+ifeq (HALO_SEEDING,$(findstring HALO_SEEDING,$(CONFIGVARS)))
+OBJS    += fof/fof_seeding.o \
+		   fof/fof_seeding_registry.o
+INCL    += fof/fof_seeding.h
 endif
 endif
 
@@ -310,6 +333,12 @@ OBJS    += blackholes/bh_density.o \
            blackholes/bh_jet_density.o\
            blackholes/bh_feedback.o \
            blackholes/bh_refinement.o
+INCL    += blackholes/bh_proto.h
+SUBDIRS += blackholes
+endif
+
+ifeq (BLACKHOLE_SEEDING,$(findstring BLACKHOLE_SEEDING,$(CONFIGVARS)))
+OBJS    += blackholes/bh_seed.o
 INCL    += blackholes/bh_proto.h
 SUBDIRS += blackholes
 endif

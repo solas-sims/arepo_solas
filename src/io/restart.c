@@ -77,11 +77,16 @@
 #include "../debug_md5/Md5.h"
 #include "../domain/domain.h"
 #include "../mesh/voronoi/voronoi.h"
+#include "../fof/fof_seeding.h"
 
 #define MODUS_WRITE 0
 #define MODUS_READ 1
 #define MODUS_READCHECK 2
 #define MODUS_CHECK 3
+
+#ifdef HALO_SEEDING
+void fof_seeding_registry_io(HaloSeedRegistry *r, int modus);
+#endif
 
 /*! \brief Data for scheduling restart file IO.
  */
@@ -1285,6 +1290,13 @@ static void contents_restart_file(int modus)
   byten(TimeBinsStar.LastInTimeBin, TIMEBINS * sizeof(int), modus);
 #endif
 
+#ifdef HALO_SEEDING
+#ifndef FOF
+#error "HALO_SEEDING requires FOF to be enabled."
+#endif /* #ifdef FOF */
+fof_seeding_registry_io(&HaloSeeds, modus);
+#endif
+
   polling(modus);
 
   /* now store relevant data for tree */
@@ -1583,3 +1595,38 @@ void deallocate_iobuf(int modus)
 
   free(io_buf);
 }
+
+#ifdef HALO_SEEDING
+/*! \brief Manages reading/writing of halo seeding registry data 
+ *  in the restart-files.
+ *
+ *  \param[in] modus Read or write.
+ *
+ *  \return void
+ */
+void fof_seeding_registry_io(HaloSeedRegistry *r, int modus)
+{
+    int n;
+    MyIDType *buf = NULL;
+
+    if(modus == MODUS_WRITE)
+    {
+        halo_seed_registry_pack(r, &buf, &n);
+
+        in(&n, modus);
+        byten(buf, n * sizeof(MyIDType), modus);
+    }
+    else
+    {
+        in(&n, modus);
+
+        buf = mymalloc("tmp", n * sizeof(MyIDType));
+
+        byten(buf, n * sizeof(MyIDType), modus);
+
+        halo_seed_registry_unpack(r, buf, n);
+
+        myfree(buf);
+    }
+}
+#endif /* #ifdef HALO_SEEDING */

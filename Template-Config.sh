@@ -5,8 +5,9 @@
 ##################################################
 
 #--------------------------------------- SOLAS additions
-
-
+#ENABLE_PROFILE_UTIL
+#_MPI
+#IGNORE_CODE
 #--------------------------------------- Feedback options
 #FEEDBACK_TESTING_RESTRICT_SNAPSHOTS  # Only dump snapshots after a feedback event
 #STARS
@@ -41,6 +42,8 @@
 #OUTPUT_TIMEBIN_STAR
 #OUTPUTTIMESTEP_BH
 
+#BLACKHOLE_SEEDING # Requires HALOS_SEEDING; seeds black holes in halos above a certain mass threshold
+
 #--------------------------------------- Cooling parameters
 #USE_GRACKLE
 #GRACKLE_CHEMISTRY=0 # Curretly only grackle mode=0 (lookup tables) with no chemistry network is supported
@@ -52,7 +55,7 @@
 #WENDLAND_C2_KERNEL
 
 #--------------------------------------- Inline halo finding
-#FIND_HALOS
+#HALO_SEEDING # Requires FOF; seeds halos above a certain mass threshold with collisionless particles; this can be used for example to seed black holes in halos (with BLACKHOLE_SEEDING)
 
 #--------------------------------------- Basic operation mode of code; default: 3d with 6 particle types; type 0: gas >0: only gravitationally interacting
 #NTYPES=6                      # number of particle types

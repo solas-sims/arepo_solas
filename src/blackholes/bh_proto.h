@@ -21,3 +21,7 @@ void bh_ngb_feedback(void);
 #endif
 
 #endif /* #ifdef BLACKHOLES */
+
+// #ifdef BLACKHOLE_SEEDING
+void seed_black_hole_in_group(int, int *);
+// #endif /* #ifdef BLACKHOLE_SEEDING */

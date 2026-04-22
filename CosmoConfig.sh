@@ -31,7 +31,7 @@ ALLOW_DIRECT_SUMMATION         # Performed direct summation instead of tree-base
 DIRECT_SUMMATION_THRESHOLD=500 # Overrides maximum number of active particles for which direct summation is performed instead of tree based calculation
 
 #--------------------------------------- Gravity softening
-NSOFTTYPES=4                    # Number of different softening values to which particle types can be mapped.
+NSOFTTYPES=6                    # Number of different softening values to which particle types can be mapped.
 MULTIPLE_NODE_SOFTENING         # If a tree node is to be used which is softened, this is done with the softenings of its different mass components
 #INDIVIDUAL_GRAVITY_SOFTENING=32 # bitmask with particle types where the softenig type should be chosen with that of parttype 1 as a reference type
 ADAPTIVE_HYDRO_SOFTENING        # Adaptive softening of gas cells depending on their size
@@ -46,7 +46,7 @@ OVERRIDE_PEANOGRID_WARNING  # don't stop if peanogrid is not fine enough
 
 #--------------------------------------- Output/Input options
 HAVE_HDF5 # needed when HDF5 I/O support is desired (recommended)
-INPUT_IN_DOUBLEPRECISION
+#INPUT_IN_DOUBLEPRECISION
 GENERATE_GAS_IN_ICS
 
 #------------------------------------------------ On the fly FOF groupfinder
@@ -57,28 +57,32 @@ FOF_SECONDARY_LINK_TYPES=1+16+32                 # 2^type for the types linked t
 #------------------------------------------------ Subfind
 SUBFIND                                          # enables substructure finder
 #SAVE_HSML_IN_SNAPSHOT                            # stores hsml, density, and velocity dispersion values in the snapshot files
-#SUBFIND_CALC_MORE                                # calculates also the velocity dispersion in the local density estimate (this is automatically enabled by several other options, e.g. SAVE_HSML_IN_SNAPSHOT)
-#SUBFIND_EXTENDED_PROPERTIES                      # adds calculation of further quantities related to angular momentum in different components
+SUBFIND_CALC_MORE                                # calculates also the velocity dispersion in the local density estimate (this is automatically enabled by several other options, e.g. SAVE_HSML_IN_SNAPSHOT)
+SUBFIND_EXTENDED_PROPERTIES                      # adds calculation of further quantities related to angular momentum in different components
 
 #--------------------------------------- Testing and Debugging options
 DEBUG # enables core-dumps
 
 #--------------------------------------- non-standard phyiscs
-ENFORCE_JEANS_STABILITY_OF_CELLS # this imposes an adaptive floor for the temperature
-COOLING                          # Simple primordial cooling
-USE_GRACKLE			 # Use Grackle library for cooling
-GRACKLE_CHEMISTRY=0
+#ENFORCE_JEANS_STABILITY_OF_CELLS # this imposes an adaptive floor for the temperature
+#COOLING                          # Simple primordial cooling
+#USE_GRACKLE			 # Use Grackle library for cooling
+#GRACKLE_CHEMISTRY=0
 #NOUVBACKGROUND			 # Switches off UV background
-USE_SFR                          # Activate star formation
+#USE_SFR                          # Activate star formation
 #EEOS_SF			 # AGORA star formation scheme
-JEANS_SF
+#JEANS_SF
 #JEANS_MASS_BASED
-USE_CELIB
-STARS
-SUPERNOVAE
+#USE_CELIB
+#STARS
+#SUPERNOVAE
 #PASSIVE_SCALARS=1
 #METALS
 
 #REFINEMENT_AROUND_BH
 #BLACKHOLES
 #BONDI_ACCRETION
+
+HALO_SEEDING
+BLACKHOLE_SEEDING
+#OUTPUT_EVERY_STEP
