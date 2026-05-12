@@ -102,7 +102,7 @@ void update_bh_accretion_rate(void)
   
   int i;
   double M_BH, M_gas, M_star, M_enc, M_gas_disk, M_star_disk, M_disk;
-  double R0, f_d, f_gas, f0;
+  double R0, f_d, f_gas, f0, suppression;
   double torque_rate, EddingtonRate;
   double accretion_rate, acc_rate_for_print;
   
@@ -149,7 +149,7 @@ void update_bh_accretion_rate(void)
       if(f_gas > 1.0) f_gas = 1.0;
       
       /* If no disk, no torque-driven accretion */
-      if(f_d < 1e-6 || M_disk < 1e-6)
+      if(f_d < 1e-6 || M_disk < 1e-6 || f_gas <= 0.0)
         {
           BhP[i].AccretionRate = 0;
           continue;
@@ -160,7 +160,6 @@ void update_bh_accretion_rate(void)
       f0 = 0.31 * f_d * f_d * pow(M_disk * All.UnitMass_in_g / 1e9 / SOLAR_MASS, -1.0/3.0);
 
       /* Suppression factor */
-      double suppression = 1.0;
       if(f_gas > 0)
         suppression = 1.0 / (1.0 + f0 / f_gas);
       else
@@ -239,7 +238,6 @@ void update_bh_accretion_rate(void)
            momentum and must circularise first.  The reservoir drains into the
            disc on the dynamical / capture timescale ADP_tcap. */
       M_res += Mcap;
-      BhP[i].ADP_CapturedMass = 0;
 
       /* How much flows from reservoir → disc this timestep?
          dM = M_res * (dt / tcap).
