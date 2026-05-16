@@ -95,6 +95,208 @@ void update_bh_accretion_rate(void)
   mpi_printf("BLACK_HOLES: Black hole accretion rate: %e \n", acc_rate_for_print);
 }
 #endif
+#ifdef TORQUE_ACCRETION
+void update_bh_accretion_rate(void)
+{
+  /* Calculate Torque-limited accretion rate */
+  
+  int i;
+  double M_BH, M_gas, M_star, M_enc, M_gas_disk, M_star_disk, M_disk;
+  double R0, f_d, f_gas, f0, suppression;
+  double torque_rate, EddingtonRate;
+  double accretion_rate, acc_rate_for_print;
+  
+  accretion_rate = acc_rate_for_print = 0;
+  
+  for(i = 0; i < NumBhs; i++)
+    {
+      M_BH        = PPB(i).Mass;
+      M_gas       = BhP[i].TorqueMgas;       // Total gas mass within R0
+      M_star      = BhP[i].TorqueMstar;      // Total stellar mass within R0
+      M_gas_disk  = BhP[i].TorqueMgasDisk;   // Disk component gas mass 
+      M_star_disk = BhP[i].TorqueMstarDisk;  // Disk component stellar mass 
+      R0          = BhP[i].TorqueR0;         // Aperture radius
+      f_d         = BhP[i].TorqueFd;         // Disk fraction
+
+      if(R0 <= 0 || (M_gas + M_star) <= 0)
+        {
+          BhP[i].AccretionRate = 0;
+          continue;
+        }
+
+      /* Disk mass (gas + stars in disk component) */
+      M_disk = M_gas_disk + M_star_disk;
+      
+      /* Total enclosed mass */
+      M_enc = M_gas + M_star;
+      
+      /* Recompute disk fraction  */
+      if(M_enc > 0)
+        f_d = M_disk / M_enc;
+      else
+        f_d = 0.0;
+        
+      /* Gas fraction within disk */
+      if(M_disk > 0)
+        f_gas = M_gas_disk / M_disk;  // Only disk gas / disk mass
+      else
+        f_gas = 1.0;  // Default to pure gas if no disk
+
+      /* Ensure physical values */
+      if(f_d < 0.0) f_d = 0.0;
+      if(f_d > 1.0) f_d = 1.0;
+      if(f_gas < 0.0) f_gas = 0.0;
+      if(f_gas > 1.0) f_gas = 1.0;
+      
+      /* If no disk, no torque-driven accretion */
+      if(f_d < 1e-6 || M_disk < 1e-6 || f_gas <= 0.0)
+        {
+          BhP[i].AccretionRate = 0;
+          continue;
+        }
+
+      /* Computing f0 */
+      /* f0 ≈ 0.31 * f_d^2 * (M_disk / 10^9 Msun)^(-1/3) */
+      f0 = 0.31 * f_d * f_d * pow(M_disk * All.UnitMass_in_g / 1e9 / SOLAR_MASS, -1.0/3.0);
+
+      /* Suppression factor */
+      if(f_gas > 0)
+        suppression = 1.0 / (1.0 + f0 / f_gas);
+      else
+        suppression = 0.0;  // No gas, no accretion
+
+      /* Torque-limited accretion rate (Angles-Alcazar et al. 2016, Equation 2) */
+
+      torque_rate = All.Epsilon_T                                      /* Normalization */
+                  * pow(f_d, 2.5)                                      /* f_d^(5/2) */
+                  * pow(M_BH * All.UnitMass_in_g / 1e8 / SOLAR_MASS, 1.0/6.0)  /* (M_BH/1e8 Msun)^(1/6) */
+                  * (M_disk * All.UnitMass_in_g / 1e9 / SOLAR_MASS)   /* (M_disk/1e9 Msun) */
+                  * pow(R0 * All.UnitLength_in_cm / (100.0 * PARSEC), -1.5)    /* (R0/100pc)^(-3/2) */
+                  * suppression;                                       /* 1/(1 + f0/f_gas) */
+
+      /* Convert from Msun/yr to code units (code mass / code time) */
+      torque_rate *= SOLAR_MASS / All.UnitMass_in_g;         
+      torque_rate *= All.UnitTime_in_s / SEC_PER_YEAR;       
+
+      /* Eddington limit (can allow up to 10× super-Eddington as in paper) */
+      EddingtonRate = 4.0 * M_PI * GRAVITY * (M_BH * All.UnitMass_in_g) * PROTONMASS
+                      / (All.Epsilon_r * CLIGHT * THOMPSON);
+      EddingtonRate *= (All.UnitTime_in_s / All.UnitMass_in_g);
+      
+      /* Allow up to 10× Eddington (Angles-Alcazar et al. 2016, Section 2.3) */
+      double max_accretion = 10.0 * EddingtonRate;
+
+      /* Apply Eddington limit */
+      accretion_rate = fmin(torque_rate, max_accretion);
+
+      /* Store the accretion rate */
+      BhP[i].AccretionRate = accretion_rate;
+      
+      /* Track maximum for output */
+      if(accretion_rate > acc_rate_for_print)
+        acc_rate_for_print = accretion_rate;
+    }
+
+  MPI_Allreduce(&acc_rate_for_print, &accretion_rate, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+  MPI_Barrier(MPI_COMM_WORLD); 
+  mpi_printf("BLACK_HOLES: Black hole torque-limited accretion rate: %e (code units)\n", accretion_rate);
+}
+#endif
+#ifdef ADP_ACCRETION
+void update_bh_accretion_rate(void)
+{
+  int i;
+  int bin;
+  double dt;
+  double M_BH;
+  double Mcap;
+  double M_res;
+  double M_disc;
+  double dM_to_disc, mdot_visc, mdot_cap, dM_bh;
+  double EddingtonRate, accretion_rate, acc_rate_for_print;
+
+  accretion_rate = acc_rate_for_print = 0;
+
+  for(i = 0; i < NumBhs; i++)
+    {
+      bin = BhP[i].TimeBinBh;
+      dt  = (bin ? (((integertime)1) << bin) : 0) * All.Timebase_interval;
+
+      if(dt <= 0) continue;
+
+      M_BH   = PPB(i).Mass;
+
+      Mcap   = BhP[i].ADP_CapturedMass;   /* set by bh_density this step    */
+      M_res  = BhP[i].ADP_ReservoirMass;  /* carried over from previous step */
+      M_disc = BhP[i].ADP_DiscMass;       /* carried over from previous step */
+
+      if(Mcap < 0) Mcap = 0;
+
+      /* 
+       * Stage 1 → 2: Captured mass enters the reservoir immediately.
+           Gas that crossed Racc is not yet on the disc — it still has angular
+           momentum and must circularise first.  The reservoir drains into the
+           disc on the dynamical / capture timescale ADP_tcap. */
+      M_res += Mcap;
+
+      /* How much flows from reservoir → disc this timestep?
+         dM = M_res * (dt / tcap).
+         If ADP_tcap == 0 (instantaneous) dump everything at once. */
+      if(All.ADP_tcap > 0)
+        dM_to_disc = M_res * (dt / All.ADP_tcap);
+      else
+        dM_to_disc = M_res;   /* instantaneous: reservoir empties each step */
+
+      if(dM_to_disc > M_res) dM_to_disc = M_res;
+      if(dM_to_disc < 0)     dM_to_disc = 0;
+
+      M_res  -= dM_to_disc;
+      M_disc += dM_to_disc;
+
+      /*  Stage 2 → 3: Disc drains onto the BH on the viscous timescale.
+          Mdot_BH = min( Mdisc / tvisc , Mdot_Edd ) */
+      if(All.ADP_tvisc > 0)
+        mdot_visc = M_disc / All.ADP_tvisc;
+      else
+        mdot_visc = (dt > 0) ? M_disc / dt : 0;   /* fallback: drain in one step */
+
+      if(mdot_visc < 0) mdot_visc = 0;
+
+      EddingtonRate = 4.0 * M_PI * GRAVITY * (M_BH * All.UnitMass_in_g) * PROTONMASS
+                    / (All.Epsilon_r * CLIGHT * THOMPSON);
+      EddingtonRate *= (All.UnitTime_in_s / All.UnitMass_in_g);
+
+      mdot_cap = All.ADP_EddFactor * EddingtonRate;
+
+      accretion_rate = fmin(mdot_visc, mdot_cap);
+
+      dM_bh = accretion_rate * dt;
+
+      if(dM_bh > M_disc)
+        {
+          dM_bh          = M_disc;
+          accretion_rate = (dt > 0) ? dM_bh / dt : 0;
+        }
+      if(dM_bh < 0) dM_bh = 0;
+
+      M_disc -= dM_bh;
+
+      BhP[i].ADP_ReservoirMass = M_res;
+      BhP[i].ADP_DiscMass      = M_disc;
+      BhP[i].AccretionRate     = accretion_rate;
+
+      mpi_printf("ADP BH %d: Mcap=%e  Mres=%e  Mdisc=%e  mdot_visc=%e  mdot_Edd=%e  Mdot_BH=%e\n",
+                 i, Mcap, M_res, M_disc, mdot_visc, EddingtonRate, accretion_rate);
+
+      if(accretion_rate > acc_rate_for_print)
+        acc_rate_for_print = accretion_rate;
+    }
+
+  MPI_Allreduce(&acc_rate_for_print, &accretion_rate, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+  MPI_Barrier(MPI_COMM_WORLD);
+  mpi_printf("BLACK_HOLES: Black hole ADP accretion rate: %e (code units)\n", accretion_rate);
+}
+#endif
 #endif
 
 #ifdef STARS
@@ -399,6 +601,102 @@ void perform_end_of_step_physics(void)
         BhP[i].Accretion = 0;
     }
 #endif
+#ifdef TORQUE_ACCRETION
+    int j, bin;
+    double dt;
+    /* accrete mass, angular momentum onto the bh and drain ngb cells */
+    for(i=0; i<NumBhs; i++)
+    {
+        bin = BhP[i].TimeBinBh;
+        dt  = (bin ? (((integertime)1) << bin) : 0) * All.Timebase_interval;
+        PPB(i).Mass += (1-All.Epsilon_r) * BhP[i].AccretionRate * dt;
+        BhP[i].AngularMomentum[0] += BhP[i].AccretionRate * dt * BhP[i].VelocityGasCircular[0];
+        BhP[i].AngularMomentum[1] += BhP[i].AccretionRate * dt * BhP[i].VelocityGasCircular[1];
+        BhP[i].AngularMomentum[2] += BhP[i].AccretionRate * dt * BhP[i].VelocityGasCircular[2];
+        for(j=0; j<NumGas; j++)
+        {
+            if(SphP[j].MassDrain > 0)
+            {
+                if(P[j].Mass - SphP[j].MassDrain < 0.1*P[j].Mass)
+                {
+                    P[j].Mass -= 0.9*P[j].Mass;
+                    BhP[i].MassToDrain += SphP[j].MassDrain - 0.9*P[j].Mass;
+                    /* we're also losing thermal and kinetic energy & momentum */
+
+                    /* update total energy */
+                    SphP[j].Energy *= 0.1;
+
+                    /* update momentum */
+                    SphP[j].Momentum[0] *= 0.1;
+                    SphP[j].Momentum[1] *= 0.1;
+                    SphP[j].Momentum[2] *= 0.1;
+                }
+                else
+                {
+                    P[j].Mass -= SphP[j].MassDrain;
+
+                    /* update total energy */
+                    SphP[j].Energy *= (P[j].Mass)/(P[j].Mass + SphP[j].MassDrain);
+
+                    /* update momentum */
+                    SphP[j].Momentum[0] *= (P[j].Mass)/(P[j].Mass + SphP[j].MassDrain);
+                    SphP[j].Momentum[1] *= (P[j].Mass)/(P[j].Mass + SphP[j].MassDrain);
+                    SphP[j].Momentum[2] *= (P[j].Mass)/(P[j].Mass + SphP[j].MassDrain);
+                }
+                SphP[j].MassDrain = 0;
+            }
+        }
+    }
+#endif
+#ifdef ADP_ACCRETION
+    int j, bin;
+    double dt;
+
+    /* accrete mass onto the BH and drain gas cells that were captured */
+    for(i = 0; i < NumBhs; i++)
+      {
+        bin = BhP[i].TimeBinBh;
+        dt  = (bin ? (((integertime)1) << bin) : 0) * All.Timebase_interval;
+
+        if(dt <= 0) continue;
+
+        PPB(i).Mass += (1.0 - All.Epsilon_r) * BhP[i].AccretionRate * dt;
+        for(j=0; j<NumGas; j++)
+        {
+            if(SphP[j].MassDrain > 0)
+            {
+                if(P[j].Mass - SphP[j].MassDrain < 0.1*P[j].Mass)
+                {
+                    P[j].Mass -= 0.9*P[j].Mass;
+
+                    BhP[i].MassToDrain += SphP[j].MassDrain - 0.9*P[j].Mass;
+                    /* we're also losing thermal and kinetic energy & momentum */
+
+                    /* update total energy */
+                    SphP[j].Energy *= 0.1;
+
+                    /* update momentum */
+                    SphP[j].Momentum[0] *= 0.1;
+                    SphP[j].Momentum[1] *= 0.1;
+                    SphP[j].Momentum[2] *= 0.1;
+                }
+                else
+                {
+                    P[j].Mass -= SphP[j].MassDrain;
+
+                    /* update total energy */
+                    SphP[j].Energy *= (P[j].Mass)/(P[j].Mass + SphP[j].MassDrain);
+
+                    /* update momentum */
+                    SphP[j].Momentum[0] *= (P[j].Mass)/(P[j].Mass + SphP[j].MassDrain);
+                    SphP[j].Momentum[1] *= (P[j].Mass)/(P[j].Mass + SphP[j].MassDrain);
+                    SphP[j].Momentum[2] *= (P[j].Mass)/(P[j].Mass + SphP[j].MassDrain);
+                }
+                SphP[j].MassDrain = 0;
+            }
+        }
+      }
+#endif  
     
 #endif // BLACKHOLES
     

@@ -555,6 +555,24 @@ void read_parameter_file(char *fname)
       strcpy(tag[nt], "Epsilon_r"); // Radiative efficiency for accretion rate
       addr[nt] = &All.Epsilon_r;
       id[nt++] = REAL;
+#ifdef TORQUE_ACCRETION
+      strcpy(tag[nt], "Epsilon_T"); // NORMALIZATION FOR TORQUE_ACCRETION
+      addr[nt] = &All.Epsilon_T;
+      id[nt++] = REAL;
+#endif
+#ifdef ADP_ACCRETION
+      strcpy(tag[nt], "ADP_tvisc");         /* viscous timescale */
+      addr[nt] = &All.ADP_tvisc;
+      id[nt++] = REAL;
+
+      strcpy(tag[nt], "ADP_tcap");         /* capture timescale */
+      addr[nt] = &All.ADP_tcap;
+      id[nt++] = REAL;
+
+      strcpy(tag[nt], "ADP_EddFactor");
+      addr[nt] = &All.ADP_EddFactor;
+      id[nt++] = REAL;
+#endif
 #ifdef BLACKHOLES_FEEDBACK
       strcpy(tag[nt], "JetFeedback");
       addr[nt] = &All.JetFeedback;
