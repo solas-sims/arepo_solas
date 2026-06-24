@@ -521,6 +521,10 @@ int init(void)
   tree_based_timesteps_setsoundspeeds();
 #endif /* #ifdef TREE_BASED_TIMESTEPS */
 
+#ifdef POPIII_SF
+  All.PopIIIMetallicityThreshold = All.PopIIIMetallicityThresholdinSolar * SOLAR_METALLICITY;
+#endif
+
   /* initialize star formation rate */
 #ifdef EEOS_SF
   sfr_init();
@@ -549,26 +553,34 @@ int init(void)
 #ifdef STAR_PARTICLES
 if(ThisTask == 0)
   {
-    build_imf_cdf();
+    build_imf_cdf(POPII);
+#ifdef POPIII_SF
+    build_imf_cdf(POPIII);
+#endif
 
 #if defined(STAR_PARTICLES) && STAR_PARTICLES < 2
-    setup_mass_bins();
+    setup_mass_bins(POPII);
+#ifdef POPIII_SF
+    setup_mass_bins(POPIII);
+#endif
 #endif
 
 #if STAR_PARTICLES == 0
-    setup_imf_integrals();
+    setup_imf_integrals(POPII);
+#ifdef POPIII_SF
+    setup_imf_integrals(POPIII);
+#endif
 #endif
   }
-MPI_Bcast(cdf_masses, N_CDF_BINS + 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-MPI_Bcast(cdf_values, N_CDF_BINS + 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+MPI_Bcast(cdf_masses, N_IMF_TYPES*(N_CDF_BINS + 1), MPI_DOUBLE, 0, MPI_COMM_WORLD);
+MPI_Bcast(cdf_values, N_IMF_TYPES*(N_CDF_BINS + 1), MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
 #if defined(STAR_PARTICLES) && STAR_PARTICLES < 2
-MPI_Bcast(StarMeanMassInBins, NBINS, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+MPI_Bcast(StarMeanMassInBins, N_IMF_TYPES*NBINS, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 #endif
 
 #if STAR_PARTICLES == 0
-MPI_Bcast(&norm, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-MPI_Bcast(bin_imf, NBINS, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+MPI_Bcast(bin_imf, N_IMF_TYPES*NBINS, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
 #include <gsl/gsl_rng.h>
 

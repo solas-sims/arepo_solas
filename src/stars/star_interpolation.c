@@ -494,7 +494,7 @@ Star_Feedback star_particle_feedback(int index, double dt, double z, double a)
 
       Nstars = SP[index].NumOfStarsInBins[i];
       
-      m = StarMeanMassInBins[i]; 
+      m = StarMeanMassInBins[SP[index].PopulationType][i]; 
 
       Star_Feedback Star = star_feedback_compute(dt, z, m, a);
 

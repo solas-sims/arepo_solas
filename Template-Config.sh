@@ -22,6 +22,8 @@
 
 #INDIVIDUAL_STAR_BY_STAR_FORMATION # Form individual resolved stars (need STAR_PARTICLES=2 AND USE_SFR)
 
+#POPIII_SF              # form pop-III stars from metal-poor gas using a distinct IMF. Requires METALS. Requires GRACKLE_CHEMISTRY>=2 if using H_2 threshold for SF.
+
 #---------------------------------------- Star options
 #STARS                  # General stars framework flag
 

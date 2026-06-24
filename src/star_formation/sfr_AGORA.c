@@ -66,6 +66,16 @@ static int sf_criteria(int i)
     return 0;
 #endif
 
+#if defined(POPIII_SF) && defined(USE_GRACKLE)
+#if (GRACKLE_CHEMISTRY >= 2)
+  if(SphP[i].GasMetallicity < All.PopIIIMetallicityThreshold)
+  {
+    if(SphP[i].GrackleSpecies(GRACKLE_H2I) < All.PopIIIH2FractionThreshold)
+      return 0;
+  }
+#endif
+#endif
+
   return 1;
 }
 

@@ -216,7 +216,7 @@ void sfr_create_star_particles(void)
 
 #if defined(STAR_PARTICLES) && STAR_PARTICLES < 2
   for(i = NumStars-stars_spawned-stars_converted; i < NumStars; i++)
-    sample_star_particle(PPS(i).Mass * All.cf_UnitMass_in_Msun, SP[i].NumOfStarsInBins);
+    sample_star_particle(SP[i].PopulationType, PPS(i).Mass * All.cf_UnitMass_in_Msun, SP[i].NumOfStarsInBins);
 #endif
 
   int in[4], out[4], cnt = 2;
@@ -354,6 +354,12 @@ void convert_cell_into_star(int i, double birthtime)
 #ifdef METALS 
   SP[NumStars].Metallicity = SphP[i].GasMetallicity;
 #endif 
+
+#ifdef POPIII_SF
+  SP[NumStars].PopulationType = (SphP[i].GasMetallicity < All.PopIIIMetallicityThreshold) ? POPIII : POPII;
+#else
+  SP[NumStars].PopulationType = POPII;
+#endif
 #endif 
 
 #ifdef STAR_FEEDBACK_ACTIVE
@@ -444,6 +450,12 @@ void spawn_star_from_cell(int igas, double birthtime, int istar, MyDouble mass_o
   SP[NumStars].PID = istar;
 #ifdef METALS 
   SP[NumStars].Metallicity = SphP[igas].GasMetallicity;
+#endif
+
+#ifdef POPIII_SF
+  SP[NumStars].PopulationType = (SphP[igas].GasMetallicity < All.PopIIIMetallicityThreshold) ? POPIII : POPII;
+#else
+  SP[NumStars].PopulationType = POPII;
 #endif
 #endif
 

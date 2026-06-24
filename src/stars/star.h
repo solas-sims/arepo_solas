@@ -70,6 +70,10 @@ typedef struct Star_Particle_Data
 {
   MyIDType PID;
 
+#ifdef STAR_PARTICLES
+  int PopulationType;
+#endif
+
 #ifdef METALS
   MyDouble Metallicity;
 #endif

@@ -13,22 +13,26 @@ void domain_resize_storage_stars(int count_get_star);
 double imf_kroupa(double m); 
 double imf_chabrier(double m); 
 double imf_salpeter(double m);
-double imf(double m); 
-double m_times_imf(double m); 
-void build_imf_cdf(void);
-double sample_imf(double u);
+double imf_popii(double m); 
+double m_times_imf_popii(double m); 
+#ifdef POPIII_SF
+double imf_popiii(double m); 
+double m_times_imf_popiii(double m); 
+#endif
+void build_imf_cdf(int imf_type);
+double sample_imf(int imf_type, double u);
 #endif
 
 #if defined(STAR_PARTICLES) && STAR_PARTICLES < 2
-void setup_mass_bins(void);
-void sample_star_particle(double m, int *bins);
+void setup_mass_bins(int imf_type);
+void sample_star_particle(int imf_type, double m, int *bins);
 #ifdef STAR_FEEDBACK_ACTIVE
 Star_Feedback star_particle_feedback(int index, double dt, double z, double a);
 #endif
 #endif
 
 #if STAR_PARTICLES == 0 
-void setup_imf_integrals(void);
+void setup_imf_integrals(int imf_type);
 #endif
 
 #ifdef INDIVIDUAL_STAR_BY_STAR_FORMATION

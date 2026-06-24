@@ -532,6 +532,15 @@ typedef unsigned long long peano1D;
 #define GRACKLE_HDI   10
 #endif
 
+enum IMFType
+{
+    POPII = 0,
+#ifdef POPIII_SF
+    POPIII,
+#endif
+    N_IMF_TYPES  /* 2 #ifdef POPIII_SF, else 1 */-
+};
+
 #ifndef FOF_PRIMARY_LINK_TYPES
 #define FOF_PRIMARY_LINK_TYPES 2
 #endif /* #ifndef FOF_PRIMARY_LINK_TYPES */
@@ -1337,7 +1346,7 @@ extern struct global_data_all_processes
 #endif            /* #ifdef MHD_SEEDFIELD */
 
 #ifdef METALS
-double InitMetallicityinSolar; 
+  double InitMetallicityinSolar; 
 #endif 
 
 #ifdef COOLING
@@ -1387,6 +1396,12 @@ double InitMetallicityinSolar;
 
 #ifdef STAR_PARTICLES
   int IMF;
+#ifdef POPIII_SF
+  int IMFPopIII;
+  double PopIIIMetallicityThresholdinSolar;
+  double PopIIIMetallicityThreshold;
+  double PopIIIH2FractionThreshold;
+#endif
 #endif
 
 #ifdef STAR_FEEDBACK_ACTIVE
