@@ -56,6 +56,11 @@
 
 #include "../fof/fof.h"
 
+#ifdef SIDM
+#include "../sidm/sidm.h"
+#include "../sidm/sidm_tree.h"
+#endif
+
 static void do_second_order_source_terms_first_half(void);
 static void do_second_order_source_terms_second_half(void);
 static void create_end_file(void);
@@ -103,12 +108,22 @@ void run(void)
       set_non_standard_physics_for_current_time();
 
       ngb_treefree();
+#ifdef SIDM
+        sidm_treefree();
+#endif /* #ifdef SIDM */
       domain_free();
       domain_Decomposition(); /* do domain decomposition if needed */
 
       ngb_treeallocate();
+#ifdef SIDM
+        sidm_treeallocate();
+#endif /* #ifdef SIDM */
       ngb_treebuild(NumGas);
-
+#ifdef SIDM
+        sidm_treebuild();
+        sidm_density();
+#endif /* #ifdef SIDM */
+        
       calculate_non_standard_physics_prior_mesh_construction();
 
       create_mesh();
@@ -263,6 +278,9 @@ void run(void)
 #endif /* #ifdef VORONOI_STATIC_MESH */
 
           ngb_treefree();
+#ifdef SIDM
+          sidm_treefree();
+#endif /* #ifdef SIDM */
           domain_free();
 
           drift_all_particles();
@@ -270,7 +288,14 @@ void run(void)
           domain_Decomposition(); /* do new domain decomposition, will also make a new chained-list of synchronized particles */
 
           ngb_treeallocate();
+#ifdef SIDM
+          sidm_treeallocate();
+#endif /* #ifdef SIDM */
           ngb_treebuild(NumGas);
+#ifdef SIDM
+          sidm_treebuild();
+          sidm_density();
+#endif /* #ifdef SIDM */
 
 #if defined(VORONOI_STATIC_MESH)
           create_mesh();

@@ -6,8 +6,16 @@
 
 #---------------------------------------- SOLAS additions
 
+#---------------------------------------- Dark Matter parameters
+#SIDM                   # Self-interacting Dark Matter - allows for particle scattering following Vogelsberger et al. 2019
+#SIDM_H
+#SIDM_TREE_H
+
+
 #---------------------------------------- Metal parameters
 #PASSIVE_SCALARS=1      # Number of passive scalar fields advected with fluid (default: 0)
+#PASSIVE_SCALARS_EXTRA
+#SCALAR_REFINE
 #METALS                 # Advect all metals, ie metal mass fraction, as a PASSIVE_SCALARS
 
 #---------------------------------------- Cooling parameters
@@ -24,6 +32,12 @@
 
 #---------------------------------------- Star options
 #STARS                  # General stars framework flag
+#STAR_H
+#STAR_PROTO_H
+#STAR_PARTICLE_H
+#STAR_TABLES_H
+
+
 
 #STAR_PARTICLES=1       # Star particles model flag: set to 0, 1 for massive star particles, set to 2 for resolved individual stars
 
@@ -38,6 +52,15 @@
 #PHOTOIONIZATION        # Only photoionization
 
 #SUPERNOVAE             # Only supernovae
+#AGB			
+
+#STAR_FEEDBACK_ACTIVE
+#STAR_RADIATION_ACTIVE
+#TREECOLUMN
+#RAD_OPENING_ANGLE
+#STAR_FEEDBACK_SPH
+#STAR_HOST_REFINEMENT
+
 
 #---------------------------------------- Blackhole options
 #BLACKHOLES             # General blackholes framework flag
@@ -63,6 +86,14 @@
 #BH_JET_FEEDBACK
 #BH_JET_REFINEMENT
 #OUTPUT_REFBHCOUNTER
+
+#BH_ACTIVE
+#BH_ACCRETION_ACTIVE
+#BH_FEEDBACK_ACTIVE
+
+#TODO
+#DIVVEL
+#NOUVBACKGROUND
 
 #---------------------------------------- Special behaviour
 #FEEDBACK_TESTING_RESTRICT_SNAPSHOTS     # Only dump snapshots after a feedback event
@@ -249,6 +280,8 @@
 #---------------------------------------- output fields in snapshots--Default output filds are: position, velocity, ID, mass, spec. internal energy (gas), density(gas)
 #OUTPUT_TASK                   # output MPI task
 #OUTPUT_TIMEBIN_HYDRO          # output hydrodynamics time-bin
+#OUTPUT_TIMEBIN_BH
+#OUTPUT_TIMEBIN_STAR
 #OUTPUT_PRESSURE_GRADIENT      # output pressure gradient
 #OUTPUT_DENSITY_GRADIENT       # output density gradient
 #OUTPUT_VELOCITY_GRADIENT      # output velocity gradient
@@ -288,3 +321,8 @@
 #---------------------------------------- Mesh-relaxing or mesh-adding (this will not carry out a simulation)
 #MESHRELAX                     # this keeps the mass constant and only regularizes the mesh
 #ADDBACKGROUNDGRID=16          # Re-grid hydrodynamics quantities on a Oct-tree AMR grid. This does not perform a simulation.
+
+
+#ENABLE_PROFILE_UTIL
+#_MPI
+

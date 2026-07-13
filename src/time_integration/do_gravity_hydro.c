@@ -47,6 +47,10 @@
 #include "../main/allvars.h"
 #include "../main/proto.h"
 
+#ifdef SIDM
+#include "../sidm/sidm.h"
+#endif /* #ifdef SIDM */
+
 #include "../mesh/voronoi/voronoi.h"
 
 /*! \brief Applies gravity kick to particles.
@@ -443,6 +447,16 @@ void do_gravity_step_second_half(void)
                           SphP[i].FullGravAccel[j] = P[i].GravAccel[j];
                     }
                 }
+#ifdef SIDM
+                /* Scatter/kick evaluated once per timebin here, after the
+                 * gravity kick for this timebin completes -- operates on
+                 * post-gravity-kick velocities. sidm_scatter() itself
+                 * filters to P[i].TimeBinGrav == timebin internally, so
+                 * each particle rolls its scatter dice exactly once per
+                 * its own actual step, not once per coarser timebin this
+                 * cumulative active-list pass also includes it in. */
+                sidm_scatter(timebin);
+#endif /* #ifdef SIDM */
             }
         }
     }
