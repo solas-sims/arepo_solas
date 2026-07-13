@@ -72,8 +72,8 @@ void star_density(void);
 /* Radiation */
 #include "../stars/star_radiation.h"
 
-void start_healpix(void);
 void update_kappa(void);
+void start_healpix(void);
 void append_ray(RayWorkStack *w, const RayPacket *ray);
 void split_ray(const RayPacket *parent, RayPacket children[4]);
 void append_export(RayExportBuffer *buf, const RayPacket *ray, int task);
