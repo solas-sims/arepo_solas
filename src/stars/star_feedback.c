@@ -109,8 +109,6 @@ static void SN_compute(int ev, int h, double e, double a, double b, double NgbsD
       
       return;
     }
-  
-  
 
   double E_SNR = E_SN + e;
   double E51 = E_SN * All.cf_UnitEnergy_in_cgs / 1.0e51;
@@ -188,16 +186,25 @@ static int SN_feedback_radius(int i, int ev, int h)
   return SN_MESH;
 }
  
-/* Host-only injection path: deposit this star's SN mass, momentum, and
+/* 
+ * Host-only injection path: deposit this star's SN mass, momentum, and
  * energy budget directly into its host cell, with no
  * mesh-neighbour loop. Density/metallicity feeding into SN_compute() are
- * the host cell's own (unweighted) values, since there is nothing to
- * average over.
+ * the host cell's own (unweighted) values, since there is nothing to average over.
  */
 static void SN_feedback_host(int i, int ev, int h, int mode)
 {
+  double xtmp, ytmp, ztmp;
+
   Mechanical_Feedback_Data *MechanicalFeedbackData = &MechanicalFeedbackEvents.MechanicalFeedbackData[ev + h];
   Mechanical_Feedback *MechanicalFeedback = &MechanicalFeedbackData->MechanicalFeedback;
+  
+  /* Treat periodic boundaries */
+  double xstar[3];
+
+  xstar[0] = P[i].Pos[0] - NEAREST_X(P[i].Pos[0] - MechanicalFeedback->StarPosition[0]);
+  xstar[1] = P[i].Pos[1] - NEAREST_Y(P[i].Pos[1] - MechanicalFeedback->StarPosition[1]);
+  xstar[2] = P[i].Pos[2] - NEAREST_Z(P[i].Pos[2] - MechanicalFeedback->StarPosition[2]);
 
   int k;
 
@@ -213,10 +220,9 @@ static void SN_feedback_host(int i, int ev, int h, int mode)
   double wbar[3] = {0.0, 0.0, 0.0};
 
   double d[3], dd;
-
-  d[0] = NEAREST_X(P[i].Pos[0] - MechanicalFeedback->StarPosition[0]);
-  d[1] = NEAREST_Y(P[i].Pos[1] - MechanicalFeedback->StarPosition[1]);
-  d[2] = NEAREST_Z(P[i].Pos[2] - MechanicalFeedback->StarPosition[2]);
+  
+  for(k = 0; k < 3; k++)
+    d[k] = P[i].Pos[k] - xstar[k];
 
   dd = sqrt(d[0]*d[0] + d[1]*d[1] + d[2]*d[2]);
 
@@ -312,6 +318,7 @@ void star_feedback(void)
   #define MAX_FACES 128
 
   int ev, h, i, k, q, f;
+  double xtmp, ytmp, ztmp;
 
   int n_export = 0;
   int max_export = 20 * MechanicalFeedbackEvents.NumEvents;
@@ -379,6 +386,13 @@ void star_feedback(void)
           if((!flag_wind || flag_wind_host) && (!flag_sn || flag_sn_host))
             continue;
 
+          /* Treat periodic boundaries */
+          double xstar[3];
+
+          xstar[0] = P[i].Pos[0] - NEAREST_X(P[i].Pos[0] - MechanicalFeedback->StarPosition[0]);
+          xstar[1] = P[i].Pos[1] - NEAREST_Y(P[i].Pos[1] - MechanicalFeedback->StarPosition[1]);
+          xstar[2] = P[i].Pos[2] - NEAREST_Z(P[i].Pos[2] - MechanicalFeedback->StarPosition[2]);
+
           /* Mesh deposition */
           /* We will loop over the cell faces 4 times */
           int n_faces = 0;
@@ -435,9 +449,9 @@ void star_feedback(void)
               /* Star-to-face direction */
               double d[3], dd; 
                   
-              d[0] = Mesh.VF[vf].cx - MechanicalFeedback->StarPosition[0];
-              d[1] = Mesh.VF[vf].cy - MechanicalFeedback->StarPosition[1];
-              d[2] = Mesh.VF[vf].cz - MechanicalFeedback->StarPosition[2];
+              d[0] = Mesh.VF[vf].cx - xstar[0];
+              d[1] = Mesh.VF[vf].cy - xstar[1];
+              d[2] = Mesh.VF[vf].cz - xstar[2];
               
               dd = sqrt(d[0]*d[0] + d[1]*d[1] + d[2]*d[2]);
 
@@ -455,9 +469,9 @@ void star_feedback(void)
                   /* Star-to-cell direction */
                   double r[3], rr; 
                   
-                  r[0] = Mesh.DP[dp].x - MechanicalFeedback->StarPosition[0];
-                  r[1] = Mesh.DP[dp].y - MechanicalFeedback->StarPosition[1];
-                  r[2] = Mesh.DP[dp].z - MechanicalFeedback->StarPosition[2];
+                  r[0] = Mesh.DP[dp].x - xstar[0];
+                  r[1] = Mesh.DP[dp].y - xstar[1];
+                  r[2] = Mesh.DP[dp].z - xstar[2];
 
                   rr = sqrt(r[0]*r[0] + r[1]*r[1] + r[2]*r[2]);
 
@@ -512,9 +526,9 @@ void star_feedback(void)
               /* Star-to-face direction */
               double d[3], dd; 
                   
-              d[0] = Mesh.VF[vf].cx - MechanicalFeedback->StarPosition[0];
-              d[1] = Mesh.VF[vf].cy - MechanicalFeedback->StarPosition[1];
-              d[2] = Mesh.VF[vf].cz - MechanicalFeedback->StarPosition[2];
+              d[0] = Mesh.VF[vf].cx - xstar[0];
+              d[1] = Mesh.VF[vf].cy - xstar[1];
+              d[2] = Mesh.VF[vf].cz - xstar[2];
               
               dd = sqrt(d[0]*d[0] + d[1]*d[1] + d[2]*d[2]);
 
@@ -532,9 +546,9 @@ void star_feedback(void)
                   /* Star-to-cell direction */
                   double r[3], rr; 
                   
-                  r[0] = Mesh.DP[dp].x - MechanicalFeedback->StarPosition[0];
-                  r[1] = Mesh.DP[dp].y - MechanicalFeedback->StarPosition[1];
-                  r[2] = Mesh.DP[dp].z - MechanicalFeedback->StarPosition[2];
+                  r[0] = Mesh.DP[dp].x - xstar[0];
+                  r[1] = Mesh.DP[dp].y - xstar[1];
+                  r[2] = Mesh.DP[dp].z - xstar[2];
 
                   rr = sqrt(r[0]*r[0] + r[1]*r[1] + r[2]*r[2]);
 
