@@ -7,6 +7,10 @@
 #include "../main/allvars.h"
 #include "../main/proto.h"
 
+/* SN host-injection modes, returned by SN_feedback_radius() */
+#define SN_MESH          0 /* Couple across Voronoi faces */
+#define SN_HOST          1 /* Thermal dump into host  */
+#define SN_HOST_MOMENTUM 2 /* Momentum kick to host */
 
 /* Kick packet sent to remote face-neighbor cells */
 struct Feedback_Kick
@@ -104,7 +108,9 @@ static void SN_compute(int ev, int h, double e, double a, double b, double NgbsD
       *E = E_SN; 
       
       return;
-    }  
+    }
+  
+  
 
   double E_SNR = E_SN + e;
   double E51 = E_SN * All.cf_UnitEnergy_in_cgs / 1.0e51;
@@ -143,15 +149,18 @@ static void SN_compute(int ev, int h, double e, double a, double b, double NgbsD
 #endif 
 
 #ifdef SUPERNOVAE
-/* Sedov/cooling-radius check: is the host cell too large to resolve the
- * pressure-driven expansion of this SN, such that all mass, momentum and
- * energy should be dumped directly into the host cell instead of being
- * distributed across mesh faces?
- *
- * r_SN = 30 pc * (E_SN / 1e51 erg)^0.29 * (rho_h / (1.4*m_p) / cm^-3)^(-0.46)
+/* 
+ * Sedov/cooling radius check: is the host cell able to resolve the
+ * pressure-driven expansion of this SN?
+ * Kim & Ostriker (2015)-> r_SN = 30 pc * (E_SN / 1e51 erg)^0.29 * (rho_h / (1.4*m_p) / cm^-3)^(-0.46) 
+ * Unphysical radius check: is the host cell too large for us to 
+ * couple the SN to its neighbours?
+ * Mathew Smith (2026)-> r_unphysical = 1 kpc
  */
 static int SN_feedback_radius(int i, int ev, int h)
 {
+  double r_host = get_cell_radius(i); 
+
   Mechanical_Feedback_Data *MechanicalFeedbackData = &MechanicalFeedbackEvents.MechanicalFeedbackData[ev + h];
   Mechanical_Feedback *MechanicalFeedback = &MechanicalFeedbackData->MechanicalFeedback;
   
@@ -160,14 +169,23 @@ static int SN_feedback_radius(int i, int ev, int h)
   double E51 = E_SN * All.cf_UnitEnergy_in_cgs / 1.0e51;
  
   double rho_cgs = SphP[i].Density * All.cf_UnitDensity_in_cgs;
-  double n_cgs = rho_cgs / (1.4 * PROTONMASS); /* cm^-3 */
+  double n_cgs = rho_cgs / (1.4 * PROTONMASS); 
  
   double r_SN_pc = 30.0 * pow(E51, 0.29) * pow(n_cgs, -0.46); /* parsec */
   double r_SN = (r_SN_pc * PARSEC) / All.cf_UnitLength_in_cm; /* code units */
- 
-  double r_host = get_cell_radius(i); /* code units */
- 
-  return (r_host > r_SN);
+
+  /* Thermal dump into host  */
+  if(r_host < r_SN / 10.0)
+    return SN_HOST;
+
+  double r_unphysical = 1.0 * KILOPARSEC / All.cf_UnitLength_in_cm;
+  
+  /* Momentum kick to host */
+  if(r_host > r_unphysical)
+    return SN_HOST_MOMENTUM;
+  
+  /* Couple across Voronoi faces */ 
+  return SN_MESH;
 }
  
 /* Host-only injection path: deposit this star's SN mass, momentum, and
@@ -176,20 +194,42 @@ static int SN_feedback_radius(int i, int ev, int h)
  * the host cell's own (unweighted) values, since there is nothing to
  * average over.
  */
-static void SN_feedback_host(int i, int ev, int h)
+static void SN_feedback_host(int i, int ev, int h, int mode)
 {
   Mechanical_Feedback_Data *MechanicalFeedbackData = &MechanicalFeedbackEvents.MechanicalFeedbackData[ev + h];
   Mechanical_Feedback *MechanicalFeedback = &MechanicalFeedbackData->MechanicalFeedback;
  
   struct Feedback_Kick Kick = {0};
   Kick.CellIndex = i;
+
+  if(mode == SN_HOST)
+    {
+      double m_ej = MechanicalFeedback->SN_MassLoss;
+      double E_SN = MechanicalFeedback->SN_EnergyInject;
+
+      double sq_vstar = MechanicalFeedback->StarVelocity[0] * MechanicalFeedback->StarVelocity[0]
+      + MechanicalFeedback->StarVelocity[1] * MechanicalFeedback->StarVelocity[1]
+      + MechanicalFeedback->StarVelocity[2] * MechanicalFeedback->StarVelocity[2];
+
+      double E = 0.5 * m_ej * sq_vstar + E_SN;
+
+      Kick.SN_DeltaMass = m_ej;
+#ifdef METALS
+      Kick.SN_DeltaMetals = MechanicalFeedback->SN_MetalsLoss;
+#endif
+      for(int k = 0; k < 3; k++)
+        Kick.SN_DeltaP[k] = m_ej * MechanicalFeedback->StarVelocity[k];
  
+      Kick.SN_DeltaE = E;
+    }
+  else if(mode == SN_HOST_MOMENTUM)
+    {
   /* Star -> host cell-centre direction */
   double d[3], dd; 
                   
-  d[0] = P[i].Pos[0] - MechanicalFeedback->StarPosition[0];
-  d[1] = P[i].Pos[1] - MechanicalFeedback->StarPosition[1];
-  d[2] = P[i].Pos[2] - MechanicalFeedback->StarPosition[2];
+  d[0] = NEAREST_X(P[i].Pos[0] - MechanicalFeedback->StarPosition[0]);
+  d[1] = NEAREST_Y(P[i].Pos[1] - MechanicalFeedback->StarPosition[1]);
+  d[2] = NEAREST_Z(P[i].Pos[2] - MechanicalFeedback->StarPosition[2]);
               
   dd = sqrt(d[0]*d[0] + d[1]*d[1] + d[2]*d[2]);
 
@@ -266,6 +306,9 @@ static void SN_feedback_host(int i, int ev, int h)
     Kick.SN_DeltaP[k] = m_ej * MechanicalFeedback->StarVelocity[k] + p * wbar[k];
  
   Kick.SN_DeltaE = E;
+  }
+  else
+    terminate("Should not have another mode!");
  
   apply_kick(i, &Kick);
 }
@@ -311,7 +354,7 @@ void star_feedback(void)
 #endif
         
 #ifdef WINDS
-          /* Unresolved wind deposition radius */
+          /* Wind radius */
           /* Skip the mesh-neighbour geometry entirely and dump Wind into the host cell */
           if(flag_wind)
             {
@@ -324,13 +367,15 @@ void star_feedback(void)
 #endif
 
 #ifdef SUPERNOVAE
-          /* Unresolved SN cooling radius */
+          /* SN radius */
           /* Skip the mesh-neighbour geometry entirely and dump SN into the host cell */
           if(flag_sn)
             {
-              if(SN_feedback_radius(i, ev, h))
+              int sn_mode = SN_feedback_radius(i, ev, h);
+
+              if(sn_mode != SN_MESH)
                 {
-                  SN_feedback_host(i, ev, h);
+                  SN_feedback_host(i, ev, h, sn_mode);
                   flag_sn_host = 1;
                 }
             }
@@ -341,7 +386,7 @@ void star_feedback(void)
             continue;
           
           /* Host deposition */
-          if(flag_wind_host && flag_sn_host)
+          if((!flag_wind || flag_wind_host) && (!flag_sn || flag_sn_host))
             continue;
 
           /* Mesh deposition */
