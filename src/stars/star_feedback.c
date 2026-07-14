@@ -104,10 +104,10 @@ static void SN_compute(int ev, int h, double e, double a, double b, double NgbsD
       *E = E_SN; 
       
       return;
-    }
+    }  
 
   double E_SNR = E_SN + e;
-  double E51 = E_SNR * All.cf_UnitEnergy_in_cgs / 1.0e51;
+  double E51 = E_SN * All.cf_UnitEnergy_in_cgs / 1.0e51;
   
   double n_H  = 0.76 * NgbsDensity * All.cf_UnitDensity_in_cgs / PROTONMASS; 
 
