@@ -198,118 +198,108 @@ static void SN_feedback_host(int i, int ev, int h, int mode)
 {
   Mechanical_Feedback_Data *MechanicalFeedbackData = &MechanicalFeedbackEvents.MechanicalFeedbackData[ev + h];
   Mechanical_Feedback *MechanicalFeedback = &MechanicalFeedbackData->MechanicalFeedback;
- 
-  struct Feedback_Kick Kick = {0};
-  Kick.CellIndex = i;
 
-  if(mode == SN_HOST)
-    {
-      double m_ej = MechanicalFeedback->SN_MassLoss;
-      double E_SN = MechanicalFeedback->SN_EnergyInject;
+  int k;
 
-      double sq_vstar = MechanicalFeedback->StarVelocity[0] * MechanicalFeedback->StarVelocity[0]
-      + MechanicalFeedback->StarVelocity[1] * MechanicalFeedback->StarVelocity[1]
-      + MechanicalFeedback->StarVelocity[2] * MechanicalFeedback->StarVelocity[2];
+  double p = 0.0, E = 0.0;
 
-      double E = 0.5 * m_ej * sq_vstar + E_SN;
+  double m_ej = MechanicalFeedback->SN_MassLoss;
 
-      Kick.SN_DeltaMass = m_ej;
-#ifdef METALS
-      Kick.SN_DeltaMetals = MechanicalFeedback->SN_MetalsLoss;
-#endif
-      for(int k = 0; k < 3; k++)
-        Kick.SN_DeltaP[k] = m_ej * MechanicalFeedback->StarVelocity[k];
- 
-      Kick.SN_DeltaE = E;
-    }
-  else if(mode == SN_HOST_MOMENTUM)
-    {
-  /* Star -> host cell-centre direction */
-  double d[3], dd; 
-                  
+  /* Single target: the host cell takes 100% of the deposit */
+  const double sq_wbar = 1.0;
+  const double sqrtsq_wbar = 1.0;
+
+  /* Star -> host cell-centre direction (replaces the star-to-face direction) */
+  double wbar[3] = {0.0, 0.0, 0.0};
+
+  double d[3], dd;
+
   d[0] = NEAREST_X(P[i].Pos[0] - MechanicalFeedback->StarPosition[0]);
   d[1] = NEAREST_Y(P[i].Pos[1] - MechanicalFeedback->StarPosition[1]);
   d[2] = NEAREST_Z(P[i].Pos[2] - MechanicalFeedback->StarPosition[2]);
-              
-  dd = sqrt(d[0]*d[0] + d[1]*d[1] + d[2]*d[2]);
 
-  double wbar[3] = {0};
+  dd = sqrt(d[0]*d[0] + d[1]*d[1] + d[2]*d[2]);
 
   if(dd > 0.0)
     {
-      for(int k = 0; k < 3; k++)
-        {
-          wbar[k] = d[k] / dd;
-        }    
-    }        
-  
-  /* Helpers for supernovae injection */
-  double num, den, e = 0.0, a = 0.0, b = 0.0;
-  double m_ej = MechanicalFeedback->SN_MassLoss;
-              
-  /* Ngbs properties */
-  double NgbsDensity = 0.0, NgbsMetallicity = 0.0;
+      for(k = 0; k < 3; k++)
+        wbar[k] = d[k] / dd;
+    }
 
-  /* Single target: 100% of the deposit */
-  const double sq_wbar = 1.0; 
-  const double sqrtsq_wbar = 1.0;
+  if(mode == SN_HOST_MOMENTUM)
+    {
+      /* Helpers for supernovae injection */
+      double num, den, e = 0.0, a = 0.0, b = 0.0;
 
-  double mj, vj[3];
-  
-  mj = P[i].Mass + SphP[i].StarMassFeed;
-  
-  for(int k = 0; k < 3; k++)
-    vj[k] = (SphP[i].Momentum[k] + SphP[i].StarMomentumFeed[k]) / mj;
+      /* Ngbs properties */
+      int Ngbs = 0;
+      double NgbsMass = 0.0, NgbsDensity = 0.0, NgbsMetallicity = 0.0;
 
-  double sq_vj = vj[0]*vj[0] + vj[1]*vj[1] + vj[2]*vj[2];
-      
-  double sq_vstar = MechanicalFeedback->StarVelocity[0]*MechanicalFeedback->StarVelocity[0]
-  + MechanicalFeedback->StarVelocity[1]*MechanicalFeedback->StarVelocity[1]
-  + MechanicalFeedback->StarVelocity[2]*MechanicalFeedback->StarVelocity[2];
-      
-  double cross = 2.0 * (vj[0]*MechanicalFeedback->StarVelocity[0]
-  + vj[1]*MechanicalFeedback->StarVelocity[1]
-  + vj[2]*MechanicalFeedback->StarVelocity[2]);
-  
-  num = 0.5 * mj * m_ej * sqrtsq_wbar * (sq_vj + sq_vstar - cross);
-  den = mj + m_ej * sqrtsq_wbar;
- 
-  e = num / den;
+      double mj, vj[3];
 
-  num = sq_wbar;
+      mj = P[i].Mass + SphP[i].StarMassFeed;
 
-  a = num / den;
+      for(k = 0; k < 3; k++)
+        vj[k] = (SphP[i].Momentum[k] + SphP[i].StarMomentumFeed[k]) / mj;
 
-  num =  mj * ((vj[0] - MechanicalFeedback->StarVelocity[0]) * wbar[0]
-  + (vj[1] - MechanicalFeedback->StarVelocity[1]) * wbar[1]
-  + (vj[2] - MechanicalFeedback->StarVelocity[2]) * wbar[2]);
+      double sq_vj = vj[0]*vj[0] + vj[1]*vj[1] + vj[2]*vj[2];
 
-  b = num / den;
- 
-  /* Host-only density/metallicity: the host cell's own values, unweighted */
-  NgbsDensity = SphP[i].Density;
+      double sq_vstar = MechanicalFeedback->StarVelocity[0]*MechanicalFeedback->StarVelocity[0]
+      + MechanicalFeedback->StarVelocity[1]*MechanicalFeedback->StarVelocity[1]
+      + MechanicalFeedback->StarVelocity[2]*MechanicalFeedback->StarVelocity[2];
+
+      double cross = 2.0 * (vj[0]*MechanicalFeedback->StarVelocity[0]
+      + vj[1]*MechanicalFeedback->StarVelocity[1]
+      + vj[2]*MechanicalFeedback->StarVelocity[2]);
+
+      num = 0.5 * mj * m_ej * sqrtsq_wbar * (sq_vj + sq_vstar - cross);
+      den = mj + m_ej * sqrtsq_wbar;
+
+      e += num / den;
+
+      num = sq_wbar;
+
+      a += num / den;
+
+      num = mj * ((vj[0] - MechanicalFeedback->StarVelocity[0]) * wbar[0]
+      + (vj[1] - MechanicalFeedback->StarVelocity[1]) * wbar[1]
+      + (vj[2] - MechanicalFeedback->StarVelocity[2]) * wbar[2]);
+
+      b += num / den;
+
+      Ngbs++;
+      NgbsMass += mj * sqrtsq_wbar;
+      NgbsDensity += mj / SphP[i].Volume * sqrtsq_wbar;
 #ifdef METALS
-  NgbsMetallicity = (SphP[i].GasMetals + SphP[i].StarMetalsFeed) / mj;
-#else
-  NgbsMetallicity = 0.0;
+      NgbsMetallicity += (SphP[i].GasMetals + SphP[i].StarMetalsFeed) / mj * sqrtsq_wbar;
 #endif
- 
-  double p, E;
-      
-  SN_compute(ev, h, e, a, b, NgbsDensity, NgbsMetallicity, &p, &E);
- 
-  Kick.SN_DeltaMass = m_ej;
-#ifdef METALS
-  Kick.SN_DeltaMetals = MechanicalFeedback->SN_MetalsLoss;
-#endif
-  for(int k = 0; k < 3; k++)
-    Kick.SN_DeltaP[k] = m_ej * MechanicalFeedback->StarVelocity[k] + p * wbar[k];
- 
-  Kick.SN_DeltaE = E;
-  }
+
+      SN_compute(ev, h, e, a, b, NgbsDensity, NgbsMetallicity, &p, &E);
+    }
+  else if(mode == SN_HOST) 
+    {
+      double sq_vstar = MechanicalFeedback->StarVelocity[0]*MechanicalFeedback->StarVelocity[0]
+      + MechanicalFeedback->StarVelocity[1]*MechanicalFeedback->StarVelocity[1]
+      + MechanicalFeedback->StarVelocity[2]*MechanicalFeedback->StarVelocity[2];
+
+      p = 0.0;
+      E = 0.5 * m_ej * sq_vstar + MechanicalFeedback->SN_EnergyInject;
+    }
   else
-    terminate("Should not have another mode!");
- 
+    terminate("SN_feedback_host: unknown mode %d for host cell %d\n", mode, i);
+
+  struct Feedback_Kick Kick = {0};
+  Kick.CellIndex = i;
+
+  Kick.SN_DeltaMass = m_ej * sqrtsq_wbar;
+#ifdef METALS
+  Kick.SN_DeltaMetals = MechanicalFeedback->SN_MetalsLoss * sqrtsq_wbar;
+#endif
+  for(k = 0; k < 3; k++)
+    Kick.SN_DeltaP[k] = m_ej * sqrtsq_wbar * MechanicalFeedback->StarVelocity[k] + p * wbar[k];
+
+  Kick.SN_DeltaE = E * sqrtsq_wbar;
+
   apply_kick(i, &Kick);
 }
 #endif
