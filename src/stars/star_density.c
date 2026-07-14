@@ -395,12 +395,12 @@ void star_density(void)
  */
 static int star_density_evaluate1(int target, int mode, int threadid)
 {
-  int i, n, numnodes, *firstnode; 
-  double h, h2, dx, dy, dz, r, r2, wk; 
+  int i, n, numnodes, *firstnode;
+  MyDouble xtmp, ytmp, ztmp;  
+  MyDouble h, h2, dx, dy, dz, r, r2, wk;
   MyDouble *pos;
 
-  int ngbs; 
-  int host_index = -1, host_task = -1;
+  int ngbs = 0, host_index = -1, host_task = -1;
   MyFloat host_distance = MAX_REAL_NUMBER;
   
   data_in local, *target_data;
@@ -425,8 +425,6 @@ static int star_density_evaluate1(int target, int mode, int threadid)
   h = target_data->Hsml;
   h2 = h * h;
 
-  ngbs = 0;
-
   int nfound = ngb_treefind_variable_threads(pos, h, target, mode, threadid, numnodes, firstnode);
 
   for(n = 0; n < nfound; n++)
@@ -436,31 +434,10 @@ static int star_density_evaluate1(int target, int mode, int threadid)
       if(P[i].Type != 0 || P[i].Mass == 0 || P[i].ID == 0)
         continue;
 
-      /* Compute cell->star position vectors */
-      dx = P[i].Pos[0] - pos[0];
-      dy = P[i].Pos[1] - pos[1]; 
-      dz = P[i].Pos[2] - pos[2]; 
-
-#ifndef REFLECTIVE_X
-      if(dx > boxHalf_X)
-        dx -= boxSize_X;
-      if(dx < -boxHalf_X)
-        dx += boxSize_X;
-#endif /* #ifndef REFLECTIVE_X */
-
-#ifndef REFLECTIVE_Y
-      if(dy > boxHalf_Y)
-        dy -= boxSize_Y;
-      if(dy < -boxHalf_Y)
-        dy += boxSize_Y;
-#endif /* #ifndef REFLECTIVE_Y */
-
-#ifndef REFLECTIVE_Z
-      if(dz > boxHalf_Z)
-        dz -= boxSize_Z;
-      if(dz < -boxHalf_Z)
-        dz += boxSize_Z;
-#endif /* #ifndef REFLECTIVE_Z */
+      /* Compute star->cell position vector */
+      dx = NEAREST_X(P[i].Pos[0] - pos[0]);
+      dy = NEAREST_Y(P[i].Pos[1] - pos[1]);
+      dz = NEAREST_Z(P[i].Pos[2] - pos[2]);
 
       r2 = dx * dx + dy * dy + dz * dz;
 
@@ -496,7 +473,8 @@ static int star_density_evaluate1(int target, int mode, int threadid)
 static int star_density_evaluate2(int target, int mode, int threadid)
 {
   int i, n, numnodes, *firstnode; 
-  double h, h2, dx, dy, dz, r, r2, wk; 
+  MyDouble xtmp, ytmp, ztmp;  
+  MyDouble h, h2, dx, dy, dz, r, r2, wk;
   MyDouble *pos;
 
   int hosthydrobin = 0; 
@@ -538,31 +516,10 @@ static int star_density_evaluate2(int target, int mode, int threadid)
       if(P[i].Type != 0 || P[i].Mass == 0 || P[i].ID == 0)
         continue;
 
-      /* compute cell->star position vectors */
-      dx = P[i].Pos[0] - pos[0];
-      dy = P[i].Pos[1] - pos[1]; 
-      dz = P[i].Pos[2] - pos[2]; 
-
-#ifndef REFLECTIVE_X
-      if(dx > boxHalf_X)
-        dx -= boxSize_X;
-      if(dx < -boxHalf_X)
-        dx += boxSize_X;
-#endif /* #ifndef REFLECTIVE_X */
-
-#ifndef REFLECTIVE_Y
-      if(dy > boxHalf_Y)
-        dy -= boxSize_Y;
-      if(dy < -boxHalf_Y)
-        dy += boxSize_Y;
-#endif /* #ifndef REFLECTIVE_Y */
-
-#ifndef REFLECTIVE_Z
-      if(dz > boxHalf_Z)
-        dz -= boxSize_Z;
-      if(dz < -boxHalf_Z)
-        dz += boxSize_Z;
-#endif /* #ifndef REFLECTIVE_Z */
+      /* Compute star->cell position vector */
+      dx = NEAREST_X(P[i].Pos[0] - pos[0]);
+      dy = NEAREST_Y(P[i].Pos[1] - pos[1]);
+      dz = NEAREST_Z(P[i].Pos[2] - pos[2]);
 
       r2 = dx * dx + dy * dy + dz * dz;
 
