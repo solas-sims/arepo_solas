@@ -1400,11 +1400,6 @@ double InitMetallicityinSolar;
   char StarTablesFile[MAXLEN_PATH];
 #endif 
 
-#ifdef STAR_FEEDBACK_SPH
-  double StarDesNgb;
-  double StarDesDev;
-#endif
-
 #ifdef STAR_RADIATION_ACTIVE
   double RaySplitFactor;
 #endif

@@ -165,8 +165,10 @@ static int SN_feedback_radius(int i, int ev, int h)
   double E_SN = MechanicalFeedback->SN_EnergyInject;
  
   double E51 = E_SN * All.cf_UnitEnergy_in_cgs / 1.0e51;
- 
-  double rho_cgs = SphP[i].Density * All.cf_UnitDensity_in_cgs;
+  
+  double rho = (P[i].Mass + SphP[i].StarMassFeed) / SphP[i].Volume;
+  double rho_cgs = rho * All.cf_UnitDensity_in_cgs;
+
   double n_cgs = rho_cgs / (1.4 * PROTONMASS); 
  
   double r_SN_pc = 30.0 * pow(E51, 0.29) * pow(n_cgs, -0.46); /* parsec */

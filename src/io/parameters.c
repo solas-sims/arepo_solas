@@ -605,16 +605,6 @@ void read_parameter_file(char *fname)
       id[nt++] = STRING;
 #endif
 
-#ifdef STAR_FEEDBACK_SPH
-      strcpy(tag[nt], "StarDesNgb");
-      addr[nt] = &All.StarDesNgb;
-      id[nt++] = REAL;
-      
-      strcpy(tag[nt], "StarDesDev");
-      addr[nt] = &All.StarDesDev;
-      id[nt++] = REAL;
-#endif
-
 #ifdef STAR_RADIATION_ACTIVE
       strcpy(tag[nt], "RaySplitFactor");
       addr[nt] = &All.RaySplitFactor;
