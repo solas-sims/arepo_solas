@@ -184,8 +184,6 @@ void bh_density(void)
   long long ntot;
   double t0, t1;
 
-  //mpi_printf("BH_DENSITY: Start density and neighbour search for %d black holes.\n", NumBhs);
-
   BhNgbs = (MyFloat *)mymalloc("BhNgbs", NumBhs * sizeof(MyFloat));
 
 #ifdef BH_CONSTANT_RADIUS
@@ -200,22 +198,14 @@ void bh_density(void)
     {
       Left[i] = Right[i] = 0;
       BhP[i].DensityFlag = 1;
+       
+      if(BhP[i].Hsml <= 0)
+        BhP[i].Hsml = All.SofteningTable[PPB(i).SofteningType];
     }
 
   generic_set_MaxNexport();
 
-  for(idx = 0; idx < TimeBinsBh.NActiveParticles; idx++)
-    {
-      i = TimeBinsBh.ActiveParticleList[idx];
-      if(BhP[i].Hsml <= 0)
-        {
-          //mpi_printf("BH_ACCRETION: WARNING! BH %d has invalid Hsml=%g, ... reinitializing\n", i, BhP[i].Hsml);
-          // Use softening as fallback
-          BhP[i].Hsml = All.SofteningTable[PPB(i).SofteningType];
-        }
-    }
- 
-  /* we will repeat the whole thing for those particles where we didn't find enough neighbours */
+  /* We will repeat the whole thing for those particles where we didn't find enough neighbours */
   do
     {
       t0 = second();
@@ -230,28 +220,38 @@ void bh_density(void)
             {
               if(BhNgbs[i] == 0)
                 terminate("BH_DENSITY: BH %d has zero neighbours at maximum Hsml=%g\n", i, BhP[i].Hsml);
-
-              BhP[i].DensityFlag = -1; /* Mark as inactive */
+              
+              /* Mark as inactive */
+              BhP[i].DensityFlag = -1; 
               continue;
             }
 
+#ifdef REFINEMENT
           if(BhP[i].NgbsMass < (All.BhDesNgb - All.BhDesDev) * All.TargetGasMass || BhP[i].NgbsMass > (All.BhDesNgb + All.BhDesDev) * All.TargetGasMass)
+#else
+          if(BhNgbs[i] < (All.BhDesNgb - All.BhDesDev) || BhNgbs[i] > (All.BhDesNgb + All.BhDesDev)) 
+#endif
             {
-              /* need to redo this particle */
+              /* Need to redo this particle */
               npleft++;
 
               if(Left[i] > 0 && Right[i] > 0)
                 {
                   if((Right[i] - Left[i]) < 1.0e-3 * Left[i])
                     {
-                      /* this one should be ok */
+                      /* This one should be ok */
                       npleft--;
-                      BhP[i].DensityFlag = -1; /* Mark as inactive */
+                      /* Mark as inactive */
+                      BhP[i].DensityFlag = -1; 
                       continue;
                     }
                 } 
 
+#ifdef REFINEMENT
               if(BhP[i].NgbsMass < (All.BhDesNgb - All.BhDesDev) * All.TargetGasMass)
+#else
+              if(BhNgbs[i] < (All.BhDesNgb - All.BhDesDev))
+#endif
                 Left[i] = dmax(BhP[i].Hsml, Left[i]);
               else
                 {
@@ -283,7 +283,8 @@ void bh_density(void)
                 }
             }
           else
-            BhP[i].DensityFlag = -1; /* Mark as inactive */ 
+            /* Mark as inactive */ 
+            BhP[i].DensityFlag = -1;
       
           /* Limit smoothing length */
           double hmax = All.HMaxFactor * All.SofteningTable[PPB(i).SofteningType]; 
@@ -316,7 +317,7 @@ void bh_density(void)
   myfree(Right);
   myfree(Left);
 
-  /* mark as active again */
+  /* Mark as active again */
   for(i = 0; i < NumBhs; i++)
     BhP[i].DensityFlag = 1;
 #endif
