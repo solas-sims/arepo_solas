@@ -1405,6 +1405,12 @@ double InitMetallicityinSolar;
   double StarDesDev;
 #endif
 
+#ifdef SIDM
+  double SidmDesNumNgb;
+  double SidmDesNumNgbDev;
+  double SidmCrossSection; /*!< sigma/m, constant elastic cross section for v1, in code units (length^2/mass) */
+#endif /* #ifdef SIDM */
+
 #ifdef STAR_RADIATION_ACTIVE
   double RaySplitFactor;
 #endif
@@ -1466,12 +1472,6 @@ double InitMetallicityinSolar;
   double TimeOfFirstHaloFinding;
   double NextTimeOfHaloFinding;
   double TimeBetweenHaloFinding;
-#endif
-
-#ifdef SIDM
-  double SidmDesNumNgb;
-  double SidmDesNumNgbDev;
-  double SidmCrossSection; /*!< sigma/m, constant elastic cross section for v1, in code units (length^2/mass) */
 #endif
 } All;
 
@@ -1550,12 +1550,13 @@ extern struct particle_data
 #endif
 
 #ifdef SIDM
-  MyFloat SidmDensity;             /*!< local DM density estimate from tree-reuse walk, elastic v1 */
-  MyFloat SidmHsml;                /*!< adaptive smoothing length / search radius for neighbour density estimate */
-  MyFloat SidmVelDisp;             /*!< local 1D DM velocity dispersion estimate, needed for scattering rate */
-  int     SidmNumNgb;              /*!< number of neighbours found within SidmHsml, for Hsml iteration convergence */
-  integertime SidmLastScatterTime; /*!< integer timeline of most recent scatter, diagnostic / rate-limiting */
-  int     SidmScatterFlag;         /*!< set by Monte Carlo step this timestep, consumed by kick routine */
+  /* Forward reference into the DMSP[] side array (src/sidm/sidm.h),
+   * mirroring how SID above indexes into SP[] for stars. Only
+   * meaningful for Type==1 particles. The six fields that used to live
+   * directly here (SidmDensity, SidmHsml, SidmVelDisp, SidmNumNgb,
+   * SidmLastScatterTime, SidmScatterFlag) have moved to DM_Particle_Data
+   * -- see sidm.h for the struct and the PDMS/DMPS access macros. */
+  MyIDType SIDMID;
 #endif /* #ifdef SIDM */
 } * P,              /*!< holds particle data on local processor */
     *DomainPartBuf; /*!< buffer for particle data used in domain decomposition */
@@ -2111,10 +2112,10 @@ enum iofields
   IO_TIMEBIN_BH,
 #endif
 #ifdef SIDM
-    IO_SIDM_DENSITY,
-    IO_SIDM_HSML,
-    IO_SIDM_NUMNGB,
-    IO_SIDM_VELDISP,
+  IO_SIDM_DENSITY,
+  IO_SIDM_HSML,
+  IO_SIDM_NUMNGB,
+  IO_SIDM_VELDISP,
 #endif
   IO_LASTENTRY /* This should be kept - it signals the end of the list */
 };
@@ -2129,6 +2130,9 @@ enum arrays
 #endif
 #ifdef BLACKHOLES
   A_BH,
+#endif
+#ifdef SIDM
+  A_DMSP,
 #endif
   A_PS
 };

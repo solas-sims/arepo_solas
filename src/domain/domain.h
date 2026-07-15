@@ -122,6 +122,10 @@ extern int *toGet, *toGetSph;
 extern int *toGoStars, *toGetStars;
 #endif
 
+#ifdef SIDM
+extern int *toGoDM, *toGetDM;
+#endif /* #ifdef SIDM */
+
 #ifdef BLACKHOLES
 extern int *toGoBhs, *toGetBhs;
 #endif

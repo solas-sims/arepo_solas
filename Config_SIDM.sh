@@ -14,6 +14,7 @@ HIERARCHICAL_GRAVITY                     # use hierarchical splitting of the tim
 CELL_CENTER_GRAVITY                      # uses geometric centers to calculate gravity of cells, only possible with HIERARCHICAL_GRAVITY
 ALLOW_DIRECT_SUMMATION                   # Performed direct summation instead of tree-based gravity if number of active particles < DIRECT_SUMMATION_THRESHOLD (= 3000 unless specified differently here)
 DIRECT_SUMMATION_THRESHOLD=500           # Overrides maximum number of active particles for which direct summation is performed instead of tree based calculation
+GRAVITY_NOT_PERIODIC                     # gravity is not treated periodically
 
 #--------------------------------------- Gravity softening
 NSOFTTYPES=2                             # Number of different softening values to which particle types can be mapped.
@@ -22,7 +23,7 @@ INDIVIDUAL_GRAVITY_SOFTENING=32          # bitmask with particle types where the
 ADAPTIVE_HYDRO_SOFTENING                 # Adaptive softening of gas cells depending on their size
 
 #--------------------------------------- TreePM Options
-PMGRID=256                               # Enables particle mesh; number of cells used for grid in each dimension
+PMGRID=64                               # Enables particle mesh; number of cells used for grid in each dimension
 RCUT=5.0                                 # This can be used to override the maximum radius in which the short-range tree-force is evaluated (in case the TreePM algorithm is used). The default value is 4.5, given in mesh-cells.
 
 #--------------------------------------- Time integration options
@@ -35,18 +36,18 @@ OUTPUT_COORDINATES_IN_DOUBLEPRECISION    # will always output coordinates in dou
 NGB_TREE_DOUBLEPRECISION                 # if this is enabled, double precision is used for the neighbor node extension
 
 #--------------------------------------- On the fly FOF groupfinder
-FOF                                      # enable FoF output
-FOF_PRIMARY_LINK_TYPES=2                 # 2^type for the primary dark matter type
-FOF_SECONDARY_LINK_TYPES=1+16+32         # 2^type for the types linked to nearest primaries
+#FOF                                      # enable FoF output
+#FOF_PRIMARY_LINK_TYPES=2                 # 2^type for the primary dark matter type
+#FOF_SECONDARY_LINK_TYPES=1+16+32         # 2^type for the types linked to nearest primaries
 
 #--------------------------------------- Subfind
-SUBFIND                                  # enables substructure finder
-SAVE_HSML_IN_SNAPSHOT                    # stores hsml, density, and velocity dispersion values in the snapshot files
-SUBFIND_CALC_MORE                        # calculates also the velocity dispersion in the local density estimate (this is automatically enabled by several other options, e.g. SAVE_HSML_IN_SNAPSHOT)
-SUBFIND_EXTENDED_PROPERTIES              # adds calculation of further quantities related to angular momentum in different components
+#SUBFIND                                  # enables substructure finder
+#SAVE_HSML_IN_SNAPSHOT                    # stores hsml, density, and velocity dispersion values in the snapshot files
+#SUBFIND_CALC_MORE                        # calculates also the velocity dispersion in the local density estimate (this is automatically enabled by several other options, e.g. SAVE_HSML_IN_SNAPSHOT)
+#SUBFIND_EXTENDED_PROPERTIES              # adds calculation of further quantities related to angular momentum in different components
 
 #-------------------------------------------- Things for special behaviour
-PROCESS_TIMES_OF_OUTPUTLIST              # goes through times of output list prior to starting the simulaiton to ensure that outputs are written as close to the desired time as possible (as opposed to at next possible time if this flag is not active)
+#PROCESS_TIMES_OF_OUTPUTLIST              # goes through times of output list prior to starting the simulaiton to ensure that outputs are written as close to the desired time as possible (as opposed to at next possible time if this flag is not active)
 
 #--------------------------------------- Output/Input options
 REDUCE_FLUSH                             # only flush output to log-files in predefined intervals

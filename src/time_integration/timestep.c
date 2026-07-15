@@ -379,35 +379,35 @@ integertime get_timestep_gravity(int p)
     if(dt_ext < dt)
       dt = dt_ext;
 #endif
-      
+
 #ifdef SIDM
-      /* Bounds the timestep so a DM particle's per-step scattering
-       * probability (rate*dt) stays below SIDM_TIMESTEP_SAFETY_FACTOR.
-       * rate = rho * (sigma/m) * v_rel, rho converted comoving->physical
-       * via cf_a3inv, v_rel via cf_atime -- both conversions match
-       * existing precedent elsewhere in this file (see
-       * get_timestep_hydro's own P[].Vel/cf_atime usage), not
-       * independently derived. v_rel = sqrt(2)*SidmVelDisp is a first-order
-       * approximation (relative velocity between two ~equal-dispersion
-       * particles) -- reasonable for a timestep BOUND, not necessarily
-       * precise enough for the scattering-rate calculation itself.
-       *
-       * Skipped entirely if SidmDensity/SidmVelDisp aren't yet populated
-       * (P[p].SidmDensity <= 0) -- e.g. before sidm_density() has ever run
-       * for this particle -- rather than dividing by zero or producing a
-       * nonsensical bound from stale/default values.
-       */
-      if(P[p].Type == 1 && P[p].SidmDensity > 0 && P[p].SidmVelDisp > 0)
+    /* Bounds the timestep so a DM particle's per-step scattering
+     * probability (rate*dt) stays below SIDM_TIMESTEP_SAFETY_FACTOR.
+     * rate = rho * (sigma/m) * v_rel, rho converted comoving->physical
+     * via cf_a3inv, v_rel via cf_atime -- both conversions match
+     * existing precedent elsewhere in this file (see
+     * get_timestep_hydro's own P[].Vel/cf_atime usage), not
+     * independently derived. v_rel = sqrt(2)*SidmVelDisp is a first-order
+     * approximation (relative velocity between two ~equal-dispersion
+     * particles) -- reasonable for a timestep BOUND, not necessarily
+     * precise enough for the scattering-rate calculation itself.
+     *
+     * Skipped entirely if SidmDensity/SidmVelDisp aren't yet populated
+     * (DMPS(p).SidmDensity <= 0) -- e.g. before sidm_density() has ever run
+     * for this particle -- rather than dividing by zero or producing a
+     * nonsensical bound from stale/default values.
+     */
+    if(P[p].Type == 1 && DMPS(p).SidmDensity > 0 && DMPS(p).SidmVelDisp > 0)
       {
-          double rho_phys = P[p].SidmDensity * All.cf_a3inv;
-          double v_rel     = M_SQRT2 * P[p].SidmVelDisp / All.cf_atime;
-          double rate       = rho_phys * All.SidmCrossSection * v_rel;
-          
-          if(rate > 0)
+        double rho_phys = DMPS(p).SidmDensity * All.cf_a3inv;
+        double v_rel     = M_SQRT2 * DMPS(p).SidmVelDisp / All.cf_atime;
+        double rate       = rho_phys * All.SidmCrossSection * v_rel;
+
+        if(rate > 0)
           {
-              double dt_sidm = SIDM_TIMESTEP_SAFETY_FACTOR / rate;
-              if(dt_sidm < dt)
-                  dt = dt_sidm;
+            double dt_sidm = SIDM_TIMESTEP_SAFETY_FACTOR / rate;
+            if(dt_sidm < dt)
+              dt = dt_sidm;
           }
       }
 #endif /* #ifdef SIDM */

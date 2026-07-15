@@ -61,6 +61,10 @@ int domain_countToGo(void)
 #ifdef STARS
       toGoStars[n] = 0;
 #endif
+
+#ifdef SIDM
+      toGoDM[n] = 0;
+#endif
     
 #ifdef BLACKHOLES
       toGoBhs[n] = 0;
@@ -88,6 +92,11 @@ int domain_countToGo(void)
             toGoStars[DomainTask[no]] += 1;
 #endif
 
+#ifdef SIDM
+          if(P[n].Type == 1)
+            toGoDM[DomainTask[no]] += 1;
+#endif
+
 #ifdef BLACKHOLES
           if(P[n].Type == 5)
             toGoBhs[DomainTask[no]] += 1;
@@ -100,6 +109,10 @@ int domain_countToGo(void)
 
 #ifdef STARS
   MPI_Alltoall(toGoStars, 1, MPI_INT, toGetStars, 1, MPI_INT, MPI_COMM_WORLD);
+#endif
+
+#ifdef SIDM
+  MPI_Alltoall(toGoDM, 1, MPI_INT, toGetDM, 1, MPI_INT, MPI_COMM_WORLD);
 #endif
 
 #ifdef BLACKHOLES

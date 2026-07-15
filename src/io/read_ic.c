@@ -53,6 +53,9 @@
 #include <string.h>
 
 #include "../main/allvars.h"
+#ifdef SIDM
+#include "../sidm/sidm.h"
+#endif /* #ifdef SIDM */
 #include "../main/proto.h"
 
 #ifndef IDS_OFFSET
@@ -154,6 +157,10 @@ void read_ic(const char *fname, int readTypes)
 
 #ifdef BLACKHOLES
       NumBhs  = 0;
+#endif
+
+#ifdef SIDM
+      NumDM  = 0;
 #endif
 
 #if defined(RECOMPUTE_POTENTIAL_IN_SNAPSHOT)
@@ -523,6 +530,29 @@ void read_ic(const char *fname, int readTypes)
     }
 #endif /* BLACKHOLES */
 
+#ifdef SIDM
+  /* This was the missing piece causing the bus error: STARS/BLACKHOLES
+   * both get this same "first-time assignment from a freshly-read IC"
+   * treatment, but DM never did until now. Without it, every DM
+   * particle's SIDMID stays at its zero-initialized default (from
+   * allocate.c's memset), and DMPS(i) = DMSP[P[i].SIDMID] resolves to
+   * DMSP[0] for every single DM particle -- not out of bounds, so no
+   * crash here directly, but garbage/aliased data. The actual crash
+   * came later, in peano.c's cycle-sort, once particles started
+   * moving and PIndex back-references (never properly established in
+   * the first place) were read as if valid. */
+  int jd=0;
+  for(int id = 0; id<NumPart; id++)
+    {
+      if(P[id].Type == 1)
+        {
+          P[id].SIDMID = jd;
+          DMSP[jd].PIndex = id;
+          jd++;
+        }
+    }
+#endif /* #ifdef SIDM */
+
   MPI_Barrier(MPI_COMM_WORLD);
 
   t1 = second();
@@ -707,6 +737,12 @@ void empty_read_buffer(enum iofields blocknr, int offset, int pc, int type)
 #ifdef STARS
               case A_S:
                 array_pos = SP + n;
+                break;
+#endif
+
+#ifdef SIDM
+              case A_DMSP:
+                array_pos = DMSP + n;
                 break;
 #endif
 
@@ -1018,6 +1054,11 @@ void share_particle_number_in_file(const char *fname, int filenr, int readTask, 
 #ifdef STARS
       if(type==4)
         NumStars += n_for_this_task;
+#endif
+
+#ifdef SIDM
+      if(type==1)
+        NumDM += n_for_this_task;
 #endif
 
 #ifdef BLACKHOLES
@@ -1487,6 +1528,11 @@ void read_file(const char *fname, int filenr, int readTask, int lastTask, int re
 #ifdef STARS
       if(type == 4)
         NumStars += n_for_this_task;
+#endif
+
+#ifdef SIDM
+      if(type == 1)
+        NumDM += n_for_this_task;
 #endif
 
 #ifdef BLACKHOLES

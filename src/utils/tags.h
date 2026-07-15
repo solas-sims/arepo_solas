@@ -39,6 +39,9 @@
 #ifdef BLACKHOLES
 #define TAG_BHDATA 16
 #endif
+#ifdef SIDM
+#define TAG_DMDATA 17
+#endif
 #define TAG_GRAV_B 19
 #define TAG_HYDRO_A 22
 #define TAG_HYDRO_B 23

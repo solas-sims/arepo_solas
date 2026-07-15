@@ -33,6 +33,9 @@
  */
 
 #include "../main/allvars.h"
+#ifdef SIDM
+#include "../sidm/sidm.h"
+#endif /* #ifdef SIDM */
 
 #ifdef REFINEMENT
 #include "../main/proto.h"
@@ -172,6 +175,11 @@ void move_collisionless_particle(int new_i, int old_i)
 #ifdef STARS
   if(P[new_i].Type == 4)
     SPP(new_i).PID = new_i;
+#endif
+
+#ifdef SIDM
+  if(P[new_i].Type == 1)
+    DMPS(new_i).PIndex = new_i;
 #endif
 
 #ifdef BLACKHOLES

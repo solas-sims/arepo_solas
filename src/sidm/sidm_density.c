@@ -29,6 +29,9 @@
 
 #ifdef SIDM
 
+int               NumDM;
+DM_Particle_Data *DMSP;
+
 static int sidm_density_evaluate(int target, int mode, int threadid);
 static int sidm_density_isactive(int n);
 
@@ -47,34 +50,50 @@ static void particle2in(data_in *in, int i, int firstnode)
 {
   for(int k = 0; k < 3; k++)
     in->Pos[k] = P[i].Pos[k];
-  in->Hsml       = P[i].SidmHsml;
+  in->Hsml       = DMPS(i).SidmHsml;
   in->Firstnode  = firstnode;
 }
 
 typedef struct
 {
   MyFloat Density;
-  MyFloat VelDisp;
+  MyFloat VxSum, VySum, VzSum; /*!< mass*kernel-weighted first moments of velocity -- raw
+                                 * sums are additive across local+imported contributions;
+                                 * a sqrt'd dispersion is NOT, which was the bug this
+                                 * replaces (see file header for the full explanation) */
+  MyFloat V2Sum;               /*!< mass*kernel-weighted sum of |v|^2 */
   MyFloat Ngb;
 } data_out;
 
 static data_out *DataResult, *DataOut;
 
+/*! Persistent per-particle accumulators for the raw velocity moments,
+ *  mirroring SidmNgbs[]'s role: reset by the LOCAL (mode==MODE_LOCAL_PARTICLES)
+ *  call each Hsml-test iteration, then accumulated onto by however many
+ *  imported/cross-task contributions arrive for that same iteration. */
+static MyFloat *SidmVxSum, *SidmVySum, *SidmVzSum, *SidmV2Sum;
+
 static void out2particle(data_out *out, int i, int mode)
 {
   if(mode == MODE_LOCAL_PARTICLES)
     {
-      P[i].SidmDensity = out->Density;
-      P[i].SidmVelDisp = out->VelDisp;
-      P[i].SidmNumNgb  = (int)out->Ngb;
+      DMPS(i).SidmDensity = out->Density;
+      DMPS(i).SidmNumNgb  = (int)out->Ngb;
       SidmNgbs[i]      = out->Ngb;
+      SidmVxSum[i]     = out->VxSum;
+      SidmVySum[i]     = out->VySum;
+      SidmVzSum[i]     = out->VzSum;
+      SidmV2Sum[i]     = out->V2Sum;
     }
   else
     {
-      P[i].SidmDensity += out->Density;
-      P[i].SidmVelDisp += out->VelDisp;
-      P[i].SidmNumNgb  += (int)out->Ngb;
+      DMPS(i).SidmDensity += out->Density;
+      DMPS(i).SidmNumNgb  += (int)out->Ngb;
       SidmNgbs[i]       += out->Ngb;
+      SidmVxSum[i]      += out->VxSum;
+      SidmVySum[i]      += out->VySum;
+      SidmVzSum[i]      += out->VzSum;
+      SidmV2Sum[i]      += out->V2Sum;
     }
 }
 
@@ -187,7 +206,9 @@ static int sidm_density_evaluate(int target, int mode, int threadid)
   double hinv3 = hinv * hinv * hinv;
 
   double search_min[3], search_max[3], search_max_Lsub[3], search_min_Ladd[3];
+#if !defined(GRAVITY_NOT_PERIODIC)
   double xtmp, ytmp, ztmp;
+#endif
 
   search_min[0] = pos_x - 1.001 * h;
   search_min[1] = pos_y - 1.001 * h;
@@ -196,6 +217,7 @@ static int sidm_density_evaluate(int target, int mode, int threadid)
   search_max[1] = pos_y + 1.001 * h;
   search_max[2] = pos_z + 1.001 * h;
 
+#if !defined(GRAVITY_NOT_PERIODIC)
   search_max_Lsub[0] = search_max[0] - boxSize_X;
   search_max_Lsub[1] = search_max[1] - boxSize_Y;
   search_max_Lsub[2] = search_max[2] - boxSize_Z;
@@ -203,8 +225,28 @@ static int sidm_density_evaluate(int target, int mode, int threadid)
   search_min_Ladd[0] = search_min[0] + boxSize_X;
   search_min_Ladd[1] = search_min[1] + boxSize_Y;
   search_min_Ladd[2] = search_min[2] + boxSize_Z;
+#else
+  /* Non-periodic: neutralize the wrap-around terms entirely rather than
+   * relying on boxSize_X/Y/Z being sane for this purpose -- BoxSize=0
+   * (the standard, CORRECT convention for a genuinely non-periodic
+   * setup, e.g. an isolated halo IC) makes the wrap terms degenerate
+   * (search_max_Lsub=search_max, search_min_Ladd=search_min), which
+   * causes every pruning test below to become impossible to satisfy --
+   * i.e. the tree never rejects ANY node, degrading every query from an
+   * O(log N) walk to a full O(N) scan. For ~1e5 particles this is
+   * O(N^2) total work: technically still making progress (pinned at
+   * ~100% CPU) but never finishing in practical time -- indistinguishable
+   * from a hang. Setting these to +/-infinity makes each two-clause
+   * pruning condition below collapse to a plain single-sided overlap
+   * test (see the arithmetic worked out in the fix commit/PR
+   * description), which is what a non-periodic search should be doing
+   * anyway. */
+  search_max_Lsub[0] = search_max_Lsub[1] = search_max_Lsub[2] = -INFINITY;
+  search_min_Ladd[0] = search_min_Ladd[1] = search_min_Ladd[2] = INFINITY;
+#endif /* #if !defined(GRAVITY_NOT_PERIODIC) #else */
 
   double density_sum = 0.0;
+  double vx_sum = 0.0, vy_sum = 0.0, vz_sum = 0.0;
   double v2_sum       = 0.0;
   int    numngb       = 0;
 
@@ -233,14 +275,14 @@ static int sidm_density_evaluate(int target, int mode, int threadid)
               if(P[p].Ti_Current != All.Ti_Current)
                 drift_particle(p, All.Ti_Current);
 
-              double dx = NGB_PERIODIC_LONG_X(P[p].Pos[0] - pos_x);
-              if(dx > h)
+              double dx = GRAVITY_NEAREST_X(P[p].Pos[0] - pos_x);
+              if(fabs(dx) > h)
                 continue;
-              double dy = NGB_PERIODIC_LONG_Y(P[p].Pos[1] - pos_y);
-              if(dy > h)
+              double dy = GRAVITY_NEAREST_Y(P[p].Pos[1] - pos_y);
+              if(fabs(dy) > h)
                 continue;
-              double dz = NGB_PERIODIC_LONG_Z(P[p].Pos[2] - pos_z);
-              if(dz > h)
+              double dz = GRAVITY_NEAREST_Z(P[p].Pos[2] - pos_z);
+              if(fabs(dz) > h)
                 continue;
 
               double r2 = dx * dx + dy * dy + dz * dz;
@@ -257,6 +299,9 @@ static int sidm_density_evaluate(int target, int mode, int threadid)
                 wk = hinv3 * KERNEL_COEFF_5 * (1.0 - u) * (1.0 - u) * (1.0 - u);
 
               density_sum += P[p].Mass * wk;
+              vx_sum += P[p].Mass * wk * P[p].Vel[0];
+              vy_sum += P[p].Mass * wk * P[p].Vel[1];
+              vz_sum += P[p].Mass * wk * P[p].Vel[2];
               v2_sum += P[p].Mass * wk *
                         (P[p].Vel[0] * P[p].Vel[0] + P[p].Vel[1] * P[p].Vel[1] + P[p].Vel[2] * P[p].Vel[2]);
               numngb++;
@@ -303,7 +348,10 @@ static int sidm_density_evaluate(int target, int mode, int threadid)
 
   target_result->Density = density_sum;
   target_result->Ngb     = numngb;
-  target_result->VelDisp = (numngb > 0 && density_sum > 0) ? sqrt(v2_sum / (3.0 * density_sum)) : 0.0;
+  target_result->VxSum   = vx_sum;
+  target_result->VySum   = vy_sum;
+  target_result->VzSum   = vz_sum;
+  target_result->V2Sum   = v2_sum;
 
   /* MODE_IMPORTED_PARTICLES: do NOT call out2particle here. `target` in
    * this branch is a position in the import scratch buffer on the
@@ -350,6 +398,10 @@ void sidm_density(void)
   SidmNgbs = (MyFloat *)mymalloc("SidmNgbs", NumPart * sizeof(MyFloat));
   Left     = (MyFloat *)mymalloc("Left", NumPart * sizeof(MyFloat));
   Right    = (MyFloat *)mymalloc("Right", NumPart * sizeof(MyFloat));
+  SidmVxSum = (MyFloat *)mymalloc("SidmVxSum", NumPart * sizeof(MyFloat));
+  SidmVySum = (MyFloat *)mymalloc("SidmVySum", NumPart * sizeof(MyFloat));
+  SidmVzSum = (MyFloat *)mymalloc("SidmVzSum", NumPart * sizeof(MyFloat));
+  SidmV2Sum = (MyFloat *)mymalloc("SidmV2Sum", NumPart * sizeof(MyFloat));
 
   for(idx = 0; idx < TimeBinsGravity.NActiveParticles; idx++)
     {
@@ -359,8 +411,8 @@ void sidm_density(void)
 
       Left[i] = Right[i] = 0;
 
-      if(P[i].SidmHsml <= 0)
-        P[i].SidmHsml = All.ForceSoftening[P[i].SofteningType];
+      if(DMPS(i).SidmHsml <= 0)
+        DMPS(i).SidmHsml = All.ForceSoftening[P[i].SofteningType];
     }
 
   generic_set_MaxNexport();
@@ -388,30 +440,30 @@ void sidm_density(void)
                   }
 
               if(SidmNgbs[i] < (All.SidmDesNumNgb - All.SidmDesNumNgbDev))
-                Left[i] = dmax(P[i].SidmHsml, Left[i]);
+                Left[i] = dmax(DMPS(i).SidmHsml, Left[i]);
               else
                 {
                   if(Right[i] != 0)
                     {
-                      if(P[i].SidmHsml < Right[i])
-                        Right[i] = P[i].SidmHsml;
+                      if(DMPS(i).SidmHsml < Right[i])
+                        Right[i] = DMPS(i).SidmHsml;
                     }
                   else
-                    Right[i] = P[i].SidmHsml;
+                    Right[i] = DMPS(i).SidmHsml;
                 }
 
               if(Right[i] > 0 && Left[i] > 0)
-                P[i].SidmHsml = pow(0.5 * (pow(Left[i], 3) + pow(Right[i], 3)), 1.0 / 3);
+                DMPS(i).SidmHsml = pow(0.5 * (pow(Left[i], 3) + pow(Right[i], 3)), 1.0 / 3);
               else
                 {
                   if(Right[i] == 0 && Left[i] == 0)
                     terminate("SIDM_DENSITY: should not occur");
 
                   if(Right[i] == 0 && Left[i] > 0)
-                    P[i].SidmHsml *= 1.26;
+                    DMPS(i).SidmHsml *= 1.26;
 
                   if(Right[i] > 0 && Left[i] == 0)
-                    P[i].SidmHsml /= 1.26;
+                    DMPS(i).SidmHsml /= 1.26;
                 }
             }
         }
@@ -429,6 +481,46 @@ void sidm_density(void)
     }
   while(ntot > 0);
 
+  /* Final VelDisp computation: mean-subtracted, using the LAST
+   * (converged) iteration's accumulated raw moments. This is the fix --
+   * previously VelDisp was computed as sqrt(<v^2>/3) with no mean
+   * subtraction (biased by any bulk/coherent flow, not just genuine
+   * local dispersion), AND accumulated across local+imported
+   * contributions by summing sqrt() results together, which is not
+   * mathematically valid (see file header). Both are fixed by shipping
+   * raw first/second moments through out2particle (additive, unlike
+   * sqrt'd values) and only taking the sqrt once, here, after all
+   * contributions for the final converged pass are in.
+   *
+   * var_3d = <v^2> - <v>^2 is the trace of the velocity dispersion
+   * tensor (sigma_x^2+sigma_y^2+sigma_z^2); dividing by 3 and taking
+   * the sqrt gives the 1D dispersion convention already used
+   * elsewhere in this code. Clamped to >=0 to guard against tiny
+   * negative values from floating-point rounding in near-zero-
+   * dispersion regions.
+   */
+  for(idx = 0; idx < TimeBinsGravity.NActiveParticles; idx++)
+    {
+      i = TimeBinsGravity.ActiveParticleList[idx];
+      if(i < 0 || !sidm_density_isactive(i))
+        continue;
+
+      if(DMPS(i).SidmDensity > 0)
+        {
+          double mean_vx = SidmVxSum[i] / DMPS(i).SidmDensity;
+          double mean_vy = SidmVySum[i] / DMPS(i).SidmDensity;
+          double mean_vz = SidmVzSum[i] / DMPS(i).SidmDensity;
+          double mean_v2 = mean_vx * mean_vx + mean_vy * mean_vy + mean_vz * mean_vz;
+
+          double var_3d = SidmV2Sum[i] / DMPS(i).SidmDensity - mean_v2;
+          var_3d         = fmax(0.0, var_3d);
+
+          DMPS(i).SidmVelDisp = sqrt(var_3d / 3.0);
+        }
+      else
+        DMPS(i).SidmVelDisp = 0.0;
+    }
+
   /* --- TEMPORARY diagnostic block: no I/O wiring exists yet for these
    * fields, so this is the only way to see actual values right now.
    * Remove once SidmDensity/SidmHsml/SidmNumNgb are in snapshot output. */
@@ -444,9 +536,9 @@ void sidm_density(void)
         if(i < 0 || !sidm_density_isactive(i))
           continue;
 
-        double d = P[i].SidmDensity;
-        double h = P[i].SidmHsml;
-        double n = (double)P[i].SidmNumNgb;
+        double d = DMPS(i).SidmDensity;
+        double h = DMPS(i).SidmHsml;
+        double n = (double)DMPS(i).SidmNumNgb;
 
         if(isnan(d) || isnan(h) || isinf(d) || isinf(h))
           {
@@ -503,6 +595,10 @@ void sidm_density(void)
       }
   }
 
+  myfree(SidmV2Sum);
+  myfree(SidmVzSum);
+  myfree(SidmVySum);
+  myfree(SidmVxSum);
   myfree(Right);
   myfree(Left);
   myfree(SidmNgbs);

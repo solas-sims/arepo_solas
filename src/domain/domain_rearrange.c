@@ -40,6 +40,9 @@
 
 #include "../main/allvars.h"
 #include "../main/proto.h"
+#ifdef SIDM
+#include "../sidm/sidm.h"
+#endif /* #ifdef SIDM */
 
 #include "../mesh/voronoi/voronoi.h"
 #include "domain.h"
@@ -108,6 +111,11 @@ void domain_rearrange_particle_sequence(void)
 #ifdef STARS
             if(P[NumGas - 1].Type == 4)
               SPP(NumGas - 1).PID = NumGas - 1;
+#endif
+
+#ifdef SIDM
+            if(P[NumGas - 1].Type == 1)
+              DMPS(NumGas - 1).PIndex = NumGas - 1;
 #endif
 
 #ifdef BLACKHOLES
