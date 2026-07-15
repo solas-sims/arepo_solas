@@ -117,7 +117,7 @@ static void SN_compute(int ev, int h, double e, double a, double b, double NgbsD
 
   double Zsol = fmax(NgbsMetallicity / 0.0127, 0.01);
 
-  /* Terminal momentum: Kim & Ostriker (2015) */
+  /* Terminal momentum: T. Kimm et al. (2015) and Matthew Smith (2026) */
   double p_term = 3.0e5 /* Msun km/s */
   * pow(E51, 16.0 / 17.0)
   * pow(n_H, -2.0 / 17.0)
@@ -153,7 +153,7 @@ static void SN_compute(int ev, int h, double e, double a, double b, double NgbsD
  * Kim & Ostriker (2015)-> r_SN = 22.6 pc * (E_SN / 1e51 erg)^0.29 * (rho_h / (1.4*m_p) / cm^-3)^(-0.42) 
  * Unphysical radius check: is the host cell too large for us to 
  * couple the SN to its neighbours?
- * Mathew Smith (2026)-> r_unphysical = 1 kpc
+ * Matthew Smith (2026)-> r_unphysical = 1 kpc
  */
 static int SN_feedback_radius(int i, int ev, int h)
 {
