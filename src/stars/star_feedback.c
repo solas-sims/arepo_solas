@@ -150,7 +150,7 @@ static void SN_compute(int ev, int h, double e, double a, double b, double NgbsD
 /* 
  * Sedov/cooling radius check: is the host cell able to resolve the
  * pressure-driven expansion of this SN?
- * Kim & Ostriker (2015)-> r_SN = 30 pc * (E_SN / 1e51 erg)^0.29 * (rho_h / (1.4*m_p) / cm^-3)^(-0.46) 
+ * Kim & Ostriker (2015)-> r_SN = 22.6 pc * (E_SN / 1e51 erg)^0.29 * (rho_h / (1.4*m_p) / cm^-3)^(-0.42) 
  * Unphysical radius check: is the host cell too large for us to 
  * couple the SN to its neighbours?
  * Mathew Smith (2026)-> r_unphysical = 1 kpc
@@ -171,7 +171,7 @@ static int SN_feedback_radius(int i, int ev, int h)
 
   double n_cgs = rho_cgs / (1.4 * PROTONMASS); 
  
-  double r_SN_pc = 30.0 * pow(E51, 0.29) * pow(n_cgs, -0.46); /* parsec */
+  double r_SN_pc = 22.6 * pow(E51, 0.29) * pow(n_cgs, -0.42); /* parsec */
   double r_SN = (r_SN_pc * PARSEC) / All.cf_UnitLength_in_cm; /* code units */
 
   /* Thermal dump into host  */
