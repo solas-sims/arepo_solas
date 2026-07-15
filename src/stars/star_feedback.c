@@ -112,8 +112,8 @@ static void SN_compute(int ev, int h, double e, double a, double b, double NgbsD
 
   double E_SNR = E_SN + e;
   double E51 = E_SN * All.cf_UnitEnergy_in_cgs / 1.0e51;
-  
-  double n_H  = 0.76 * NgbsDensity * All.cf_UnitDensity_in_cgs / PROTONMASS; 
+
+  double n_H = HYDROGEN_MASSFRAC * NgbsDensity * All.cf_UnitDensity_in_cgs / PROTONMASS; 
 
   double Zsol = fmax(NgbsMetallicity / 0.0127, 0.01);
 
@@ -169,6 +169,7 @@ static int SN_feedback_radius(int i, int ev, int h)
   double rho = (P[i].Mass + SphP[i].StarMassFeed) / SphP[i].Volume;
   double rho_cgs = rho * All.cf_UnitDensity_in_cgs;
 
+  /* Based on Kim & Ostriker */
   double n_cgs = rho_cgs / (1.4 * PROTONMASS); 
  
   double r_SN_pc = 22.6 * pow(E51, 0.29) * pow(n_cgs, -0.42); /* parsec */

@@ -470,7 +470,7 @@ typedef unsigned long long peano1D;
 #define GAMMA_MINUS1 (GAMMA - 1.)
 #define GAMMA_PLUS1 (GAMMA + 1.)
 
-#define HYDROGEN_MASSFRAC 0.76 /*!< mass fraction of hydrogen, relevant only for radiative cooling */
+#define HYDROGEN_MASSFRAC 0.76 /*!< mass fraction of hydrogen */
 #define HE_ABUND ((1. / HYDROGEN_MASSFRAC - 1.) / 4.)
 
 /* ... often used physical constants (cgs units; NIST 2010) */
