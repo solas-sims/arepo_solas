@@ -859,5 +859,13 @@ void init_io_fields()
              &DMSP[0].SidmVelDisp, 0, DM_ONLY);
   init_units(IO_SIDM_VELDISP, 0.5, 0., 0., 0., 1., All.UnitVelocity_in_cm_per_s);
   init_snapshot_type(IO_SIDM_VELDISP, SN_MINI);
+
+  /* Cumulative scatter count -- differencing this between two snapshots
+   * gives an empirical scattering rate per particle, for validation
+   * against Gamma = rho*(sigma/m)*v_rel. See README.md test 1. */
+  init_field(IO_SIDM_SCATTERCOUNT, "SISC", "SidmScatterCount", MEM_INT, FILE_INT, FILE_INT, 1, A_DMSP,
+             &DMSP[0].SidmScatterCount, 0, DM_ONLY);
+  init_units(IO_SIDM_SCATTERCOUNT, 0., 0., 0., 0., 0., 0.0);
+  init_snapshot_type(IO_SIDM_SCATTERCOUNT, SN_MINI);
 #endif /* #ifdef SIDM */
 }

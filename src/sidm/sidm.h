@@ -39,6 +39,11 @@ typedef struct DM_Particle_Data
   int     SidmNumNgb;      /*!< neighbours found within SidmHsml, for Hsml convergence */
   integertime SidmLastScatterTime; /*!< diagnostic / rate-limiting */
   int     SidmScatterFlag;         /*!< set by Monte Carlo step, consumed by kick routine */
+  int     SidmScatterCount;        /*!< cumulative count of scatters this particle has undergone --
+                                     * unlike SidmScatterFlag (reset-able, single-step), this only
+                                     * ever increments, so differencing it between two snapshots
+                                     * gives a genuine empirical scattering rate for validation
+                                     * against the analytic Gamma = rho*(sigma/m)*v_rel prediction. */
 } DM_Particle_Data;
 
 extern DM_Particle_Data *DMSP;

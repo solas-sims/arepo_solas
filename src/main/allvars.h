@@ -2116,6 +2116,7 @@ enum iofields
   IO_SIDM_HSML,
   IO_SIDM_NUMNGB,
   IO_SIDM_VELDISP,
+  IO_SIDM_SCATTERCOUNT,
 #endif
   IO_LASTENTRY /* This should be kept - it signals the end of the list */
 };

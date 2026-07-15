@@ -226,6 +226,8 @@ static void sidm_apply_kick_local(int i, int j)
   DMPS(j).SidmLastScatterTime = All.Ti_Current;
   DMPS(i).SidmScatterFlag     = 1;
   DMPS(j).SidmScatterFlag     = 1;
+  DMPS(i).SidmScatterCount++;
+  DMPS(j).SidmScatterCount++;
 }
 
 /*! \brief Pending instruction to a remote task: "set this local particle's
@@ -288,6 +290,7 @@ static void sidm_apply_kick_cross_task(int i, const sidm_candidate *cand, sidm_k
     P[i].Vel[k] = new_vel_i[k];
   DMPS(i).SidmLastScatterTime = All.Ti_Current;
   DMPS(i).SidmScatterFlag     = 1;
+  DMPS(i).SidmScatterCount++;
 
   int t = cand->remote_task;
   if(t < 0 || t >= NTask)
@@ -694,6 +697,32 @@ void sidm_scatter(int timebin)
 
       if(!cand[chosen].is_remote)
         sidm_apply_kick_local(i, cand[chosen].index);
+      else if(cand[chosen].remote_task == ThisTask)
+        {
+          /* Anomaly: a candidate reached via the remote-query path
+           * self-reported remote_task == ThisTask. Root cause not yet
+           * found -- checked and ruled out (a) construction incorrectly
+           * pseudo-particle-izing a locally-owned-but-empty leaf (it
+           * doesn't: gated by DomainTask[i]!=ThisTask, confirmed by
+           * reading sidm_treebuild_construct), and (b) gravity's own
+           * tree build reassigning DomainTask via optimized_domain_mapping
+           * (it can't: HIERARCHICAL_GRAVITY forces that to 0). Whatever
+           * the actual mechanism, cand[chosen].index IS a genuinely
+           * valid local P[] index whenever remote_task==ThisTask (by
+           * construction of how remote_task/index get set in
+           * out2particle), so this is handled correctly -- as a local
+           * kick -- rather than crashing or silently dropping the
+           * interaction. Logged with enough context to actually find
+           * the mechanism if it recurs. */
+          printf(
+              "SIDM_SCATTER anomaly: task=%d self-targeted candidate. i_ID=%lld i_pos=(%.6f %.6f %.6f) "
+              "cand_index=%d cand_r=%.6e cand_p_ij=%.6e ncand=%d\n",
+              ThisTask, (long long)P[i].ID, P[i].Pos[0], P[i].Pos[1], P[i].Pos[2], cand[chosen].index, cand[chosen].r,
+              cand[chosen].p_ij, ncand);
+          fflush(stdout);
+
+          sidm_apply_kick_local(i, cand[chosen].index);
+        }
       else
         sidm_apply_kick_cross_task(i, &cand[chosen], poke_buf, poke_count, poke_capacity);
     }
@@ -724,6 +753,7 @@ void sidm_scatter(int timebin)
             P[ri].Vel[k] = recv_buf[p].new_vel[k];
           DMPS(ri).SidmLastScatterTime = recv_buf[p].scatter_time;
           DMPS(ri).SidmScatterFlag     = 1;
+          DMPS(ri).SidmScatterCount++;
         }
 
       if(nrecv > 0)
