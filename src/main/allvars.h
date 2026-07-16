@@ -1400,6 +1400,10 @@ double InitMetallicityinSolar;
   char StarTablesFile[MAXLEN_PATH];
 #endif 
 
+#ifdef SUPERNOVAE
+  double SNHostShellSweepFrac;
+#endif
+
 #ifdef STAR_RADIATION_ACTIVE
   double RaySplitFactor;
 #endif

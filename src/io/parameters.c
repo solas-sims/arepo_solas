@@ -605,6 +605,12 @@ void read_parameter_file(char *fname)
       id[nt++] = STRING;
 #endif
 
+#ifdef SUPERNOVAE
+      strcpy(tag[nt], "SNHostShellSweepFrac");
+      addr[nt] = All.SNHostShellSweepFrac;
+      id[nt++] = REAL;
+#endif
+
 #ifdef STAR_RADIATION_ACTIVE
       strcpy(tag[nt], "RaySplitFactor");
       addr[nt] = &All.RaySplitFactor;
