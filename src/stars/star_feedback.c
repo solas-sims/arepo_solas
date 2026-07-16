@@ -654,10 +654,6 @@ void star_feedback(void)
                   double sq_vwind = MechanicalFeedback->WindMomentum / MechanicalFeedback->MassLoss
                   * MechanicalFeedback->WindMomentum / MechanicalFeedback->MassLoss; 
 
-                  //double cross = 2.0 * (MechanicalFeedback->StarVelocity[0] * MechanicalFeedback->WindMomentum / MechanicalFeedback->MassLoss * wbar[0] 
-                  //+ MechanicalFeedback->StarVelocity[1] * MechanicalFeedback->WindMomentum / MechanicalFeedback->MassLoss * wbar[1] 
-                  //+ MechanicalFeedback->StarVelocity[2] * MechanicalFeedback->WindMomentum / MechanicalFeedback->MassLoss * wbar[2]);
-
                   Kick.DeltaE = 0.5 * MechanicalFeedback->MassLoss * (sq_vstar + sq_vwind) * sqrtsq_wbar;
                 }   
 #endif
