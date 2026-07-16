@@ -8,9 +8,8 @@
 #include "../main/proto.h"
 
 /* SN host-injection modes, returned by SN_feedback_radius() */
-#define MESH          0 /* Couple across Voronoi faces */
-#define HOST          1 /* Thermal dump into host  */
-#define HOST_MOMENTUM 2 /* Momentum kick to host */
+#define MESH 0 /* Couple across Voronoi faces */
+#define HOST 1 /* Thermal dump into host  */
 
 /* Kick packet sent to remote face-neighbor cells */
 struct Feedback_Kick
@@ -148,21 +147,10 @@ static void SN_compute(int ev, int h, double e, double a, double b, double NgbsD
 
 #ifdef WINDS
 /*
- * Unphysical radius check: is the host cell too large for us to
- * couple the wind to its neighbours?
- * Matthew Smith (2026)-> r_unphysical = 1 kpc
+ * TODO
  */
 static int Wind_feedback_radius(int i, int ev, int h)
 {
-  double r_host = get_cell_radius(i);
-
-  double r_unphysical = 1.0 * KILOPARSEC / All.cf_UnitLength_in_cm;
-
-  /* Host-only injection */
-  if(r_host > r_unphysical)
-    return HOST_MOMENTUM;
-
-  /* Couple across Voronoi faces */
   return MESH;
 }
 
@@ -173,61 +161,7 @@ static int Wind_feedback_radius(int i, int ev, int h)
  */
 static void Wind_feedback_host(int i, int ev, int h, int mode)
 {
-  double xtmp, ytmp, ztmp;
-
-  Mechanical_Feedback_Data *MechanicalFeedbackData = &MechanicalFeedbackEvents.MechanicalFeedbackData[ev + h];
-  Mechanical_Feedback *MechanicalFeedback = &MechanicalFeedbackData->MechanicalFeedback;
-
-  /* Treat periodic boundaries */
-  double xstar[3];
-
-  xstar[0] = P[i].Pos[0] - NEAREST_X(P[i].Pos[0] - MechanicalFeedback->StarPosition[0]);
-  xstar[1] = P[i].Pos[1] - NEAREST_Y(P[i].Pos[1] - MechanicalFeedback->StarPosition[1]);
-  xstar[2] = P[i].Pos[2] - NEAREST_Z(P[i].Pos[2] - MechanicalFeedback->StarPosition[2]);
-
-  int k;
-
-  double m_ej = MechanicalFeedback->MassLoss;
-
-  /* Single target: the host cell takes 100% of the deposit */
-  const double sqrtsq_wbar = 1.0;
-
-  /* Star -> host cell-centre direction (replaces the star-to-face direction) */
-  double wbar[3] = {0.0, 0.0, 0.0};
-
-  double d[3], dd;
-
-  for(k = 0; k < 3; k++)
-    d[k] = P[i].Pos[k] - xstar[k];
-
-  dd = sqrt(d[0]*d[0] + d[1]*d[1] + d[2]*d[2]);
-
-  if(dd > 0.0)
-    {
-      for(k = 0; k < 3; k++)
-        wbar[k] = d[k] / dd;
-    }
-
-  double sq_vstar = MechanicalFeedback->StarVelocity[0]*MechanicalFeedback->StarVelocity[0]
-  + MechanicalFeedback->StarVelocity[1]*MechanicalFeedback->StarVelocity[1]
-  + MechanicalFeedback->StarVelocity[2]*MechanicalFeedback->StarVelocity[2];
-
-  double sq_vwind = MechanicalFeedback->WindMomentum / m_ej
-  * MechanicalFeedback->WindMomentum / m_ej;
-
-  struct Feedback_Kick Kick = {0};
-  Kick.CellIndex = i;
-
-  Kick.DeltaMass = m_ej * sqrtsq_wbar;
-#ifdef METALS
-  Kick.DeltaMetals = MechanicalFeedback->MetalsLoss * sqrtsq_wbar;
-#endif
-  for(k = 0; k < 3; k++)
-    Kick.DeltaP[k] = m_ej * sqrtsq_wbar * MechanicalFeedback->StarVelocity[k] + MechanicalFeedback->WindMomentum * wbar[k];
-
-  Kick.DeltaE = 0.5 * m_ej * (sq_vstar + sq_vwind) * sqrtsq_wbar;
-
-  apply_kick(i, &Kick);
+  terminate("Wind_feedback_host: host-mode winds not yet implemented (cell %d, mode %d)\n", i, mode);
 }
 #endif
 
@@ -236,9 +170,6 @@ static void Wind_feedback_host(int i, int ev, int h, int mode)
  * Sedov/cooling radius check: is the host cell able to resolve the
  * pressure-driven expansion of this SN?
  * Kim & Ostriker (2015)-> r_SN = 22.6 pc * (E_SN / 1e51 erg)^0.29 * (rho_h / (1.4*m_p) / cm^-3)^(-0.42) 
- * Unphysical radius check: is the host cell too large for us to 
- * couple the SN to its neighbours?
- * Matthew Smith (2026)-> r_unphysical = 1 kpc
  */
 static int SN_feedback_radius(int i, int ev, int h)
 {
@@ -263,12 +194,6 @@ static int SN_feedback_radius(int i, int ev, int h)
   /* Thermal dump into host  */
   if(r_host < r_SN / 10.0)
     return HOST;
-
-  double r_unphysical = 1.0 * KILOPARSEC / All.cf_UnitLength_in_cm;
-  
-  /* Momentum kick to host */
-  if(r_host > r_unphysical)
-    return HOST_MOMENTUM;
   
   /* Couple across Voronoi faces */ 
   return MESH;
@@ -282,101 +207,22 @@ static int SN_feedback_radius(int i, int ev, int h)
  */
 static void SN_feedback_host(int i, int ev, int h, int mode)
 {
-  double xtmp, ytmp, ztmp;
-
   Mechanical_Feedback_Data *MechanicalFeedbackData = &MechanicalFeedbackEvents.MechanicalFeedbackData[ev + h];
   Mechanical_Feedback *MechanicalFeedback = &MechanicalFeedbackData->MechanicalFeedback;
-  
-  /* Treat periodic boundaries */
-  double xstar[3];
-
-  xstar[0] = P[i].Pos[0] - NEAREST_X(P[i].Pos[0] - MechanicalFeedback->StarPosition[0]);
-  xstar[1] = P[i].Pos[1] - NEAREST_Y(P[i].Pos[1] - MechanicalFeedback->StarPosition[1]);
-  xstar[2] = P[i].Pos[2] - NEAREST_Z(P[i].Pos[2] - MechanicalFeedback->StarPosition[2]);
 
   int k;
 
-  double p = 0.0, E = 0.0;
-
   double m_ej = MechanicalFeedback->SN_MassLoss;
 
-  /* Single target: the host cell takes 100% of the deposit */
-  const double sq_wbar = 1.0;
-  const double sqrtsq_wbar = 1.0;
+  double sq_vstar = MechanicalFeedback->StarVelocity[0]*MechanicalFeedback->StarVelocity[0]
+  + MechanicalFeedback->StarVelocity[1]*MechanicalFeedback->StarVelocity[1]
+  + MechanicalFeedback->StarVelocity[2]*MechanicalFeedback->StarVelocity[2];
 
-  /* Star -> host cell-centre direction (replaces the star-to-face direction) */
-  double wbar[3] = {0.0, 0.0, 0.0};
+  double E;
 
-  double d[3], dd;
-  
-  for(k = 0; k < 3; k++)
-    d[k] = P[i].Pos[k] - xstar[k];
-
-  dd = sqrt(d[0]*d[0] + d[1]*d[1] + d[2]*d[2]);
-
-  if(dd > 0.0)
+  if(mode == HOST)
     {
-      for(k = 0; k < 3; k++)
-        wbar[k] = d[k] / dd;
-    }
-
-  if(mode == HOST_MOMENTUM)
-    {
-      /* Helpers for supernovae injection */
-      double num, den, e = 0.0, a = 0.0, b = 0.0;
-
-      /* Ngbs properties */
-      int Ngbs = 0;
-      double NgbsMass = 0.0, NgbsDensity = 0.0, NgbsMetallicity = 0.0;
-
-      double mj, vj[3];
-
-      mj = P[i].Mass + SphP[i].StarMassFeed;
-
-      for(k = 0; k < 3; k++)
-        vj[k] = (SphP[i].Momentum[k] + SphP[i].StarMomentumFeed[k]) / mj;
-
-      double sq_vj = vj[0]*vj[0] + vj[1]*vj[1] + vj[2]*vj[2];
-
-      double sq_vstar = MechanicalFeedback->StarVelocity[0]*MechanicalFeedback->StarVelocity[0]
-      + MechanicalFeedback->StarVelocity[1]*MechanicalFeedback->StarVelocity[1]
-      + MechanicalFeedback->StarVelocity[2]*MechanicalFeedback->StarVelocity[2];
-
-      double cross = 2.0 * (vj[0]*MechanicalFeedback->StarVelocity[0]
-      + vj[1]*MechanicalFeedback->StarVelocity[1]
-      + vj[2]*MechanicalFeedback->StarVelocity[2]);
-
-      num = 0.5 * mj * m_ej * sqrtsq_wbar * (sq_vj + sq_vstar - cross);
-      den = mj + m_ej * sqrtsq_wbar;
-
-      e += num / den;
-
-      num = sq_wbar;
-
-      a += num / den;
-
-      num = mj * ((vj[0] - MechanicalFeedback->StarVelocity[0]) * wbar[0]
-      + (vj[1] - MechanicalFeedback->StarVelocity[1]) * wbar[1]
-      + (vj[2] - MechanicalFeedback->StarVelocity[2]) * wbar[2]);
-
-      b += num / den;
-
-      Ngbs++;
-      NgbsMass += mj * sqrtsq_wbar;
-      NgbsDensity += mj / SphP[i].Volume * sqrtsq_wbar;
-#ifdef METALS
-      NgbsMetallicity += (SphP[i].GasMetals + SphP[i].StarMetalsFeed) / mj * sqrtsq_wbar;
-#endif
-
-      SN_compute(ev, h, e, a, b, NgbsDensity, NgbsMetallicity, &p, &E);
-    }
-  else if(mode == HOST) 
-    {
-      double sq_vstar = MechanicalFeedback->StarVelocity[0]*MechanicalFeedback->StarVelocity[0]
-      + MechanicalFeedback->StarVelocity[1]*MechanicalFeedback->StarVelocity[1]
-      + MechanicalFeedback->StarVelocity[2]*MechanicalFeedback->StarVelocity[2];
-
-      p = 0.0;
+      /* Thermal + advected-mass dump: no directed momentum into the host */
       E = 0.5 * m_ej * sq_vstar + MechanicalFeedback->SN_EnergyInject;
     }
   else
@@ -385,14 +231,15 @@ static void SN_feedback_host(int i, int ev, int h, int mode)
   struct Feedback_Kick Kick = {0};
   Kick.CellIndex = i;
 
-  Kick.SN_DeltaMass = m_ej * sqrtsq_wbar;
+  Kick.SN_DeltaMass = m_ej;
 #ifdef METALS
-  Kick.SN_DeltaMetals = MechanicalFeedback->SN_MetalsLoss * sqrtsq_wbar;
+  Kick.SN_DeltaMetals = MechanicalFeedback->SN_MetalsLoss;
 #endif
+  /* Advected mass only: ejecta carries the star's own velocity */
   for(k = 0; k < 3; k++)
-    Kick.SN_DeltaP[k] = m_ej * sqrtsq_wbar * MechanicalFeedback->StarVelocity[k] + p * wbar[k];
+    Kick.SN_DeltaP[k] = m_ej * MechanicalFeedback->StarVelocity[k];
 
-  Kick.SN_DeltaE = E * sqrtsq_wbar;
+  Kick.SN_DeltaE = E;
 
   apply_kick(i, &Kick);
 }
