@@ -39,6 +39,12 @@
 
 #include "../main/allvars.h"
 #include "../main/proto.h"
+#ifdef SIDM
+#include "../sidm/sidm.h"
+#endif /* #ifdef SIDM */
+#ifdef FDM
+#include "../fdm/fdm.h"
+#endif /* #ifdef FDM */
 
 
 /*! \brief Allocates memory for global arrays.
@@ -89,6 +95,26 @@ void allocate_memory(void)
   mpi_printf("ALLOCATE: initial allocation for MaxPart = %d\n", All.MaxPart);
   P = (struct particle_data *)mymalloc_movable(&P, "P", All.MaxPart * sizeof(struct particle_data));
 
+#ifdef SIDM
+  /* Sized off All.MaxPart, not a dedicated MaxPartDM (none exists --
+   * same choice already made for SidmTree_MaxPart in sidm_tree.c).
+   * Grows in lockstep with P[] itself in reallocate_memory_maxpart()
+   * below, rather than having its own independent reallocate_memory_*
+   * function the way stars/BH do (they have their own independently-
+   * changing MaxPartStars/MaxPartBhs; DMSP[] doesn't need one since
+   * it's always tied 1:1 to All.MaxPart). */
+  mpi_printf("ALLOCATE: initial allocation for SIDM DMSP (MaxPart = %d)\n", All.MaxPart);
+  DMSP = (DM_Particle_Data *)mymalloc_movable(&DMSP, "DMSP", All.MaxPart * sizeof(DM_Particle_Data));
+#endif /* #ifdef SIDM */
+#ifdef FDM
+  /* Same reasoning as DMSP[] above: sized off All.MaxPart, grows in
+   * lockstep with P[] itself in reallocate_memory_maxpart() below,
+   * no independent reallocate_memory_* function needed since it's
+   * always tied 1:1 to All.MaxPart. */
+  mpi_printf("ALLOCATE: initial allocation for FDM_StarResult (MaxPart = %d)\n", All.MaxPart);
+  FDM_StarResult = (fdm_star_result *)mymalloc_movable(&FDM_StarResult, "FDM_StarResult", All.MaxPart * sizeof(fdm_star_result));
+#endif /* #ifdef FDM */
+
   mpi_printf("ALLOCATE: initial allocation for MaxPartSph = %d\n", All.MaxPartSph);
   SphP = (struct sph_particle_data *)mymalloc_movable(&SphP, "SphP", All.MaxPartSph * sizeof(struct sph_particle_data));
 
@@ -120,6 +146,12 @@ void allocate_memory(void)
 
   /* set to zero */
   memset(P, 0, All.MaxPart * sizeof(struct particle_data));
+#ifdef SIDM
+  memset(DMSP, 0, All.MaxPart * sizeof(DM_Particle_Data));
+#endif /* #ifdef SIDM */
+#ifdef FDM
+  memset(FDM_StarResult, 0, All.MaxPart * sizeof(fdm_star_result));
+#endif /* #ifdef FDM */
   memset(SphP, 0, All.MaxPartSph * sizeof(struct sph_particle_data));
 
 #ifdef STARS
@@ -142,6 +174,12 @@ void reallocate_memory_maxpart(void)
   mpi_printf("ALLOCATE: Changing to MaxPart = %d\n", All.MaxPart);
 
   P = (struct particle_data *)myrealloc_movable(P, All.MaxPart * sizeof(struct particle_data));
+#ifdef SIDM
+  DMSP = (DM_Particle_Data *)myrealloc_movable(DMSP, All.MaxPart * sizeof(DM_Particle_Data));
+#endif /* #ifdef SIDM */
+#ifdef FDM
+  FDM_StarResult = (fdm_star_result *)myrealloc_movable(FDM_StarResult, All.MaxPart * sizeof(fdm_star_result));
+#endif /* #ifdef FDM */
   timebins_reallocate(&TimeBinsGravity);
 }
 

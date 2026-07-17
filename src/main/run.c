@@ -55,6 +55,13 @@
 #include "../mesh/voronoi/voronoi.h"
 
 #include "../fof/fof.h"
+#ifdef SIDM
+#include "../sidm/sidm.h"
+#include "../sidm/sidm_tree.h"
+#endif /* #ifdef SIDM */
+#ifdef FDM
+#include "../fdm/fdm.h"
+#endif /* #ifdef FDM */
 
 static void do_second_order_source_terms_first_half(void);
 static void do_second_order_source_terms_second_half(void);
@@ -103,11 +110,21 @@ void run(void)
       set_non_standard_physics_for_current_time();
 
       ngb_treefree();
+#ifdef SIDM
+      sidm_treefree();
+#endif /* #ifdef SIDM */
       domain_free();
       domain_Decomposition(); /* do domain decomposition if needed */
 
       ngb_treeallocate();
+#ifdef SIDM
+      sidm_treeallocate();
+#endif /* #ifdef SIDM */
       ngb_treebuild(NumGas);
+#ifdef SIDM
+      sidm_treebuild();
+      sidm_density();
+#endif /* #ifdef SIDM */
 
       calculate_non_standard_physics_prior_mesh_construction();
 
@@ -230,6 +247,11 @@ void run(void)
 
           find_next_sync_point(); /* find next synchronization time */
 
+#ifdef FDM
+          fdm_advance_to_time(All.Ti_Current); /* advance FDM's own independent clock to catch up --
+                                                 * see fdm_integrator.c for the full reasoning */
+#endif /* #ifdef FDM */
+
           make_list_of_active_particles();
 
           output_log_messages(); /* write some info to log-files */
@@ -263,6 +285,9 @@ void run(void)
 #endif /* #ifdef VORONOI_STATIC_MESH */
 
           ngb_treefree();
+#ifdef SIDM
+          sidm_treefree();
+#endif /* #ifdef SIDM */
           domain_free();
 
           drift_all_particles();
@@ -270,7 +295,14 @@ void run(void)
           domain_Decomposition(); /* do new domain decomposition, will also make a new chained-list of synchronized particles */
 
           ngb_treeallocate();
+#ifdef SIDM
+          sidm_treeallocate();
+#endif /* #ifdef SIDM */
           ngb_treebuild(NumGas);
+#ifdef SIDM
+          sidm_treebuild();
+          sidm_density();
+#endif /* #ifdef SIDM */
 
 #if defined(VORONOI_STATIC_MESH)
           create_mesh();

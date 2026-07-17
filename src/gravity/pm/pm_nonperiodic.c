@@ -320,6 +320,26 @@ void pm_init_nonperiodic(void)
   kernel[0] = (fft_real *)mymalloc("kernel[0]", bytes = maxfftsize * sizeof(fft_real));
   bytes_tot += bytes;
   fft_of_kernel[0] = (fft_complex *)kernel[0];
+
+  /* All.Asmth[0]/All.Rcut[0] are used unconditionally as the DEFAULT
+   * short-range/long-range splitting scale in forcetree_walk.c's
+   * force_treeevaluate()/force_evaluate_direct() (used whenever
+   * PLACEHIGHRESREGION is not defined, or a particle is not in the
+   * zoom region), for ANY PMGRID+GRAVITY_NOT_PERIODIC run -- but,
+   * unlike pm_periodic.c (which explicitly computes
+   * All.Asmth[0]=ASMTH*All.BoxSize/GRID), this file never actually set
+   * them for the plain non-periodic, no-zoom-region case: only
+   * All.Asmth[1]/All.Rcut[1] get set below, gated by
+   * PLACEHIGHRESREGION specifically. Left at their zero-initialized
+   * default, this causes a division by zero (asmthinv=0.5/asmth)
+   * propagating to an infinite/NaN table index and a segfault the
+   * first time ANY particle pair's force gets evaluated -- not
+   * specific to FDM, but only actually triggered by a
+   * PMGRID+GRAVITY_NOT_PERIODIC+no-PLACEHIGHRESREGION combination,
+   * apparently not exercised elsewhere. Mirrors pm_periodic.c's own
+   * formula exactly. */
+  All.Asmth[0] = ASMTH * All.BoxSize / GRID;
+  All.Rcut[0]  = RCUT * All.Asmth[0];
 #endif /* #if defined(GRAVITY_NOT_PERIODIC) */
 
 #if defined(PLACEHIGHRESREGION)

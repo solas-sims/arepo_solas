@@ -48,6 +48,9 @@
 #include <unistd.h>
 
 #include "../main/allvars.h"
+#ifdef FDM
+#include "../fdm/fdm.h"
+#endif /* #ifdef FDM */
 #include "../main/proto.h"
 #include "../gitversion/version.h"
 
@@ -127,6 +130,21 @@ void begrun1(void)
 #endif /* #ifdef MULTIPLE_NODE_SOFTENING */
 
   set_units();
+
+#ifdef FDM
+  /* Genuine one-time allocation at startup -- unlike SIDM's dedicated
+   * tree (rebuilt at every domain decomposition, since particle-to-task
+   * assignment changes), FDM's mesh size (All.FDMGrid) and task count
+   * are both fixed for the life of the run, so this needs calling
+   * exactly once. Placed here (after set_units, not tied to IC/restart
+   * reading like allocate_memory() is) because All.FDMGrid/FDMBoxSize/
+   * FDMMass are purely param.txt-specified, not derived from an IC
+   * file's particle counts the way All.MaxPart is. */
+  fdm_allocate();
+
+  if(All.FDMICFile[0] != '\0')
+    fdm_read_field(All.FDMICFile); /* otherwise psi stays at fdm_allocate()'s own zero-init */
+#endif /* #ifdef FDM */
 
   if(RestartFlag == 1) /* this is needed here to allow domain decomposition right after restart */
     if(All.ComovingIntegrationOn)

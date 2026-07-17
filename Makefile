@@ -546,6 +546,12 @@ INCL += subfind/subfind.h
 SUBDIRS += subfind
 endif
 
+# FDM
+ifeq (FDM,$(findstring FDM,$(CONFIGVARS)))
+OBJS += fdm/fdm_field.o fdm/fdm_integrator.o fdm/fdm_poisson.o fdm/fdm_io.o fdm/fdm_gradient.o fdm/fdm_particle_coupling.o
+INCL += fdm/fdm.h 
+SUBDIRS += fdm
+endif
 
 ##########################
 #combine compiler options#

@@ -40,6 +40,9 @@
 
 #include "../main/allvars.h"
 #include "../main/proto.h"
+#ifdef FDM
+#include "../fdm/fdm.h"
+#endif /* #ifdef FDM */
 
 /*! \brief Computes the gravitational accelerations for all active particles.
  *
@@ -263,6 +266,28 @@ void gravity_force_finalize(int timebin)
 
       for(j = 0; j < 3; j++)
         P[i].GravAccel[j] *= All.G;
+
+#ifdef FDM
+      /* Phase 2a: add FDM_StarResult's force -- computed as -grad(Phi)
+       * in fdm_gradient.c, where Phi is a potential PER UNIT MASS (the
+       * standard gravitational convention this project has used
+       * throughout, e.g. the same units FDM_Potential itself uses in
+       * fdm_poisson.c) -- so this IS already an acceleration, already
+       * including G (baked into Phi's own normalization there), and
+       * must be added AFTER the *=All.G above, not before, or G would
+       * be double-applied to this term specifically. Interpolated
+       * once per outer sync point by fdm_interpolate_to_stars(),
+       * called from fdm_advance_to_time() (fdm_integrator.c) -- same
+       * basic-version-first caveat noted there: reflects the
+       * potential at the current sync point, not anything finer-
+       * grained during FDM's own sub-cycling in between. */
+      if(P[i].Type == 4)
+        {
+          P[i].GravAccel[0] += FDM_StarResult[i].ForceX;
+          P[i].GravAccel[1] += FDM_StarResult[i].ForceY;
+          P[i].GravAccel[2] += FDM_StarResult[i].ForceZ;
+        }
+#endif /* #ifdef FDM */
 
 #ifdef EVALPOTENTIAL
 

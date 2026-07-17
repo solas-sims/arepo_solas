@@ -605,6 +605,53 @@ void read_parameter_file(char *fname)
       id[nt++] = STRING;
 #endif
 
+#ifdef STAR_FEEDBACK_SPH
+      strcpy(tag[nt], "StarDesNgb");
+      addr[nt] = &All.StarDesNgb;
+      id[nt++] = REAL;
+      
+      strcpy(tag[nt], "StarDesDev");
+      addr[nt] = &All.StarDesDev;
+      id[nt++] = REAL;
+#endif
+
+#ifdef SIDM
+      /* Mirrors the StarDesNgb/StarDesDev pattern above. SidmDesNumNgb
+       * and SidmDesNumNgbDev may already exist in your param.txt/tree
+       * from earlier -- this is a single reference block covering all
+       * three SIDM parameters together, so there's one place to
+       * reconcile against whatever you already added independently. */
+      strcpy(tag[nt], "SidmDesNumNgb");
+      addr[nt] = &All.SidmDesNumNgb;
+      id[nt++] = REAL;
+
+      strcpy(tag[nt], "SidmDesNumNgbDev");
+      addr[nt] = &All.SidmDesNumNgbDev;
+      id[nt++] = REAL;
+
+      strcpy(tag[nt], "SidmCrossSection");
+      addr[nt] = &All.SidmCrossSection;
+      id[nt++] = REAL;
+#endif /* #ifdef SIDM */
+
+#ifdef FDM
+      strcpy(tag[nt], "FDMGrid");
+      addr[nt] = &All.FDMGrid;
+      id[nt++] = INT;
+
+      strcpy(tag[nt], "FDMBoxSize");
+      addr[nt] = &All.FDMBoxSize;
+      id[nt++] = REAL;
+
+      strcpy(tag[nt], "FDMMass");
+      addr[nt] = &All.FDMMass;
+      id[nt++] = REAL;
+
+      strcpy(tag[nt], "FDMICFile");
+      addr[nt] = All.FDMICFile;
+      id[nt++] = STRING;
+#endif /* #ifdef FDM */
+
 #ifdef STAR_RADIATION_ACTIVE
       strcpy(tag[nt], "RaySplitFactor");
       addr[nt] = &All.RaySplitFactor;

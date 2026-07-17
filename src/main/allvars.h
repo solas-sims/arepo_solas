@@ -470,7 +470,7 @@ typedef unsigned long long peano1D;
 #define GAMMA_MINUS1 (GAMMA - 1.)
 #define GAMMA_PLUS1 (GAMMA + 1.)
 
-#define HYDROGEN_MASSFRAC 0.76 /*!< mass fraction of hydrogen */
+#define HYDROGEN_MASSFRAC 0.76 /*!< mass fraction of hydrogen, relevant only for radiative cooling */
 #define HE_ABUND ((1. / HYDROGEN_MASSFRAC - 1.) / 4.)
 
 /* ... often used physical constants (cgs units; NIST 2010) */
@@ -1400,6 +1400,25 @@ double InitMetallicityinSolar;
   char StarTablesFile[MAXLEN_PATH];
 #endif 
 
+#ifdef STAR_FEEDBACK_SPH
+  double StarDesNgb;
+  double StarDesDev;
+#endif
+
+#ifdef SIDM
+  double SidmDesNumNgb;
+  double SidmDesNumNgbDev;
+  double SidmCrossSection; /*!< sigma/m, constant elastic cross section for v1, in code units (length^2/mass) */
+#endif /* #ifdef SIDM */
+
+#ifdef FDM
+  int    FDMGrid;     /*!< mesh size N (per dimension) for the wavefunction field, independent of PMGRID */
+  double FDMBoxSize;  /*!< physical box size L for the FDM mesh, in code length units */
+  double FDMMass;     /*!< boson mass mc^2, in eV (converted to code units where needed -- see fdm_field.c) */
+  char   FDMICFile[MAXLEN_PATH]; /*!< optional path to an HDF5 file (fdm_write_field()'s format) to initialize psi
+                                   * from; empty string means start from psi=0 (fdm_allocate()'s own zero-init) */
+#endif /* #ifdef FDM */
+
 #ifdef STAR_RADIATION_ACTIVE
   double RaySplitFactor;
 #endif
@@ -1537,6 +1556,16 @@ extern struct particle_data
 #ifdef BLACKHOLES
   MyIDType BhID;
 #endif
+
+#ifdef SIDM
+  /* Forward reference into the DMSP[] side array (src/sidm/sidm.h),
+   * mirroring how SID above indexes into SP[] for stars. Only
+   * meaningful for Type==1 particles. The six fields that used to live
+   * directly here (SidmDensity, SidmHsml, SidmVelDisp, SidmNumNgb,
+   * SidmLastScatterTime, SidmScatterFlag) have moved to DM_Particle_Data
+   * -- see sidm.h for the struct and the PDMS/DMPS access macros. */
+  MyIDType SIDMID;
+#endif /* #ifdef SIDM */
 } * P,              /*!< holds particle data on local processor */
     *DomainPartBuf; /*!< buffer for particle data used in domain decomposition */
 
@@ -2090,6 +2119,13 @@ enum iofields
 #ifdef OUTPUT_TIMEBIN_BH
   IO_TIMEBIN_BH,
 #endif
+#ifdef SIDM
+  IO_SIDM_DENSITY,
+  IO_SIDM_HSML,
+  IO_SIDM_NUMNGB,
+  IO_SIDM_VELDISP,
+  IO_SIDM_SCATTERCOUNT,
+#endif
   IO_LASTENTRY /* This should be kept - it signals the end of the list */
 };
 
@@ -2103,6 +2139,9 @@ enum arrays
 #endif
 #ifdef BLACKHOLES
   A_BH,
+#endif
+#ifdef SIDM
+  A_DMSP,
 #endif
   A_PS
 };
@@ -2132,6 +2171,7 @@ enum types_in_memory
 enum e_typelist
 {
   GAS_ONLY                      = 1,
+  DM_ONLY                       = 2,
   STARS_ONLY                    = 16,
   GAS_AND_STARS                 = 17,
   BHS_ONLY                      = 32,
