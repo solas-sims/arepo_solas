@@ -11,6 +11,9 @@
 #define MESH 0 /* Couple across Voronoi faces */
 #define HOST 1 /* Thermal dump into host  */
 
+/* Percent thermal energy in the energy conserving phase (Sedov-Taylor) of an SN */
+#define SN_F_THERMAL 0.72 
+
 /* Kick packet sent to remote face-neighbor cells */
 struct Feedback_Kick
 { 
@@ -91,59 +94,58 @@ static void apply_kick_primexch(int particle, const struct Feedback_Kick *Kick)
 }
 
 #ifdef SUPERNOVAE
-/* Compute corrent p and E scaling of SN explosion */
-static void SN_compute(int ev, int h, double e, double a, double b, double NgbsDensity, double NgbsMetallicity, double *p, double *E)
+/*
+ * Solve the energy-conserving SN momentum quadratic
+ *
+ * alpha p^2 + beta p + gamma = 0 , gamma = dU_SN,th - E_SN <= 0
+ *
+ * and return the physical (positive) root
+ *
+ * p_SN = (-beta + sqrt(beta^2 - 4 alpha gamma)) / (2 alpha)
+ */
+static void SN_compute(int ev, int h, double alpha, double beta, double gamma, double NgbsDensity, double NgbsMetallicity, double *p)
 {
-  Mechanical_Feedback_Data *MechanicalFeedbackData = &MechanicalFeedbackEvents.MechanicalFeedbackData[ev + h];
-  Mechanical_Feedback *MechanicalFeedback = &MechanicalFeedbackData->MechanicalFeedback;
-  
-  double E_SN = MechanicalFeedback->SN_EnergyInject;
-  double m_ej = MechanicalFeedback->SN_MassLoss;
-
-  /* Pure thermal injection: no ejecta mass, skip momentum prescription */
-  if(m_ej <= 0.0)
+  if(alpha <= 0.0)
     {
       *p = 0.0;
-      *E = E_SN; 
-      
       return;
     }
 
-  double E_SNR = E_SN + e;
-  double E51 = E_SN * All.cf_UnitEnergy_in_cgs / 1.0e51;
+  double disc = beta * beta - 4.0 * alpha * gamma;
+  
+  if(disc < 0.0)
+    disc = 0.0;
 
-  double n_H = HYDROGEN_MASSFRAC * NgbsDensity * All.cf_UnitDensity_in_cgs / PROTONMASS; 
-
-  double Zsol = fmax(NgbsMetallicity / 0.0127, 0.01);
+  double p_SN = (-beta + sqrt(disc)) / (2.0 * alpha);
+  
+  if(p_SN < 0.0)
+    p_SN = 0.0;
 
   /* Terminal momentum: T. Kimm et al. (2015) and Matthew Smith (2026) */
+  Mechanical_Feedback_Data *MechanicalFeedbackData = &MechanicalFeedbackEvents.MechanicalFeedbackData[ev + h];
+  Mechanical_Feedback *MechanicalFeedback = &MechanicalFeedbackData->MechanicalFeedback;
+
+  double E_SN  = MechanicalFeedback->SN_EnergyInject;
+  double E51 = E_SN * All.cf_UnitEnergy_in_cgs / 1.0e51;
+  
+  double n_H = HYDROGEN_MASSFRAC * NgbsDensity * All.cf_UnitDensity_in_cgs / PROTONMASS;
+  
+  double Zsol = fmax(NgbsMetallicity / 0.0127, 0.01);
+
+ 
   double p_term = 3.0e5 /* Msun km/s */
-  * pow(E51, 16.0 / 17.0)
-  * pow(n_H, -2.0 / 17.0)
-  * pow(Zsol, -0.14);
+                * pow(E51, 16.0 / 17.0)
+                * pow(n_H, -2.0 / 17.0)
+                * pow(Zsol, -0.14);
   
   p_term /= (All.cf_UnitMass_in_Msun * All.cf_UnitVelocity_in_cm_per_s / 1.0e5);
-  
-  /* Boost momentum */
-  double fkin = 0.28;
 
-  a *= m_ej;
-  b *= sqrt(m_ej / (2 * fkin * E_SNR));
-  
-  double fboost = fmin((sqrt(b*b + a) - b) / a, p_term / (sqrt(2 * fkin * E_SNR * m_ej)));
+  if(p_SN > p_term)
+    p_SN = p_term;
 
-  double p_SNR = fboost * sqrt(2 * fkin * E_SNR * m_ej);
-
-  double sq_vstar = MechanicalFeedback->StarVelocity[0]*MechanicalFeedback->StarVelocity[0] 
-  + MechanicalFeedback->StarVelocity[1]*MechanicalFeedback->StarVelocity[1] 
-  + MechanicalFeedback->StarVelocity[2]*MechanicalFeedback->StarVelocity[2];
-
-  double E_tot = 0.5 * m_ej * sq_vstar + E_SN;
-
-  *p = p_SNR;
-  *E = E_tot;
+  *p = p_SN;
 }
-#endif 
+#endif
 
 #ifdef WINDS
 /*
@@ -514,20 +516,65 @@ void star_feedback(void)
           if(wtot <= 0.0)
             terminate("STAR_FEEDBACK: invalid weight for host cell %d\n", i);
     
-#ifdef SUPERNOVAE     
-          double p, E;
+#ifdef SUPERNOVAE
+          /* Directed momentum magnitude and thermal budget for this event */
+          double p_SN = 0.0;
+          double dU_SN_th = 0.0;
+
+          /* Ejecta mass and internal energy -> cold ejecta default */
+          double m_ej = MechanicalFeedback->SN_MassLoss;
+          double U_ej = 0.0;
+
+          /* Host swept mass and internal energy */
+          double m_h = P[i].Mass + SphP[i].StarMassFeed;
+          
+          double p_h[3], v_h[3];
+          for(k = 0; k < 3; k++)
+            {
+              p_h[k] = (SphP[i].Momentum[k] + SphP[i].StarMomentumFeed[k]);
+              v_h[k] = (SphP[i].Momentum[k] + SphP[i].StarMomentumFeed[k]) / m_h;
+            }
+          
+          double shell_sweep_frac = fmin(All.SNHostShellSweepFrac, 0.9);
+          double dm_h = fmin(shell_sweep_frac * m_h, m_h - 0.1 * P[i].Mass); 
+          dm_h = fmax(dm_h, 0.0);  
+
+#ifdef METALS
+          double dmZ_h = dm_h * (SphP[i].GasMetals + SphP[i].StarMetalsFeed) / m_h;
+#endif
+
+          double K_h = (p_h[0]*p_h[0] + p_h[1]*p_h[1] + p_h[2]*p_h[2]) / (2 * m_h);
+          double U_h = SphP[i].Energy + SphP[i].StarEnergyFeed - K_h;
+          
+          if(U_h < 0.0)
+            U_h = 0.0;    
+          
+          double dU_h = (dm_h / m_h) * U_h; 
+
+          /* Total advected (ejecta + swept host) mass */
+          double m_feed = m_ej + dm_h; 
+
+          /* Per-face state carried from the coefficient pass to deposition */
+          double SN_ptilde[MAX_FACES][3]; /* pre-kick momentum m_j v_j + advected */
+          double SN_mfj[MAX_FACES];       /* final neighbour mass m_j + |w|m_dep   */
+          double SN_KEj[MAX_FACES];       /* initial neighbour kinetic energy      */
+          double SN_Dj[MAX_FACES];        /* kinetic energy dissipated in-place    */
 
           if(flag_sn && !flag_sn_host)
             {
-              /* Helpers for supernovae injection */
-              double num, den, e = 0.0, a = 0.0, b = 0.0;
-              double m_ej = MechanicalFeedback->SN_MassLoss;
-              
-              /* Ngbs properties */
-              int Ngbs = 0;
-              double NgbsMass = 0.0, NgbsDensity = 0.0, NgbsMetallicity = 0.0;
-   
-              /* Third pass */ 
+              /* Quadratic coefficients alpha p^2 + beta p + gamma = 0 */
+              double alpha = 0.0, beta = 0.0;
+
+              /* Ngbs properties (for the optional terminal-momentum cap) */
+              double NgbsDensity = 0.0, NgbsMetallicity = 0.0;
+
+              double sq_vstar = MechanicalFeedback->StarVelocity[0]*MechanicalFeedback->StarVelocity[0]
+              + MechanicalFeedback->StarVelocity[1]*MechanicalFeedback->StarVelocity[1]
+              + MechanicalFeedback->StarVelocity[2]*MechanicalFeedback->StarVelocity[2];
+
+              double sq_vh = v_h[0]*v_h[0] + v_h[1]*v_h[1] + v_h[2]*v_h[2];
+
+              /* Coefficient pass */
               for(f = 0; f < n_faces; f++)
                 {
                   q = dc_list[f];
@@ -538,61 +585,64 @@ void star_feedback(void)
                   if(particle >= NumGas && Mesh.DP[dp].task == ThisTask)
                     particle -= NumGas;
 
-                  double wbar[3]; 
-          
+                  double wbar[3];
+
                   for(k = 0; k < 3; k++)
                     wbar[k] = weights[f][k] / wtot;
 
                   double sq_wbar = (wbar[0]*wbar[0] + wbar[1]*wbar[1] + wbar[2]*wbar[2]);
-                  double sqrtsq_wbar = sqrt(sq_wbar);  
+                  double sqrtsq_wbar = sqrt(sq_wbar);
 
                   double mj, vj[3];
                   if(Mesh.DP[dp].task == ThisTask)
                     {
                       mj = P[particle].Mass + SphP[particle].StarMassFeed;
-                      
+
                       for(k = 0; k < 3; k++)
-                        vj[k] = (SphP[particle].Momentum[k] + SphP[particle].StarMomentumFeed[k]) / mj;   
+                        vj[k] = (SphP[particle].Momentum[k] + SphP[particle].StarMomentumFeed[k]) / mj;
                     }
                   else
                     {
                       mj = PrimExch[particle].Density * PrimExch[particle].Volume + PrimExch[particle].MassFeed;
-                      
+
                       for(k = 0; k < 3; k++)
                         vj[k] = (PrimExch[particle].Density * PrimExch[particle].Volume * PrimExch[particle].VelGas[k]
                         + PrimExch[particle].MomentumFeed[k]) / mj;
-
                     }
 
                   double sq_vj = vj[0]*vj[0] + vj[1]*vj[1] + vj[2]*vj[2];
-                  
-                  double sq_vstar = MechanicalFeedback->StarVelocity[0]*MechanicalFeedback->StarVelocity[0]
-                  + MechanicalFeedback->StarVelocity[1]*MechanicalFeedback->StarVelocity[1]
-                  + MechanicalFeedback->StarVelocity[2]*MechanicalFeedback->StarVelocity[2];
-                  
-                  double cross = 2.0 * (vj[0]*MechanicalFeedback->StarVelocity[0]
-                  + vj[1]*MechanicalFeedback->StarVelocity[1]
-                  + vj[2]*MechanicalFeedback->StarVelocity[2]);
-         
-                  num = 0.5 * mj * m_ej * sqrtsq_wbar * (sq_vj + sq_vstar - cross);
-                  den = mj + m_ej * sqrtsq_wbar;
-          
-                  e += num / den;
-               
-                  num = sq_wbar;
-          
-                  a += num / den;
 
-                  num = mj * ((vj[0] - MechanicalFeedback->StarVelocity[0]) * wbar[0] 
-                  + (vj[1] - MechanicalFeedback->StarVelocity[1]) * wbar[1]
-                  + (vj[2] - MechanicalFeedback->StarVelocity[2]) * wbar[2]);
+                  /* Pre-kick momentum: neighbour + advected ejecta (at v_star) + advected swept host (at v_host) */
+                  double ptilde[3];
+                  for(k = 0; k < 3; k++)
+                    ptilde[k] = mj * vj[k] + sqrtsq_wbar * (m_ej * MechanicalFeedback->StarVelocity[k] + dm_h * v_h[k]);
 
-                  b += num / den;
+                  double mfj = mj + sqrtsq_wbar * m_feed;
+                  double sq_ptilde = ptilde[0]*ptilde[0] + ptilde[1]*ptilde[1] + ptilde[2]*ptilde[2];
+                  double bw_dot_pt = wbar[0]*ptilde[0] + wbar[1]*ptilde[1] + wbar[2]*ptilde[2];
+
+                  /* alpha = sum |wbar|^2 / (2 m_f) ; beta = sum wbar.ptilde / m_f */
+                  alpha += sq_wbar / (2.0 * mfj);
+                  beta += bw_dot_pt / mfj;
+
+                  /* Kinetic energy dissipated in the inelastic merge of the
+                   * (neighbour, ejecta, host) streams; thermalised in place. */
+                  double ke_streams = 0.5 * mj * sq_vj + 0.5 * sqrtsq_wbar * m_ej * sq_vstar + 0.5 * sqrtsq_wbar * dm_h * sq_vh;
+
+                  double D = ke_streams - 0.5 * sq_ptilde / mfj;
+                  
+                  if(D < 0.0)
+                    D = 0.0;
+
+                  for(k = 0; k < 3; k++)
+                    SN_ptilde[f][k] = ptilde[k];
+                  
+                  SN_mfj[f] = mfj;
+                  SN_KEj[f] = 0.5 * mj * sq_vj;
+                  SN_Dj[f] = D;
 
                   if(Mesh.DP[dp].task == ThisTask)
                     {
-                      Ngbs++;
-                      NgbsMass += mj * sqrtsq_wbar;
                       NgbsDensity += mj / SphP[particle].Volume * sqrtsq_wbar;
 #ifdef METALS
                       NgbsMetallicity += (SphP[particle].GasMetals + SphP[particle].StarMetalsFeed) / mj * sqrtsq_wbar;
@@ -600,17 +650,19 @@ void star_feedback(void)
                     }
                   else
                     {
-                      Ngbs++;
-                      NgbsMass += mj * sqrtsq_wbar;
-                      NgbsDensity +=  mj / PrimExch[particle].Volume * sqrtsq_wbar;
+                      NgbsDensity += mj / PrimExch[particle].Volume * sqrtsq_wbar;
 #ifdef METALS
-                      NgbsMetallicity += (PrimExch[particle].Density * PrimExch[particle].Volume * PrimExch[particle].Scalars[METALS_INDEX] 
+                      NgbsMetallicity += (PrimExch[particle].Density * PrimExch[particle].Volume * PrimExch[particle].Scalars[METALS_INDEX]
                       + PrimExch[particle].MetalsFeed) / mj * sqrtsq_wbar;
 #endif
-                    }  
+                    }
                 }
 
-              SN_compute(ev, h, e, a, b, NgbsDensity, NgbsMetallicity, &p, &E);
+              /* gamma = dU_SN,th - E_SN, then solve the quadratic for p_SN */
+              dU_SN_th = SN_F_THERMAL * MechanicalFeedback->SN_EnergyInject;
+              double gamma = dU_SN_th - MechanicalFeedback->SN_EnergyInject;
+
+              SN_compute(ev, h, alpha, beta, gamma, NgbsDensity, NgbsMetallicity, &p_SN);
             }
 #endif
       
@@ -661,14 +713,32 @@ void star_feedback(void)
 #ifdef SUPERNOVAE
               if(flag_sn && !flag_sn_host)
                 {
-                  Kick.SN_DeltaMass = MechanicalFeedback->SN_MassLoss * sqrtsq_wbar;
+                  /* Advected mass = ejecta + swept host, shared by |wbar| */
+                  Kick.SN_DeltaMass = sqrtsq_wbar * m_feed;
 #ifdef METALS
-                  Kick.SN_DeltaMetals = MechanicalFeedback->SN_MetalsLoss * sqrtsq_wbar;
-#endif 
+                  Kick.SN_DeltaMetals = sqrtsq_wbar * (MechanicalFeedback->SN_MetalsLoss + dmZ_h);
+#endif
+                  /* Momentum = advected (ejecta @ v_star + host @ v_host)
+                   * + directed energy-conserving kick p_SN * wbar.          */
                   for(k = 0; k < 3; k++)
-                    Kick.SN_DeltaP[k] = MechanicalFeedback->SN_MassLoss * sqrtsq_wbar * MechanicalFeedback->StarVelocity[k] + p * wbar[k];
+                    Kick.SN_DeltaP[k] = sqrtsq_wbar * (m_ej * MechanicalFeedback->StarVelocity[k] + dm_h * v_h[k])
+                    + p_SN * wbar[k];
 
-                  Kick.SN_DeltaE = E * sqrtsq_wbar;
+                  /* Total energy = kinetic change + internal-energy gain.
+                   * StarEnergyFeed tracks *total* energy, so we form the
+                   * exact final-minus-initial cell energy here:
+                   *   DKE = |ptilde + p_SN wbar|^2 / (2 m_f) - KE_j
+                   *   dU  = |wbar|(U_ej + dU_h + dU_SN,th) + D_j            */
+                  double pf[3];
+                  for(k = 0; k < 3; k++)
+                    pf[k] = SN_ptilde[f][k] + p_SN * wbar[k];
+
+                  double sq_pf = pf[0]*pf[0] + pf[1]*pf[1] + pf[2]*pf[2];
+
+                  double DKE = sq_pf / (2.0 * SN_mfj[f]) - SN_KEj[f];
+                  double dU  = sqrtsq_wbar * (U_ej + dU_h + dU_SN_th) + SN_Dj[f];
+
+                  Kick.SN_DeltaE = DKE + dU;
                 }
 #endif
 
@@ -692,6 +762,27 @@ void star_feedback(void)
                   n_export++;
                 }
             }
+
+#ifdef SUPERNOVAE
+          if(flag_sn && !flag_sn_host && dm_h > 0.0)
+            {
+              double sq_vh = v_h[0]*v_h[0] + v_h[1]*v_h[1] + v_h[2]*v_h[2];
+
+              struct Feedback_Kick Kick_h = {0};
+              Kick_h.CellIndex = i;
+
+              Kick_h.SN_DeltaMass = -dm_h;
+#ifdef METALS
+              Kick_h.SN_DeltaMetals = -dmZ_h;
+#endif
+              for(k = 0; k < 3; k++)
+                Kick_h.SN_DeltaP[k] = -dm_h * v_h[k];
+
+              Kick_h.SN_DeltaE = -(0.5 * dm_h * sq_vh + dU_h);
+
+              apply_kick(i, &Kick_h);
+            }
+#endif
         } //for(int h = 0; h < SphP[i].Host; h++)
       
       /* Go to next host */
