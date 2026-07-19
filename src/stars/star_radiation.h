@@ -87,6 +87,8 @@ typedef struct RayPacket
   WavebandData Radiated[WAVEBANDS];
   WavebandData Radiated_Init[WAVEBANDS];
 
+  double N_H2; /* accumulated H2 column since source [cm^-2] */
+
   int ray_id;
   int home_task;
   
