@@ -8,30 +8,46 @@ double HealpixDirs[MAX_NUM_RAYS][3];
 
 int NRays; 
 
-/* Reference opacity coefficients [cm^2/g of gas] at solar metallicity */
-double Kappa[WAVEBANDS] = 
+double Kappa[WAVEBANDS] =
 {
-  /* Per gram of gas at solar Z (= kappa_dust * dust_to_gas_ratio_solar) */
-  /* Representative wavelengths: IR~2um, OPT~0.51um, UV~0.15um */
-  /* Draine & Li (2007) MW dust model, Cardelli+89 extinction law */
-  [INFRARED] = 3.0, /* mid/far-IR dust, cm^2/g, solar Z  */
-  [OPTICAL] = 25.0, /* optical-NIR dust, cm^2/g, solar Z */
-  [ULTRAVIOLET] = 180.0, /* FUV/photoelectric dust, cm^2/g, solar Z */
-  [LYMAN_WERNER] = 0.0, /* DISSOCIATING H2 -> Computed directly from H2 */
-  [IONIZING_HI] = 0.0, /* IONIZING_HI -> Computed directly from HI */
-  [IONIZING_HeI] = 0.0, /* IONIZING_HeI -> Computed directly from HeI */
-  [IONIZING_HeII] = 0.0, /* IONIZING_HeII -> Computed directly from HeII */
+  /* Effective attenuation kappa_ext*(1 - a*<g>) [cm^2/g gas, solar Z]
+     Band-averaged over Draine 2003 (renorm. WD01) MW R_V=3.1 model,
+     kext_albedo_WD_MW_3.1_60_D03.all, photon-weighted 4e4 K BB.
+     Gas mass per H = 2.311e-24 g (M_dust/H = 1.398e-26, M_gas/M_dust = 165.3) */
+  [INFRARED] = 26.0, 
+  [OPTICAL] = 240.0, 
+  [ULTRAVIOLET] = 405.0,  
+  [LYMAN_WERNER] = 730.0, /* DUST component; H2 line opacity added in update_kappa */
+  [IONIZING_HI] = 0.0,
+  [IONIZING_HeI] = 0.0,
+  [IONIZING_HeII] = 0.0,
+};
+
+/* Fraction of kappa_eff-attenuated energy that is truly absorbed (heats grains):
+   f_abs = kappa_abs/kappa_eff = (1-a)/(1-a<g>), D03 MW dust, band-averaged.
+   Remainder is non-forward-scattered light: removed from the ray and it does
+   deliver momentum (kappa_eff is exactly the momentum-transfer opacity), but
+   it must NOT contribute to heating. */
+double TrueAbsorbedFraction[WAVEBANDS] =
+{
+  [INFRARED] = 0.58,
+  [OPTICAL] = 0.61,
+  [ULTRAVIOLET] = 0.80,
+  [LYMAN_WERNER] = 0.88, /* dust share only; H2 line share is pure absorption */
+  [IONIZING_HI] = 1.0,
+  [IONIZING_HeI] = 1.0,
+  [IONIZING_HeII] = 1.0,
 };
 
 double ReradiatedFraction[WAVEBANDS] = 
 {
-  [INFRARED] = 1.0,
-  [OPTICAL] = 1.0,
-  [ULTRAVIOLET] = 0.95, /* 5% goes to pe heating */
-  [LYMAN_WERNER] = 0.0, /* No reradiation->dissociation instead */
-  [IONIZING_HI] = 0.0, /* No reradiation->photoionization instead */
-  [IONIZING_HeI] = 0.0, /* No reradiation->photoionization instead */
-  [IONIZING_HeII] = 0.0, /* No reradiation->photoionization instead */
+  [INFRARED] = 0.58,
+  [OPTICAL] = 0.61,
+  [ULTRAVIOLET] = 0.76, /* 5% goes to pe heating */
+  [LYMAN_WERNER] = 0.84, /* 5% goes to pe heating */
+  [IONIZING_HI] = 0.0, /* No reradiation */
+  [IONIZING_HeI] = 0.0, /* No reradiation */
+  [IONIZING_HeII] = 0.0, /* No reradiation */
 };
 
 void update_kappa(void)
