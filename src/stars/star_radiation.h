@@ -59,7 +59,8 @@ typedef struct WavebandData
   double Energy;
 } WavebandData;
 
-extern double Kappa[WAVEBANDS];
+extern double Kappa_E[WAVEBANDS];
+extern double Kappa_N[WAVEBANDS];
 
 extern double ReradiatedFraction[WAVEBANDS];
 

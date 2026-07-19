@@ -8,19 +8,30 @@ double HealpixDirs[MAX_NUM_RAYS][3];
 
 int NRays; 
 
-double Kappa[WAVEBANDS] =
+/* Effective attenuation kappa_ext*(1 - a*<g>) [cm^2/g gas, solar Z]
+   Band-averaged over Draine 2003 (renorm. WD01) MW R_V=3.1 model,
+   kext_albedo_WD_MW_3.1_60_D03.all, energy and photon-weighted 4e4 K BB.
+   Gas mass per H = 2.311e-24 g (M_dust/H = 1.398e-26, M_gas/M_dust = 165.3) */
+double Kappa_E[WAVEBANDS] =
 {
-  /* Effective attenuation kappa_ext*(1 - a*<g>) [cm^2/g gas, solar Z]
-     Band-averaged over Draine 2003 (renorm. WD01) MW R_V=3.1 model,
-     kext_albedo_WD_MW_3.1_60_D03.all, photon-weighted 4e4 K BB.
-     Gas mass per H = 2.311e-24 g (M_dust/H = 1.398e-26, M_gas/M_dust = 165.3) */
-  [INFRARED] = 26.0, 
-  [OPTICAL] = 240.0, 
-  [ULTRAVIOLET] = 405.0,  
-  [LYMAN_WERNER] = 730.0, /* DUST component; H2 line opacity added in update_kappa */
-  [IONIZING_HI] = 0.0,
-  [IONIZING_HeI] = 0.0,
-  [IONIZING_HeII] = 0.0,
+  [INFRARED] = 34.9, 
+  [OPTICAL] = 278.3, 
+  [ULTRAVIOLET] = 417.7,  
+  [LYMAN_WERNER] = 736.6, /* Dust component; H2 line opacity added in update_kappa */
+  [IONIZING_HI] = 1.0,
+  [IONIZING_HeI] = 1.0,
+  [IONIZING_HeII] = 1.0,
+};
+
+double Kappa_N[WAVEBANDS] =
+{
+  [INFRARED] = 30.0, 
+  [OPTICAL] = 242.3, 
+  [ULTRAVIOLET] = 406.9,  
+  [LYMAN_WERNER] = 731.4, /* Dust component; H2 line opacity added in update_kappa */
+  [IONIZING_HI] = 1.0,
+  [IONIZING_HeI] = 1.0,
+  [IONIZING_HeII] = 1.0,
 };
 
 /* Fraction of kappa_eff-attenuated energy that is truly absorbed (heats grains):
@@ -30,9 +41,9 @@ double Kappa[WAVEBANDS] =
    it must NOT contribute to heating. */
 double TrueAbsorbedFraction[WAVEBANDS] =
 {
-  [INFRARED] = 0.58,
-  [OPTICAL] = 0.61,
-  [ULTRAVIOLET] = 0.80,
+  [INFRARED] = 0.54,
+  [OPTICAL] = 0.62,
+  [ULTRAVIOLET] = 0.81,
   [LYMAN_WERNER] = 0.88, /* dust share only; H2 line share is pure absorption */
   [IONIZING_HI] = 1.0,
   [IONIZING_HeI] = 1.0,
@@ -41,9 +52,9 @@ double TrueAbsorbedFraction[WAVEBANDS] =
 
 double ReradiatedFraction[WAVEBANDS] = 
 {
-  [INFRARED] = 0.58,
-  [OPTICAL] = 0.61,
-  [ULTRAVIOLET] = 0.76, /* 5% goes to pe heating */
+  [INFRARED] = 0.54,
+  [OPTICAL] = 0.62,
+  [ULTRAVIOLET] = 0.77, /* 5% goes to pe heating */
   [LYMAN_WERNER] = 0.84, /* 5% goes to pe heating */
   [IONIZING_HI] = 0.0, /* No reradiation */
   [IONIZING_HeI] = 0.0, /* No reradiation */
@@ -56,28 +67,47 @@ void update_kappa(void)
     {
       if(P[i].Type != 0 || P[i].Mass == 0 || P[i].ID == 0)
         continue;
+
+      double units = All.cf_UnitLength_in_cm * All.cf_UnitLength_in_cm / All.cf_UnitMass_in_g;
       
 #ifdef METALS
       double Zsol = SphP[i].GasMetallicity / SOLAR_METALLICITY;
 #else
       double Zsol = 0;
 #endif
-      
-      double units = All.cf_UnitLength_in_cm * All.cf_UnitLength_in_cm / All.cf_UnitMass_in_g;
-      
-      SphP[i].Kappa[INFRARED] = (Kappa[INFRARED] / units) * Zsol;
-      SphP[i].Kappa[OPTICAL] = (Kappa[OPTICAL] / units) * Zsol;
-      SphP[i].Kappa[ULTRAVIOLET] = (Kappa[ULTRAVIOLET] / units) * Zsol;      
 
-      const double sigma_H2 = 2.47e-18; /* cm^2, effective Solomon-process cross section (Baczynski+15) */ 
-      SphP[i].Kappa[LYMAN_WERNER] = (sigma_H2 / (2.0 * PROTONMASS) / units) * SphP[i].GrackleSpecies(GRACKLE_H2I);
+      double sigma_HI, sigma_HeI, sigma_HeII;
+
+      SphP[i].Kappa_E[INFRARED] = (Kappa_E[INFRARED] / units) * Zsol;
+      SphP[i].Kappa_E[OPTICAL] = (Kappa_E[OPTICAL] / units) * Zsol;
+      SphP[i].Kappa_E[ULTRAVIOLET] = (Kappa_E[ULTRAVIOLET] / units) * Zsol;      
+
+      /* Dust only */
+      SphP[i].Kappa_E[LYMAN_WERNER] = (Kappa_E[LYMAN_WERNER] / units) * Zsol;
       
-      const double sigma_HI = 6.30e-18; /* cm^2, HI threshold, 13.6 eV */
-      const double sigma_HeI = 7.83e-18; /* cm^2, HeI threshold, 24.6 eV */
-      const double sigma_HeII = 1.58e-18; /* cm^2, HeII threshold, 54.4 eV */
-      SphP[i].Kappa[IONIZING_HI] = (sigma_HI / (PROTONMASS) / units) * SphP[i].GrackleSpecies(GRACKLE_HI);
-      SphP[i].Kappa[IONIZING_HeI] = (sigma_HeI / (4.0 * PROTONMASS) / units) * SphP[i].GrackleSpecies(GRACKLE_HeI);
-      SphP[i].Kappa[IONIZING_HeII] = (sigma_HeII / (4.0 * PROTONMASS) / units) * SphP[i].GrackleSpecies(GRACKLE_HeII);  
+      /* Band averaged sigma0*(v/v0)^(-3), in cm^2 */
+      sigma_HI = 3.25e-18;
+      sigma_HeI = 5.04e-18;
+      sigma_HeII = 1.30e-18; 
+      SphP[i].Kappa_E[IONIZING_HI] = (sigma_HI / (PROTONMASS) / units) * SphP[i].GrackleSpecies(GRACKLE_HI);
+      SphP[i].Kappa_E[IONIZING_HeI] = (sigma_HeI / (4.0 * PROTONMASS) / units) * SphP[i].GrackleSpecies(GRACKLE_HeI);
+      SphP[i].Kappa_E[IONIZING_HeII] = (sigma_HeII / (4.0 * PROTONMASS) / units) * SphP[i].GrackleSpecies(GRACKLE_HeII);  
+      
+
+      SphP[i].Kappa_N[INFRARED] = (Kappa_N[INFRARED] / units) * Zsol;
+      SphP[i].Kappa_N[OPTICAL] = (Kappa_N[OPTICAL] / units) * Zsol;
+      SphP[i].Kappa_N[ULTRAVIOLET] = (Kappa_N[ULTRAVIOLET] / units) * Zsol;      
+
+      /* Dust only */
+      SphP[i].Kappa_N[LYMAN_WERNER] = (Kappa_N[LYMAN_WERNER] / units) * Zsol;
+      
+      /* Band averaged sigma0*(v/v0)^(-3), in cm^2 */
+      sigma_HI = 3.48e-18; 
+      sigma_HeI = 5.27e-18;
+      sigma_HeII = 1.31e-18; 
+      SphP[i].Kappa_N[IONIZING_HI] = (sigma_HI / (PROTONMASS) / units) * SphP[i].GrackleSpecies(GRACKLE_HI);
+      SphP[i].Kappa_N[IONIZING_HeI] = (sigma_HeI / (4.0 * PROTONMASS) / units) * SphP[i].GrackleSpecies(GRACKLE_HeI);
+      SphP[i].Kappa_N[IONIZING_HeII] = (sigma_HeII / (4.0 * PROTONMASS) / units) * SphP[i].GrackleSpecies(GRACKLE_HeII);  
     }
 }
 
@@ -421,9 +451,13 @@ static void distribute_node_rad(int no)
   if(!has_rad) 
     return;
   
-  double node_tau[WAVEBANDS];
+  double node_deltatau_E[WAVEBANDS], node_deltatau_N[WAVEBANDS];
+
   for(int w = 0; w < WAVEBANDS; w++)
-    node_tau[w] = RtNgb_Nodes[no].volume * RtNgb_Nodes[no].density_kappa[w];
+    {
+      node_deltatau_E[w] = RtNgb_Nodes[no].volume * RtNgb_Nodes[no].density_kappa_E[w];
+      node_deltatau_N[w] = RtNgb_Nodes[no].volume * RtNgb_Nodes[no].density_kappa_N[w];
+    }
 
   int child = Ngb_Nodes[no].u.d.nextnode;
   while(child != Ngb_Nodes[no].u.d.sibling && child >= 0)
@@ -439,15 +473,25 @@ static void distribute_node_rad(int no)
           
           for(int w = 0; w < WAVEBANDS; w++)
             {
-              if(node_tau[w] > 0)
+              if(node_deltatau_E[w] > 0)
                 {
-                  double child_tau = SphP[child].Volume * SphP[child].Density * SphP[child].Kappa[w];
-                  double frac = child_tau / node_tau[w];
+                  double child_deltatau_E = SphP[child].Volume * SphP[child].Density * SphP[child].Kappa_E[w];
+
+                  double frac_E = child_deltatau_E / node_deltatau_E[w];
                   
-                  SphP[child].Absorbed[w].Energy += frac * RtNgb_Nodes[no].Absorbed[w].Energy;
-                  SphP[child].Absorbed[w].Photons += frac * RtNgb_Nodes[no].Absorbed[w].Photons;
+                  SphP[child].Absorbed[w].Energy += frac_E * RtNgb_Nodes[no].Absorbed[w].Energy;
+                }
+              
+              if(node_deltatau_N[w] > 0)
+                {
+                  double child_deltatau_N = SphP[child].Volume * SphP[child].Density * SphP[child].Kappa_N[w];
+
+                  double frac_N = child_deltatau_N / node_deltatau_N[w];
+                  
+                  SphP[child].Absorbed[w].Photons += frac_N * RtNgb_Nodes[no].Absorbed[w].Photons;
                 }
             }
+
           child = Ngb_Nextnode[child];
         }
       /* Internal node - pass fraction down recursively */
@@ -455,15 +499,23 @@ static void distribute_node_rad(int no)
         {
           for(int w = 0; w < WAVEBANDS; w++)
             {
-              if(node_tau[w] > 0)
+              if(node_deltatau_E[w] > 0)
                 {
-                  double child_tau = RtNgb_Nodes[child].volume * RtNgb_Nodes[child].density_kappa[w];
-                  double frac = child_tau / node_tau[w];
+                  double child_deltatau_E = RtNgb_Nodes[child].volume * RtNgb_Nodes[child].density_kappa_E[w];
+                  double frac_E = child_deltatau_E / node_deltatau_E[w];
                   
-                  RtNgb_Nodes[child].Absorbed[w].Energy += frac * RtNgb_Nodes[no].Absorbed[w].Energy;
-                  RtNgb_Nodes[child].Absorbed[w].Photons += frac * RtNgb_Nodes[no].Absorbed[w].Photons;
+                  RtNgb_Nodes[child].Absorbed[w].Energy += frac_E * RtNgb_Nodes[no].Absorbed[w].Energy;
+                }
+              
+              if(node_deltatau_N[w] > 0)
+                {
+                  double child_deltatau_N = RtNgb_Nodes[child].volume * RtNgb_Nodes[child].density_kappa_N[w];
+                  double frac_N = child_deltatau_N / node_deltatau_N[w];
+                  
+                  RtNgb_Nodes[child].Absorbed[w].Photons += frac_N * RtNgb_Nodes[no].Absorbed[w].Photons;
                 }
             }
+
           distribute_node_rad(child);
           child = Ngb_Nodes[child].u.d.sibling;
         }
@@ -515,19 +567,10 @@ static void radiation_feedback(void)
       /* In cgs */
       double n_H2_cgs = n_H2 / (All.cf_UnitLength_in_cm * All.cf_UnitLength_in_cm * All.cf_UnitLength_in_cm);
 
-      /* Threshold energy */
-      //double energy_thresh_H2 = ;
-
       double E_abs_H2 = SphP[i].Absorbed[LYMAN_WERNER].Energy * All.cf_UnitEnergy_in_cgs;
 
       double N_abs_H2 = SphP[i].Absorbed[LYMAN_WERNER].Photons;
 
-      /* RT_heating_rate: grackle docs say erg/(s cm^3) / n, straight CGS, no conversion */
-      //double E_threshold_H2 = N_abs_H2 * energy_thresh_H2; 
-      
-      //if(n_H2_cgs)
-      //  SphP[i].H2_HeatingRate += (E_abs_H2 - E_threshold_H2) > 0 ? ((E_abs_H2 - E_threshold_H2) / dt_cgs / V_cgs) / n_H2_cgs : 0.0;
-      
       SphP[i].H2_DissociationRate += n_H2 > 0 ? (N_abs_H2 / (dt/All.cf_hubble_a/All.HubbleParam) / V) / n_H2 : 0.0;
 #endif
 

@@ -528,12 +528,15 @@ void ngb_update_node_recursive(int no, int sib, int father, int *last, int mode)
 #endif /* #ifdef TREE_BASED_TIMESTEPS */
 
 #ifdef STAR_RADIATION_ACTIVE
-  MyNgbTreeFloat volume, density_kappa[WAVEBANDS];
+  MyNgbTreeFloat volume, density_kappa_E[WAVEBANDS], density_kappa_N[WAVEBANDS];
 
   volume = 0;
   
   for(int w = 0; w < WAVEBANDS; w++)
-    density_kappa[w] = 0;
+    {
+      density_kappa_E[w] = 0;
+      density_kappa_N[w] = 0;
+    }
 #endif
 
   if(no >= Ngb_MaxPart && no < Ngb_MaxPart + Ngb_MaxNodes) /* internal node */
@@ -667,7 +670,10 @@ void ngb_update_node_recursive(int no, int sib, int father, int *last, int mode)
                           volume += RtNgb_Nodes[p].volume;
                           
                           for(int w = 0; w < WAVEBANDS; w++)
-                            density_kappa[w] += RtNgb_Nodes[p].volume * RtNgb_Nodes[p].density_kappa[w];
+                            {
+                              density_kappa_E[w] += RtNgb_Nodes[p].volume * RtNgb_Nodes[p].density_kappa_E[w];
+                              density_kappa_N[w] += RtNgb_Nodes[p].volume * RtNgb_Nodes[p].density_kappa_N[w];
+                            }
 #endif
                         }
                     }
@@ -707,7 +713,10 @@ void ngb_update_node_recursive(int no, int sib, int father, int *last, int mode)
                       volume += SphP[p].Volume;
                       
                       for(int w = 0; w < WAVEBANDS; w++)
-                        density_kappa[w] += SphP[p].Volume * SphP[p].Density * SphP[p].Kappa[w];
+                        {
+                          density_kappa_E[w] += SphP[p].Volume * SphP[p].Density * SphP[p].Kappa_E[w];
+                          density_kappa_N[w] += SphP[p].Volume * SphP[p].Density * SphP[p].Kappa_N[w];
+                        }
 #endif
                     }
                 }
@@ -733,10 +742,16 @@ void ngb_update_node_recursive(int no, int sib, int father, int *last, int mode)
           
           if(volume > 0)
             for(int w = 0; w < WAVEBANDS; w++)
-              density_kappa[w] /= volume;
+              {
+                density_kappa_E[w] /= volume;
+                density_kappa_N[w] /= volume;
+              }
 
           for(int w = 0; w < WAVEBANDS; w++)
-            RtNgb_Nodes[no].density_kappa[w] = density_kappa[w];
+            {
+              RtNgb_Nodes[no].density_kappa_E[w] = density_kappa_E[w];
+              RtNgb_Nodes[no].density_kappa_N[w] = density_kappa_N[w];
+            }
 
           /* count direct children */
           int nchildren = 0;
@@ -833,7 +848,7 @@ void ngb_exchange_topleafdata(void)
 #endif /* #ifdef TREE_BASED_TIMESTEPS */
 
 #ifdef STAR_RADIATION_ACTIVE
-    MyNgbTreeFloat volume, density_kappa[WAVEBANDS];
+    MyNgbTreeFloat volume, density_kappa_E[WAVEBANDS], density_kappa_N[WAVEBANDS];
 #endif
   };
 
@@ -890,7 +905,10 @@ void ngb_exchange_topleafdata(void)
           loc_DomainMoment[idx].volume = RtNgb_Nodes[no].volume;
           
           for(int w = 0; w < WAVEBANDS; w++)
-            loc_DomainMoment[idx].density_kappa[w] = RtNgb_Nodes[no].density_kappa[w];
+            {
+              loc_DomainMoment[idx].density_kappa_E[w] = RtNgb_Nodes[no].density_kappa_E[w];
+              loc_DomainMoment[idx].density_kappa_N[w] = RtNgb_Nodes[no].density_kappa_N[w];
+            }
 #endif
 
           idx++;
@@ -928,7 +946,11 @@ void ngb_exchange_topleafdata(void)
           RtNgb_Nodes[no].volume = DomainMoment[idx].volume;
           
           for(int w = 0; w < WAVEBANDS; w++)
-            RtNgb_Nodes[no].density_kappa[w] = DomainMoment[idx].density_kappa[w];
+            {
+              RtNgb_Nodes[no].density_kappa_E[w] = DomainMoment[idx].density_kappa_E[w];
+              RtNgb_Nodes[no].density_kappa_N[w] = DomainMoment[idx].density_kappa_N[w];
+            }
+
 #endif
 
           Ngb_Nodes[no].Ti_Current = All.Ti_Current;

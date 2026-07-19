@@ -62,7 +62,8 @@ extern struct RtNgbNODE
 
     /* RT quantities - volume-weighted, accumulated during tree build */
     float volume;
-    float density_kappa[WAVEBANDS];
+    float density_kappa_E[WAVEBANDS];
+    float density_kappa_N[WAVEBANDS];
     
     /* RT quantities - accumulated during tree walk */
     WavebandData Absorbed[WAVEBANDS];

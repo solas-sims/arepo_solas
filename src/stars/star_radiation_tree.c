@@ -105,7 +105,7 @@ double *t_enter, double *t_exit)
   return 1;
 }
 
-static inline int ray_absorb(RayPacket *ray, double chord_length, double density_kappa[WAVEBANDS], WavebandData absorbed[WAVEBANDS], double *dtau_IR)
+static inline int ray_absorb(RayPacket *ray, double chord_length, double density_kappa_E[WAVEBANDS], double density_kappa_N[WAVEBANDS], WavebandData absorbed[WAVEBANDS], double *delta_tau_IR)
 {
   for(int w = 0; w < WAVEBANDS; w++)
     {
@@ -114,10 +114,11 @@ static inline int ray_absorb(RayPacket *ray, double chord_length, double density
       if(!(ray->active_bands & (1u << w)))
         continue;
 
-      double dtau = density_kappa[w] * chord_length;
-      
-      double absorbed_energy = ray->Radiated[w].Energy * (1.0 - exp(-dtau));
-      double absorbed_photons = ray->Radiated[w].Photons * (1.0 - exp(-dtau));
+      double delta_tau_E = density_kappa_E[w] * chord_length;
+      double delta_tau_N = density_kappa_N[w] * chord_length;
+   
+      double absorbed_energy  = ray->Radiated[w].Energy * (1.0 - exp(-delta_tau_E));
+      double absorbed_photons = ray->Radiated[w].Photons * (1.0 - exp(-delta_tau_N));
 
       absorbed[w].Energy += absorbed_energy;
       ray->Radiated[w].Energy -= absorbed_energy;
@@ -132,7 +133,7 @@ static inline int ray_absorb(RayPacket *ray, double chord_length, double density
     }
     
     /* IR re-absorption tau */
-    *dtau_IR = density_kappa[INFRARED] * chord_length;
+    *delta_tau_IR = density_kappa_E[INFRARED] * chord_length;
 
   return ray->active_bands != 0;
 }
@@ -188,14 +189,18 @@ void raytrace_treewalk(RayPacket *ray, RayWorkStack *work, RayExportBuffer *expo
 
           double chord_length = cur.t_exit - cur.t_enter;
               
-          double density_kappa[WAVEBANDS];
+          double density_kappa_E[WAVEBANDS];
           for(int w = 0; w < WAVEBANDS; w++)
-            density_kappa[w] = SphP[no].Density * SphP[no].Kappa[w];
+            density_kappa_E[w] = SphP[no].Density * SphP[no].Kappa_E[w];
+
+          double density_kappa_N[WAVEBANDS];
+          for(int w = 0; w < WAVEBANDS; w++)
+            density_kappa_N[w] = SphP[no].Density * SphP[no].Kappa_N[w];
           
           WavebandData absorbed[WAVEBANDS];
-          double dtau_IR;
+          double deltatau_IR;
 
-          int still_alive = ray_absorb(ray, chord_length, density_kappa, absorbed, &dtau_IR);
+          int still_alive = ray_absorb(ray, chord_length, density_kappa_E, density_kappa_N, absorbed, &deltatau_IR);
           
           /* Deposit absorbed energy into cells, one band at a time */
           double dK_total = 0.0;
@@ -207,7 +212,7 @@ void raytrace_treewalk(RayPacket *ray, RayWorkStack *work, RayExportBuffer *expo
                 dp = absorbed[w].Energy / (CLIGHT / All.cf_UnitVelocity_in_cm_per_s) / All.cf_atime;
 
               else
-                dp = absorbed[w].Energy * (1.0 + dtau_IR * ReradiatedFraction[w]) / (CLIGHT / All.cf_UnitVelocity_in_cm_per_s) / All.cf_atime;        
+                dp = absorbed[w].Energy * (1.0 + deltatau_IR * ReradiatedFraction[w]) / (CLIGHT / All.cf_UnitVelocity_in_cm_per_s) / All.cf_atime;        
             
               double dp_vec[3] = {dp * ray->dir[0], dp * ray->dir[1], dp * ray->dir[2]};
 
@@ -305,15 +310,20 @@ void raytrace_treewalk(RayPacket *ray, RayWorkStack *work, RayExportBuffer *expo
                     {
                       double chord_length = cur.t_exit - cur.t_enter;
               
-                      double density_kappa[WAVEBANDS];
+                      double density_kappa_E[WAVEBANDS];
                       for(int w = 0; w < WAVEBANDS; w++)
                         /* Volume-weighted mean kappa * density */
-                        density_kappa[w] = RtNgb_Nodes[no].density_kappa[w];  
+                        density_kappa_E[w] = RtNgb_Nodes[no].density_kappa_E[w];
+                        
+                      double density_kappa_N[WAVEBANDS];
+                      for(int w = 0; w < WAVEBANDS; w++)
+                        /* Volume-weighted mean kappa * density */
+                        density_kappa_N[w] = RtNgb_Nodes[no].density_kappa_N[w];  
 
                       WavebandData absorbed[WAVEBANDS];
-                      double dtau_IR;
+                      double deltatau_IR;
 
-                      int still_alive = ray_absorb(ray, chord_length, density_kappa, absorbed, &dtau_IR);
+                      int still_alive = ray_absorb(ray, chord_length, density_kappa_E, density_kappa_N, absorbed, &deltatau_IR);
 
                       /* Accumulate for later distribution to children */
                       for(int w = 0; w < WAVEBANDS; w++)
