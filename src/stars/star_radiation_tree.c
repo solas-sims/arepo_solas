@@ -207,10 +207,12 @@ void raytrace_treewalk(RayPacket *ray, RayWorkStack *work, RayExportBuffer *expo
           for(int w = 0; w < WAVEBANDS; w++)
             {
               double dp;
-
-              if(w == LYMAN_WERNER || w == IONIZING_HI || w == IONIZING_HeI || w == IONIZING_HeII)
+              
+              /* No IR reradiation */
+              if(w == IONIZING_HI || w == IONIZING_HeI || w == IONIZING_HeII)
                 dp = absorbed[w].Energy / (CLIGHT / All.cf_UnitVelocity_in_cm_per_s) / All.cf_atime;
 
+              /* IR reradiation */
               else
                 dp = absorbed[w].Energy * (1.0 + deltatau_IR * ReradiatedFraction[w]) / (CLIGHT / All.cf_UnitVelocity_in_cm_per_s) / All.cf_atime;        
             
