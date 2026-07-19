@@ -553,7 +553,9 @@ static void radiation_feedback(void)
       /* Photoelectric heating */
       double epsilon_pe = 0.05;
 
-      double E_pe = SphP[i].Absorbed[ULTRAVIOLET].Energy * epsilon_pe * All.cf_UnitEnergy_in_cgs; 
+      double E_pe = (SphP[i].Absorbed[ULTRAVIOLET].Energy  * TrueAbsorbedFraction[ULTRAVIOLET]
+                    + SphP[i].Absorbed[LYMAN_WERNER].Energy * TrueAbsorbedFraction[LYMAN_WERNER])
+                    * epsilon_pe * All.cf_UnitEnergy_in_cgs;
       
       /* Volumetric_heating_rate: grackle docs say erg/(s cm^3), straight CGS, no conversion */
       SphP[i].PE_VolHeatingRate +=  E_pe / dt_cgs / V_cgs;
