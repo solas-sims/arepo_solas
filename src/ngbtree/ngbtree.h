@@ -50,7 +50,7 @@ extern struct ExtNgbNODE
   float MaxCsnd;
 } * ExtNgb_Nodes;
 
-#ifdef STAR_RADIATION_ACTIVE
+#ifdef RAD_OPENING_ANGLE
 extern struct RtNgbNODE
 {
     /* geometric cell bounds — opening angle + intersection */
