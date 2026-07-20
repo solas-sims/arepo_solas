@@ -528,9 +528,9 @@ void ngb_update_node_recursive(int no, int sib, int father, int *last, int mode)
 #endif /* #ifdef TREE_BASED_TIMESTEPS */
 
 #ifdef RAD_OPENING_ANGLE
-  MyNgbTreeFloat volume, density_kappa_E[WAVEBANDS], density_kappa_N[WAVEBANDS];
+  MyNgbTreeFloat volume, dN_H2_overlength, density_kappa_E[WAVEBANDS], density_kappa_N[WAVEBANDS];
 
-  volume = 0;
+  volume = 0, dN_H2_overlength = 0;
   
   for(int w = 0; w < WAVEBANDS; w++)
     {
@@ -669,6 +669,8 @@ void ngb_update_node_recursive(int no, int sib, int father, int *last, int mode)
 #ifdef RAD_OPENING_ANGLE  
                           volume += RtNgb_Nodes[p].volume;
                           
+                          dN_H2_overlength += RtNgb_Nodes[p].volume * RtNgb_Nodes[p].dN_H2_overlength;
+                          
                           for(int w = 0; w < WAVEBANDS; w++)
                             {
                               density_kappa_E[w] += RtNgb_Nodes[p].volume * RtNgb_Nodes[p].density_kappa_E[w];
@@ -712,6 +714,8 @@ void ngb_update_node_recursive(int no, int sib, int father, int *last, int mode)
 #ifdef RAD_OPENING_ANGLE  
                       volume += SphP[p].Volume;
                       
+                      dN_H2_overlength += SphP[p].Volume * SphP[p].Density * SphP[p].GrackleSpecies(GRACKLE_H2I);
+                      
                       for(int w = 0; w < WAVEBANDS; w++)
                         {
                           density_kappa_E[w] += SphP[p].Volume * SphP[p].Density * SphP[p].Kappa_E[w];
@@ -739,20 +743,26 @@ void ngb_update_node_recursive(int no, int sib, int father, int *last, int mode)
             }
 #ifdef RAD_OPENING_ANGLE  
           RtNgb_Nodes[no].volume = volume;
+
+          RtNgb_Nodes[no].dN_H2_overlength = (volume > 0) ? dN_H2_overlength / volume : 0;
           
           if(volume > 0)
-            for(int w = 0; w < WAVEBANDS; w++)
-              {
-                density_kappa_E[w] /= volume;
-                density_kappa_N[w] /= volume;
-              }
+            {
+              for(int w = 0; w < WAVEBANDS; w++)
+                {
+                  density_kappa_E[w] /= volume;
+                  density_kappa_N[w] /= volume;
+                }
+            }
 
           for(int w = 0; w < WAVEBANDS; w++)
             {
               RtNgb_Nodes[no].density_kappa_E[w] = density_kappa_E[w];
               RtNgb_Nodes[no].density_kappa_N[w] = density_kappa_N[w];
             }
+#endif
 
+#ifdef STAR_RADIATION_ACTIVE
           /* count direct children */
           int nchildren = 0;
           
@@ -848,7 +858,7 @@ void ngb_exchange_topleafdata(void)
 #endif /* #ifdef TREE_BASED_TIMESTEPS */
 
 #ifdef RAD_OPENING_ANGLE
-    MyNgbTreeFloat volume, density_kappa_E[WAVEBANDS], density_kappa_N[WAVEBANDS];
+    MyNgbTreeFloat volume, dN_H2_overlength, density_kappa_E[WAVEBANDS], density_kappa_N[WAVEBANDS];
 #endif
   };
 
@@ -904,6 +914,8 @@ void ngb_exchange_topleafdata(void)
 #ifdef RAD_OPENING_ANGLE
           loc_DomainMoment[idx].volume = RtNgb_Nodes[no].volume;
           
+          loc_DomainMoment[idx].dN_H2_overlength; = RtNgb_Nodes[no].dN_H2_overlength;
+          
           for(int w = 0; w < WAVEBANDS; w++)
             {
               loc_DomainMoment[idx].density_kappa_E[w] = RtNgb_Nodes[no].density_kappa_E[w];
@@ -944,13 +956,14 @@ void ngb_exchange_topleafdata(void)
             }
 #ifdef RAD_OPENING_ANGLE
           RtNgb_Nodes[no].volume = DomainMoment[idx].volume;
+
+          RtNgb_Nodes[no].dN_H2_overlength = DomainMoment[idx].dN_H2_overlength;
           
           for(int w = 0; w < WAVEBANDS; w++)
             {
               RtNgb_Nodes[no].density_kappa_E[w] = DomainMoment[idx].density_kappa_E[w];
               RtNgb_Nodes[no].density_kappa_N[w] = DomainMoment[idx].density_kappa_N[w];
             }
-
 #endif
 
           Ngb_Nodes[no].Ti_Current = All.Ti_Current;

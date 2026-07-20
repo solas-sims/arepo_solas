@@ -352,7 +352,7 @@ void raytrace_treewalk(RayPacket *ray, RayWorkStack *work, RayExportBuffer *expo
                     {
                       double chord_length = cur.t_exit - cur.t_enter;
 
-                      double dN_H2 = RtNgb_Nodes[no].dN_H2_per_length * chord_length;
+                      double dN_H2 = RtNgb_Nodes[no].dN_H2_overlength * chord_length;
               
                       double density_kappa_E[WAVEBANDS];
                       for(int w = 0; w < WAVEBANDS; w++)

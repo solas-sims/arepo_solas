@@ -547,7 +547,7 @@ static void distribute_node_rad(int no)
       if(w == LYMAN_WERNER)
         {
           node_dtau_E[w] = RtNgb_Nodes[no].volume * RtNgb_Nodes[no].density_kappa_E[w];
-          node_dtau_N[w] = RtNgb_Nodes[no].volume * RtNgb_Nodes[no].dN_H2_per_length;
+          node_dtau_N[w] = RtNgb_Nodes[no].volume * RtNgb_Nodes[no].dN_H2_overlength;
         }
       else
         {
