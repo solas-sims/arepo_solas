@@ -140,7 +140,7 @@ static inline int ray_absorb(RayPacket *ray, double chord_length, double dN_H2, 
   /* LW band: H2 line self shielding + dust absorption */
   if(ray->active_bands & (1u << LYMAN_WERNER))
     {
-      double dtau_line = h2_shield_dtau(ray->N_H2, dN_H2);
+      double dtau_line = h2shield_dtau(ray->N_H2, dN_H2);
       double dtau_dust_E = density_kappa_E[LYMAN_WERNER] * chord_length;
       double dtau_dust_N = density_kappa_N[LYMAN_WERNER] * chord_length;
 

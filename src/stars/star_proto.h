@@ -75,7 +75,7 @@ void star_density(void);
 void update_kappa(void);
 double density_kappa_IR(int i);
 
-void init_h2_shield_table(void);
+void init_h2shield(void);
 double h2_shield_dtau(double N_H2, double dN_H2);
 
 void start_healpix(void);

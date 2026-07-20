@@ -579,6 +579,7 @@ gsl_rng_set(rng, ThisTask + 1);
 #endif
 
 #ifdef STAR_RADIATION_ACTIVE
+  init_h2shield();
   start_healpix();
 #endif
 

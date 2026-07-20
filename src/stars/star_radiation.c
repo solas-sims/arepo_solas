@@ -28,7 +28,7 @@ double Kappa_N[WAVEBANDS] =
   [INFRARED] = 30.0, 
   [OPTICAL] = 242.3, 
   [ULTRAVIOLET] = 406.9,  
-  [LYMAN_WERNER] = 731.4, /* Dust component; H2 line opacity added in update_kappa */
+  [LYMAN_WERNER] = 731.4, /* dust component; H2 line opacity added in update_kappa */
   [IONIZING_HI] = 1.0,
   [IONIZING_HeI] = 1.0,
   [IONIZING_HeII] = 1.0,
@@ -141,7 +141,7 @@ static inline double f_selfshield_H2(double N_H2)
  
 /* Build A(N) once at startup (trapezoid, log-spaced with linear-N areas,
    16 sub-steps per interval so table error << fit error) */
-void init_h2_shield_table(void)
+void init_h2shield(void)
 {
   H2Tab_dlogN = (H2TAB_LOGNMAX - H2TAB_LOGNMIN) / (H2TAB_N - 1);
   H2Tab_A_thinmin = SIGMA_PUMP * pow(10.0, H2TAB_LOGNMIN);
@@ -167,7 +167,7 @@ void init_h2_shield_table(void)
 }
  
 /* A(N): thin analytic below NMIN, clamp above NMAX, linear-in-logN inside */
-static inline double h2_shield_A(double N_H2)
+static inline double h2shield_A(double N_H2)
 {
   if(N_H2 <= 0.0)
     return 0.0;
@@ -191,12 +191,12 @@ static inline double h2_shield_A(double N_H2)
  
 /* Exact per-cell line optical depth for a cell adding dN_H2 to a ray
    that has already accumulated N_H2 */
-double h2_shield_dtau(double N_H2, double dN_H2)
+double h2shield_dtau(double N_H2, double dN_H2)
 {
   double N_H2_cgs = N_H2 * (All.cf_UnitMass_in_g / (All.cf_UnitLength_in_cm * All.cf_UnitLength_in_cm)) / (2.0 * PROTONMASS);
   double dN_H2_cgs = dN_H2 * (All.cf_UnitMass_in_g / (All.cf_UnitLength_in_cm * All.cf_UnitLength_in_cm)) / (2.0 * PROTONMASS);
 
-  double dtau = h2_shield_A(N_H2_cgs + dN_H2_cgs) - h2_shield_A(N_H2_cgs);
+  double dtau = h2shield_A(N_H2_cgs + dN_H2_cgs) - h2shield_A(N_H2_cgs);
   return dtau > 0.0 ? dtau : 0.0;
 }
 
