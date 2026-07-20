@@ -433,9 +433,9 @@ void spawn_star_from_cell(int igas, double birthtime, int istar, MyDouble mass_o
 //#endif /* #ifdef MHD */
 
 #ifdef MAXSCALARS
-  for(int s = 0; s < N_Scalar; s++) /* Note, the changes in MATERIALS, HIGHRESGASMASS, etc., are treated as part of the Scalars */
+  for(int s = 0; s < N_Scalar; s++)
     *(MyFloat *)(((char *)(&SphP[igas])) + scalar_elements[s].offset_mass) *= fac;
-#endif /* #ifdef MAXSCALARS */
+#endif 
 
 #ifdef STARS
   /* Zero star struct */
