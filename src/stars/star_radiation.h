@@ -10,7 +10,22 @@
 #define RAY_STACK_SIZE 64
 
 #define NSIDE_MIN 1
-#define NSIDE_MAX 32      
+#define NSIDE_MAX 32  
+
+/* Dissociation of H2 */
+#define SIGMA_DISS 2.47e-18 /* cm^2, dissociation-weighted eff. cross 
+                               section (Rollig+07 rate / DB96 flux;
+                               Baczynski+15) */
+
+#define F_DISS 0.15 /* dissociation branching per absorption */
+#define SIGMA_PUMP (SIGMA_DISS / F_DISS) /* total line absorption   */
+ 
+#define H2_SHIELD_B5 3.0 /* Doppler b / (km/s); fixed */
+ 
+/* Shielding log table parameters */
+#define H2TAB_N 1024
+#define H2TAB_LOGNMIN 11.0 /* log10 N_H2 [cm^-2]: f_sh = 1 below */
+#define H2TAB_LOGNMAX 24.0 /* f_sh negligible above */
 
 /* Change at init_rays */
 #define ALL_BANDS_ACTIVE ((uint8_t)((1u << WAVEBANDS) - 1u))
@@ -52,7 +67,7 @@ typedef enum
 #if WAVEBANDS > 8
 #error "Active_bands is uint8_t but WAVEBANDS > 8 - use uint16_t instead"
 #endif
-
+ 
 typedef struct WavebandData
 {
   double Photons;
@@ -87,7 +102,7 @@ typedef struct RayPacket
   WavebandData Radiated[WAVEBANDS];
   WavebandData Radiated_Init[WAVEBANDS];
 
-  double N_H2; /* accumulated H2 column since source [cm^-2] */
+  double N_H2; /* accumulated H2 column since source */
 
   int ray_id;
   int home_task;

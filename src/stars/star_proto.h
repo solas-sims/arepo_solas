@@ -73,10 +73,17 @@ void star_density(void);
 #include "../stars/star_radiation.h"
 
 void update_kappa(void);
+double density_kappa_IR(int i);
+
+void init_h2_shield_table(void);
+double h2_shield_dtau(double N_H2, double dN_H2);
+
 void start_healpix(void);
 void append_ray(RayWorkStack *w, const RayPacket *ray);
 void split_ray(const RayPacket *parent, RayPacket children[4]);
+
 void append_export(RayExportBuffer *buf, const RayPacket *ray, int task);
+
 void star_radiation(void);
 void raytrace_treewalk(RayPacket *ray, RayWorkStack *work, RayExportBuffer *export_buf);
 #endif

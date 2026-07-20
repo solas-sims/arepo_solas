@@ -111,6 +111,95 @@ void update_kappa(void)
     }
 }
 
+double density_kappa_IR(int i)
+{
+  double units = All.cf_UnitLength_in_cm * All.cf_UnitLength_in_cm / All.cf_UnitMass_in_g;
+
+#ifdef METALS
+  double Zsol = SphP[i].GasMetallicity / SOLAR_METALLICITY;
+#else
+  double Zsol = 0;
+#endif
+
+  double density_kappa = SphP[i].Density * (1.0 / units) * Zsol;
+
+  return density_kappa;
+}
+
+static double H2Tab_A[H2TAB_N]; /* A at table nodes */
+static double H2Tab_dlogN; /* log10 spacing */
+static double H2Tab_A_thinmin; /* A(NMIN) = SIGMA_PUMP * NMIN */
+ 
+/* Wolcott-Green et al. (2011) self-shielding function */
+static inline double f_selfshield_H2(double N_H2)
+{
+  double x  = N_H2 / 5.0e14;
+  double sq = sqrt(1.0 + x);
+  return 0.965 / pow(1.0 + x / H2_SHIELD_B5, 1.1)
+       + 0.035 / sq * exp(-8.5e-4 * sq);
+}
+ 
+/* Build A(N) once at startup (trapezoid, log-spaced with linear-N areas,
+   16 sub-steps per interval so table error << fit error) */
+void init_h2_shield_table(void)
+{
+  H2Tab_dlogN = (H2TAB_LOGNMAX - H2TAB_LOGNMIN) / (H2TAB_N - 1);
+  H2Tab_A_thinmin = SIGMA_PUMP * pow(10.0, H2TAB_LOGNMIN);
+ 
+  /* Thin part below NMIN: f_sh=1 */
+  double A = H2Tab_A_thinmin;          
+  H2Tab_A[0] = A;
+ 
+  for(int i = 1; i < H2TAB_N; i++)
+    {
+      double N0 = pow(10.0, H2TAB_LOGNMIN + (i - 1) * H2Tab_dlogN);
+      double N1 = pow(10.0, H2TAB_LOGNMIN + i * H2Tab_dlogN);
+ 
+      const int nsub = 16;
+      double dN = (N1 - N0) / nsub;
+      for(int k = 0; k < nsub; k++)
+        {
+          double Na = N0 + k * dN;
+          A += 0.5 * (f_selfshield_H2(Na) + f_selfshield_H2(Na + dN)) * dN * SIGMA_PUMP;
+        }
+      H2Tab_A[i] = A;
+    }
+}
+ 
+/* A(N): thin analytic below NMIN, clamp above NMAX, linear-in-logN inside */
+static inline double h2_shield_A(double N_H2)
+{
+  if(N_H2 <= 0.0)
+    return 0.0;
+ 
+  double logN = log10(N_H2);
+ 
+  /* f_sh = 1 exactly */
+  if(logN <= H2TAB_LOGNMIN)
+    return SIGMA_PUMP * N_H2; 
+ 
+  /* Lines exhausted */
+  if(logN >= H2TAB_LOGNMAX)
+    return H2Tab_A[H2TAB_N - 1];     
+ 
+  double u = (logN - H2TAB_LOGNMIN) / H2Tab_dlogN;
+  int    j = (int)u;
+  double f = u - j;
+ 
+  return H2Tab_A[j] * (1.0 - f) + H2Tab_A[j + 1] * f;
+}
+ 
+/* Exact per-cell line optical depth for a cell adding dN_H2 to a ray
+   that has already accumulated N_H2 */
+double h2_shield_dtau(double N_H2, double dN_H2)
+{
+  double N_H2_cgs = N_H2 * (All.cf_UnitMass_in_g / (All.cf_UnitLength_in_cm * All.cf_UnitLength_in_cm)) / (2.0 * PROTONMASS);
+  double dN_H2_cgs = dN_H2 * (All.cf_UnitMass_in_g / (All.cf_UnitLength_in_cm * All.cf_UnitLength_in_cm)) / (2.0 * PROTONMASS);
+
+  double dtau = h2_shield_A(N_H2_cgs + dN_H2_cgs) - h2_shield_A(N_H2_cgs);
+  return dtau > 0.0 ? dtau : 0.0;
+}
+
 void start_healpix(void) 
 {
   int nside = NSIDE_MIN;
@@ -451,12 +540,20 @@ static void distribute_node_rad(int no)
   if(!has_rad) 
     return;
   
-  double node_deltatau_E[WAVEBANDS], node_deltatau_N[WAVEBANDS];
+  double node_dtau_E[WAVEBANDS], node_dtau_N[WAVEBANDS];
 
   for(int w = 0; w < WAVEBANDS; w++)
     {
-      node_deltatau_E[w] = RtNgb_Nodes[no].volume * RtNgb_Nodes[no].density_kappa_E[w];
-      node_deltatau_N[w] = RtNgb_Nodes[no].volume * RtNgb_Nodes[no].density_kappa_N[w];
+      if(w == LYMAN_WERNER)
+        {
+          node_dtau_E[w] = RtNgb_Nodes[no].volume * RtNgb_Nodes[no].density_kappa_E[w];
+          node_dtau_N[w] = RtNgb_Nodes[no].volume * RtNgb_Nodes[no].dN_H2_per_length;
+        }
+      else
+        {
+          node_dtau_E[w] = RtNgb_Nodes[no].volume * RtNgb_Nodes[no].density_kappa_E[w];
+          node_dtau_N[w] = RtNgb_Nodes[no].volume * RtNgb_Nodes[no].density_kappa_N[w];
+        }
     }
 
   int child = Ngb_Nodes[no].u.d.nextnode;
@@ -473,20 +570,27 @@ static void distribute_node_rad(int no)
           
           for(int w = 0; w < WAVEBANDS; w++)
             {
-              if(node_deltatau_E[w] > 0)
+              if(node_dtau_E[w] > 0)
                 {
-                  double child_deltatau_E = SphP[child].Volume * SphP[child].Density * SphP[child].Kappa_E[w];
+                  double child_dtau_E = SphP[child].Volume * SphP[child].Density * SphP[child].Kappa_E[w];
 
-                  double frac_E = child_deltatau_E / node_deltatau_E[w];
+                  double frac_E = child_dtau_E / node_dtau_E[w];
                   
                   SphP[child].Absorbed[w].Energy += frac_E * RtNgb_Nodes[no].Absorbed[w].Energy;
                 }
               
-              if(node_deltatau_N[w] > 0)
+              if(node_dtau_N[w] > 0)
                 {
-                  double child_deltatau_N = SphP[child].Volume * SphP[child].Density * SphP[child].Kappa_N[w];
+                  if(w == LYMAN_WERNER)
+                    {
+                      double child_dtau_N = SphP[child].Volume * SphP[child].Density * SphP[child].GrackleSpecies(GRACKLE_H2I);
+                    }
+                  else
+                    {
+                      double child_dtau_N = SphP[child].Volume * SphP[child].Density * SphP[child].Kappa_N[w];
+                    }
 
-                  double frac_N = child_deltatau_N / node_deltatau_N[w];
+                  double frac_N = child_dtau_N / node_dtau_N[w];
                   
                   SphP[child].Absorbed[w].Photons += frac_N * RtNgb_Nodes[no].Absorbed[w].Photons;
                 }
@@ -499,18 +603,18 @@ static void distribute_node_rad(int no)
         {
           for(int w = 0; w < WAVEBANDS; w++)
             {
-              if(node_deltatau_E[w] > 0)
+              if(node_dtau_E[w] > 0)
                 {
-                  double child_deltatau_E = RtNgb_Nodes[child].volume * RtNgb_Nodes[child].density_kappa_E[w];
-                  double frac_E = child_deltatau_E / node_deltatau_E[w];
+                  double child_dtau_E = RtNgb_Nodes[child].volume * RtNgb_Nodes[child].density_kappa_E[w];
+                  double frac_E = child_dtau_E / node_dtau_E[w];
                   
                   RtNgb_Nodes[child].Absorbed[w].Energy += frac_E * RtNgb_Nodes[no].Absorbed[w].Energy;
                 }
               
-              if(node_deltatau_N[w] > 0)
+              if(node_dtau_N[w] > 0)
                 {
-                  double child_deltatau_N = RtNgb_Nodes[child].volume * RtNgb_Nodes[child].density_kappa_N[w];
-                  double frac_N = child_deltatau_N / node_deltatau_N[w];
+                  double child_dtau_N = RtNgb_Nodes[child].volume * RtNgb_Nodes[child].density_kappa_N[w];
+                  double frac_N = child_dtau_N / node_dtau_N[w];
                   
                   RtNgb_Nodes[child].Absorbed[w].Photons += frac_N * RtNgb_Nodes[no].Absorbed[w].Photons;
                 }
