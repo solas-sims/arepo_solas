@@ -418,10 +418,6 @@ void calculate_non_standard_physics_prior_mesh_construction(void)
       star_density();
 #endif 
 
-#ifdef STAR_RADIATION_ACTIVE
-      star_radiation();
-#endif
-
 #ifdef BH_ACTIVE
       bh_update_timesteps();
       bh_density();
@@ -454,6 +450,11 @@ void calculate_non_standard_physics_end_of_step(void)
 {
   if(All.Time > 0)
     { 
+
+#ifdef STAR_RADIATION_ACTIVE
+      star_radiation();
+#endif
+
 #if defined(WINDS) || defined(RADIATION_PRESSURE) || defined(SUPERNOVAE)
       star_perform_end_of_step_physics();
 #endif
