@@ -217,7 +217,7 @@ void raytrace_treewalk(RayPacket *ray, RayWorkStack *work, RayExportBuffer *expo
           double chord_length = cur.t_exit - cur.t_enter;
 
           double Density = P[no].Mass / SphP[no].Volume;
-          double dN_H2 = SphP[no].GrackleSpecies(GRACKLE_H2I) * Density * chord_length;
+          double dN_H2 = SphP[no].GrackleSpeciesConserved(GRACKLE_H2I) / Volume * chord_length;
               
           double density_kappa_E[WAVEBANDS];
           for(int w = 0; w < WAVEBANDS; w++)

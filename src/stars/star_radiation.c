@@ -89,9 +89,9 @@ void update_kappa(void)
       sigma_HI = 3.25e-18;
       sigma_HeI = 5.04e-18;
       sigma_HeII = 1.30e-18; 
-      SphP[i].Kappa_E[IONIZING_HI] = (sigma_HI / (PROTONMASS) / units) * SphP[i].GrackleSpecies(GRACKLE_HI);
-      SphP[i].Kappa_E[IONIZING_HeI] = (sigma_HeI / (4.0 * PROTONMASS) / units) * SphP[i].GrackleSpecies(GRACKLE_HeI);
-      SphP[i].Kappa_E[IONIZING_HeII] = (sigma_HeII / (4.0 * PROTONMASS) / units) * SphP[i].GrackleSpecies(GRACKLE_HeII);  
+      SphP[i].Kappa_E[IONIZING_HI] = (sigma_HI / (PROTONMASS) / units) * (SphP[i].GrackleSpeciesConserved(GRACKLE_HI) / P[i].Mass);
+      SphP[i].Kappa_E[IONIZING_HeI] = (sigma_HeI / (4.0 * PROTONMASS) / units) * (SphP[i].GrackleSpeciesConserved(GRACKLE_HeI) / P[i].Mass);
+      SphP[i].Kappa_E[IONIZING_HeII] = (sigma_HeII / (4.0 * PROTONMASS) / units) * (SphP[i].GrackleSpeciesConserved(GRACKLE_HeII) / P[i].Mass);  
       
 
       SphP[i].Kappa_N[INFRARED] = (Kappa_N[INFRARED] / units) * Zsol;
@@ -105,9 +105,9 @@ void update_kappa(void)
       sigma_HI = 3.48e-18; 
       sigma_HeI = 5.27e-18;
       sigma_HeII = 1.31e-18; 
-      SphP[i].Kappa_N[IONIZING_HI] = (sigma_HI / (PROTONMASS) / units) * SphP[i].GrackleSpecies(GRACKLE_HI);
-      SphP[i].Kappa_N[IONIZING_HeI] = (sigma_HeI / (4.0 * PROTONMASS) / units) * SphP[i].GrackleSpecies(GRACKLE_HeI);
-      SphP[i].Kappa_N[IONIZING_HeII] = (sigma_HeII / (4.0 * PROTONMASS) / units) * SphP[i].GrackleSpecies(GRACKLE_HeII);  
+      SphP[i].Kappa_N[IONIZING_HI] = (sigma_HI / (PROTONMASS) / units) * (SphP[i].GrackleSpeciesConserved(GRACKLE_HI) / P[i].Mass);
+      SphP[i].Kappa_N[IONIZING_HeI] = (sigma_HeI / (4.0 * PROTONMASS) / units) * (SphP[i].GrackleSpeciesConserved(GRACKLE_HeI) / P[i].Mass);
+      SphP[i].Kappa_N[IONIZING_HeII] = (sigma_HeII / (4.0 * PROTONMASS) / units) * (SphP[i].GrackleSpeciesConserved(GRACKLE_HeII) / P[i].Mass);  
     }
 }
 
@@ -587,7 +587,7 @@ static void distribute_node_rad(int no)
                 {
                   if(w == LYMAN_WERNER)
                     {
-                      double child_dtau_N = SphP[child].Volume * Density * SphP[child].GrackleSpecies(GRACKLE_H2I);
+                      double child_dtau_N = SphP[child].Volume * Density * (SphP[child].GrackleSpeciesConserved(GRACKLE_H2I) / P[child].Mass);
                     }
                   else
                     {
@@ -649,9 +649,6 @@ static void radiation_feedback(void)
       if(P[i].Type != 0 || P[i].Mass == 0 || P[i].ID == 0)
         continue;
       
-      /* Density */
-      double Density = P[i].Mass / SphP[i].Volume;
-      
       /* Volume, timestep */
       double V = SphP[i].Volume;
       double dt = (P[i].TimeBinHydro ? (((integertime)1) << P[i].TimeBinHydro) : 0) * All.Timebase_interval; 
@@ -665,8 +662,8 @@ static void radiation_feedback(void)
       double epsilon_pe = 0.05;
 
       double E_pe = (SphP[i].Absorbed[ULTRAVIOLET].Energy  * TrueAbsorbedFraction[ULTRAVIOLET]
-                    + SphP[i].Absorbed[LYMAN_WERNER].Energy * TrueAbsorbedFraction[LYMAN_WERNER])
-                    * epsilon_pe * All.cf_UnitEnergy_in_cgs;
+                     + SphP[i].Absorbed[LYMAN_WERNER].Energy * TrueAbsorbedFraction[LYMAN_WERNER])
+                     * epsilon_pe * All.cf_UnitEnergy_in_cgs;
       
       /* Volumetric_heating_rate: grackle docs say erg/(s cm^3), straight CGS, no conversion */
       SphP[i].PE_VolHeatingRate +=  E_pe / dt_cgs / V_cgs;
@@ -675,7 +672,7 @@ static void radiation_feedback(void)
 #ifdef DISSOCIATION
       /* H2 Dissociation */
       /* Number density */
-      double n_H2 = SphP[i].GrackleSpecies(GRACKLE_H2I) * Density / (2 * PROTONMASS / All.cf_UnitMass_in_g);
+      double n_H2 = SphP[i].GrackleSpeciesConserved(GRACKLE_H2I) / V / (2 * PROTONMASS / All.cf_UnitMass_in_g);
 
       /* In cgs */
       double n_H2_cgs = n_H2 / (All.cf_UnitLength_in_cm * All.cf_UnitLength_in_cm * All.cf_UnitLength_in_cm);
@@ -690,9 +687,9 @@ static void radiation_feedback(void)
 #ifdef PHOTOIONIZATION
       /* Photoionization */     
       /* Number densities */
-      double n_HI = SphP[i].GrackleSpecies(GRACKLE_HI) * Density / (PROTONMASS / All.cf_UnitMass_in_g);
-      double n_HeI = SphP[i].GrackleSpecies(GRACKLE_HeI) * Density / (4 * PROTONMASS / All.cf_UnitMass_in_g);
-      double n_HeII = SphP[i].GrackleSpecies(GRACKLE_HeII) * Density / (4 * PROTONMASS / All.cf_UnitMass_in_g);
+      double n_HI = SphP[i].GrackleSpeciesConserved(GRACKLE_HI) / V / (PROTONMASS / All.cf_UnitMass_in_g);
+      double n_HeI = SphP[i].GrackleSpeciesConserved(GRACKLE_HeI) / V / (4 * PROTONMASS / All.cf_UnitMass_in_g);
+      double n_HeII = SphP[i].GrackleSpeciesConserved(GRACKLE_HeII) / V / (4 * PROTONMASS / All.cf_UnitMass_in_g);
 
       /* In cgs */
       double n_HI_cgs = n_HI / (All.cf_UnitLength_in_cm * All.cf_UnitLength_in_cm * All.cf_UnitLength_in_cm);
