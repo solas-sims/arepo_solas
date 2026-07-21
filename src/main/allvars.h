@@ -1743,8 +1743,8 @@ extern struct sph_particle_data
 #endif
 
 #ifdef STAR_RADIATION_ACTIVE
-  MyDouble Kappa_E[WAVEBANDS];
-  MyDouble Kappa_N[WAVEBANDS];
+  MyDouble DtauOverLength_E[WAVEBANDS];
+  MyDouble DtauOverLength_N[WAVEBANDS];
   WavebandData Absorbed[WAVEBANDS];
 #endif
 

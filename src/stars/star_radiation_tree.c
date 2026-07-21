@@ -105,8 +105,8 @@ static inline int ray_sphere_intersect(const double *ray_pos, const double *ray_
   return 1;
 }
 
-static inline int ray_absorb(RayPacket *ray, double chord_length, double dN_H2, double density_kappa_E[WAVEBANDS], double density_kappa_N[WAVEBANDS], WavebandData absorbed[WAVEBANDS],
-                             double *lw_wline_E, double *lw_wline_N)
+static inline int ray_absorb(RayPacket *ray, double Dtau_E[WAVEBANDS], double Dtau_N[WAVEBANDS], WavebandData absorbed[WAVEBANDS],
+                             double dN_H2, double *lw_line)
 {
   for(int w = 0; w < WAVEBANDS; w++)
     {
@@ -123,12 +123,9 @@ static inline int ray_absorb(RayPacket *ray, double chord_length, double dN_H2, 
       /* Separate treatment of LW*/
       if(w == LYMAN_WERNER)
         continue;
-
-      double dtau_E = density_kappa_E[w] * chord_length;
-      double dtau_N = density_kappa_N[w] * chord_length;
    
-      double absorbed_energy = ray->Radiated[w].Energy * (1.0 - exp(-dtau_E));
-      double absorbed_photons = ray->Radiated[w].Photons * (1.0 - exp(-dtau_N));
+      double absorbed_energy = ray->Radiated[w].Energy * (1.0 - exp(-Dtau_E[w]));
+      double absorbed_photons = ray->Radiated[w].Photons * (1.0 - exp(-Dtau_N[w]));
 
       absorbed[w].Energy += absorbed_energy;
       ray->Radiated[w].Energy -= absorbed_energy;
@@ -140,12 +137,12 @@ static inline int ray_absorb(RayPacket *ray, double chord_length, double dN_H2, 
   /* LW band: H2 line self shielding + dust absorption */
   if(ray->active_bands & (1u << LYMAN_WERNER))
     {
-      double dtau_line = h2shield_dtau(ray->N_H2, dN_H2);
-      double dtau_dust_E = density_kappa_E[LYMAN_WERNER] * chord_length;
-      double dtau_dust_N = density_kappa_N[LYMAN_WERNER] * chord_length;
+      double Dtau_line = h2shield_dtau(ray->N_H2, dN_H2);
+      double Dtau_dust_E = Dtau_E[LYMAN_WERNER];
+      double Dtau_dust_N = Dtau_N[LYMAN_WERNER];
 
-      double tot_E = dtau_line + dtau_dust_E; 
-      double tot_N = dtau_line + dtau_dust_N;
+      double tot_E = Dtau_line + Dtau_dust_E; 
+      double tot_N = Dtau_line + Dtau_dust_N;
   
       double absorbed_energy = ray->Radiated[LYMAN_WERNER].Energy * (1.0 - exp(-tot_E));
       double absorbed_photons = ray->Radiated[LYMAN_WERNER].Photons * (1.0 - exp(-tot_N));
@@ -156,8 +153,10 @@ static inline int ray_absorb(RayPacket *ray, double chord_length, double dN_H2, 
       absorbed[LYMAN_WERNER].Photons += absorbed_photons;
       ray->Radiated[LYMAN_WERNER].Photons -= absorbed_photons;
 
-      if(tot_E > 0) *lw_wline_E = dtau_line / tot_E;
-      if(tot_N > 0) *lw_wline_N = dtau_line / tot_N;
+      if(tot_E > 0) 
+        lw_line[0] = Dtau_line / tot_E;
+      if(tot_N > 0) 
+        lw_line[1] = Dtau_line / tot_N;
     } 
   
   ray->N_H2 += dN_H2;
@@ -214,29 +213,28 @@ void raytrace_treewalk(RayPacket *ray, RayWorkStack *work, RayExportBuffer *expo
           if(P[no].Ti_Current != All.Ti_Current)
             drift_particle(no, All.Ti_Current);
 
-          double chord_length = cur.t_exit - cur.t_enter;
-
-          double Density = P[no].Mass / SphP[no].Volume;
-          double dN_H2 = SphP[no].GrackleSpeciesConserved(GRACKLE_H2I) / Volume * chord_length;
+          double length = cur.t_exit - cur.t_enter;
               
-          double density_kappa_E[WAVEBANDS];
+          double Dtau_E[WAVEBANDS];
           for(int w = 0; w < WAVEBANDS; w++)
-            density_kappa_E[w] = Density * SphP[no].Kappa_E[w];
+            Dtau_E[w] = SphP[no].DtauOverLength_E[w] * length;
 
-          double density_kappa_N[WAVEBANDS];
+          double Dtau_N[WAVEBANDS];
           for(int w = 0; w < WAVEBANDS; w++)
-            density_kappa_N[w] = Density * SphP[no].Kappa_N[w];
+            Dtau_N[w] = SphP[no].DtauOverLength_N[w] * length;
           
           WavebandData absorbed[WAVEBANDS];
 
+          /* Line Dissociation */
+          double dN_H2 = SphP[no].GrackleSpeciesConserved(GRACKLE_H2I) / SphP[no].Volume * length;
           /* Percent LW absorption that goes into H2 line dissociation */
-          double lw_wline_E = 0, lw_wline_N = 0;
+          double lw_line[2] = {0.0, 0.0};
 
           /* Proccess ray */
-          int still_alive = ray_absorb(ray, chord_length, dN_H2, density_kappa_E, density_kappa_N, absorbed, &lw_wline_E, &lw_wline_N);
+          int still_alive = ray_absorb(ray, Dtau_E, Dtau_N, absorbed, dN_H2, lw_line);
 
           /* Reradiation in the IR (Boosts momentum) */
-          double dtau_IR = density_kappa_IR(no) * chord_length;
+          double Dtau_IR = dtau_IR(no, length);
           
           /* Deposit absorbed energy into cells, one band at a time */
           double dK_total = 0.0;
@@ -249,10 +247,10 @@ void raytrace_treewalk(RayPacket *ray, RayWorkStack *work, RayExportBuffer *expo
                 dp = absorbed[w].Energy / (CLIGHT / All.cf_UnitVelocity_in_cm_per_s) / All.cf_atime;
               /* IR reradiation (dust only) */
               else if(w == LYMAN_WERNER)
-                dp = absorbed[w].Energy * (1.0 - lw_wline_E) (1.0 + dtau_IR * ReradiatedFraction[w]) / (CLIGHT / All.cf_UnitVelocity_in_cm_per_s) / All.cf_atime;
+                dp = absorbed[w].Energy * (1.0 - lw_line[0]) * (1.0 + Dtau_IR * ReradiatedFraction[w]) / (CLIGHT / All.cf_UnitVelocity_in_cm_per_s) / All.cf_atime;
               /* IR reradiation (full) */
               else
-                dp = absorbed[w].Energy * (1.0 + dtau_IR * ReradiatedFraction[w]) / (CLIGHT / All.cf_UnitVelocity_in_cm_per_s) / All.cf_atime;        
+                dp = absorbed[w].Energy * (1.0 + Dtau_IR * ReradiatedFraction[w]) / (CLIGHT / All.cf_UnitVelocity_in_cm_per_s) / All.cf_atime;        
             
               double dp_vec[3] = {dp * ray->dir[0], dp * ray->dir[1], dp * ray->dir[2]};
 
@@ -274,7 +272,7 @@ void raytrace_treewalk(RayPacket *ray, RayWorkStack *work, RayExportBuffer *expo
               SphP[no].StarMomentumFeed[2] += dp_vec[2];
 
               if(w == LYMAN_WERNER)
-                SphP[no].Absorbed[w].Energy += (1.0 - lw_wline_E) * (absorbed[w].Energy - dK);
+                SphP[no].Absorbed[w].Energy += (1.0 - lw_line[0]) * (absorbed[w].Energy - dK);
               else
                 SphP[no].Absorbed[w].Energy += absorbed[w].Energy - dK;
 
@@ -286,7 +284,7 @@ void raytrace_treewalk(RayPacket *ray, RayWorkStack *work, RayExportBuffer *expo
           
           /* Deposit absorbed photons into cells, one band at a time */
           /* Dissociating Photons */
-           SphP[no].Absorbed[LYMAN_WERNER].Photons += F_DISS * lw_wline_N * absorbed[LYMAN_WERNER].Photons; 
+           SphP[no].Absorbed[LYMAN_WERNER].Photons += F_DISS * lw_line[1] * absorbed[LYMAN_WERNER].Photons; 
 
           /* Ionizing Photons */
           SphP[no].Absorbed[IONIZING_HI].Photons += absorbed[IONIZING_HI].Photons;
@@ -351,33 +349,32 @@ void raytrace_treewalk(RayPacket *ray, RayWorkStack *work, RayExportBuffer *expo
                   /* This should only trigger for not too elongated nodes */
                   if(aspect < All.NodeAspectRatio)
                     {
-                      double chord_length = cur.t_exit - cur.t_enter;
-
-                      double dN_H2 = RtNgb_Nodes[no].dN_H2_overlength * chord_length;
+                      double length = cur.t_exit - cur.t_enter;
               
-                      double density_kappa_E[WAVEBANDS];
+                      double Dtau_E[WAVEBANDS];
                       for(int w = 0; w < WAVEBANDS; w++)
                         /* Volume-weighted mean kappa * density */
-                        density_kappa_E[w] = RtNgb_Nodes[no].density_kappa_E[w];
+                        Dtau_E[w] = RtNgb_Nodes[no].dtau_over_length_E[w] * length;
                         
-                      double density_kappa_N[WAVEBANDS];
+                      double Dtau_N[WAVEBANDS];
                       for(int w = 0; w < WAVEBANDS; w++)
                         /* Volume-weighted mean kappa * density */
-                        density_kappa_N[w] = RtNgb_Nodes[no].density_kappa_N[w];  
+                        Dtau_N[w] = RtNgb_Nodes[no].dtau_over_length_N[w] * length;
 
                       WavebandData absorbed[WAVEBANDS];
 
-                      double lw_wline_E = 0, lw_wline_N = 0;
+                      double dN_H2 = RtNgb_Nodes[no].dN_H2_overlength * length;
+                      double lw_line[2] = {0.0, 0.0};
 
-                      int still_alive = ray_absorb(ray, chord_length, dN_H2, density_kappa_E, density_kappa_N, absorbed, &lw_wline_E, &lw_wline_N);
+                      int still_alive = ray_absorb(ray, Dtau_E, Dtau_N, absorbed, dN_H2, lw_line);
 
                       /* Accumulate for later distribution to children */
                       for(int w = 0; w < WAVEBANDS; w++)
                         {
                           if(w == LYMAN_WERNER)
                             {
-                              RtNgb_Nodes[no].Absorbed[w].Energy += (1.0 - lw_wline_E) * absorbed[w].Energy;
-                              RtNgb_Nodes[no].Absorbed[w].Photons += F_DISS * lw_wline_N * absorbed[w].Photons;
+                              RtNgb_Nodes[no].Absorbed[w].Energy += (1.0 - lw_line[0]) * absorbed[w].Energy;
+                              RtNgb_Nodes[no].Absorbed[w].Photons += F_DISS * lw_line[1] * absorbed[w].Photons;
                             }
                           else
                             {
