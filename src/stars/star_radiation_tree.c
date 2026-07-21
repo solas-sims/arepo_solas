@@ -216,15 +216,16 @@ void raytrace_treewalk(RayPacket *ray, RayWorkStack *work, RayExportBuffer *expo
 
           double chord_length = cur.t_exit - cur.t_enter;
 
-          double dN_H2 = SphP[no].GrackleSpecies(GRACKLE_H2I) * SphP[no].Density * chord_length;
+          double Density = P[no].Mass / SphP[no].Volume;
+          double dN_H2 = SphP[no].GrackleSpecies(GRACKLE_H2I) * Density * chord_length;
               
           double density_kappa_E[WAVEBANDS];
           for(int w = 0; w < WAVEBANDS; w++)
-            density_kappa_E[w] = SphP[no].Density * SphP[no].Kappa_E[w];
+            density_kappa_E[w] = Density * SphP[no].Kappa_E[w];
 
           double density_kappa_N[WAVEBANDS];
           for(int w = 0; w < WAVEBANDS; w++)
-            density_kappa_N[w] = SphP[no].Density * SphP[no].Kappa_N[w];
+            density_kappa_N[w] = Density * SphP[no].Kappa_N[w];
           
           WavebandData absorbed[WAVEBANDS];
 

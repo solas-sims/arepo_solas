@@ -121,7 +121,8 @@ double density_kappa_IR(int i)
   double Zsol = 0;
 #endif
 
-  double density_kappa = SphP[i].Density * (1.0 / units) * Zsol;
+  double Density = P[i].Mass / SphP[i].Volume;
+  double density_kappa = Density * (1.0 / units) * Zsol;
 
   return density_kappa;
 }
@@ -570,9 +571,12 @@ static void distribute_node_rad(int no)
           
           for(int w = 0; w < WAVEBANDS; w++)
             {
+              double Density = P[child].Mass / SphP[child].Volume;
+
               if(node_dtau_E[w] > 0)
                 {
-                  double child_dtau_E = SphP[child].Volume * SphP[child].Density * SphP[child].Kappa_E[w];
+                  
+                  double child_dtau_E = SphP[child].Volume * Density * SphP[child].Kappa_E[w];
 
                   double frac_E = child_dtau_E / node_dtau_E[w];
                   
@@ -583,11 +587,11 @@ static void distribute_node_rad(int no)
                 {
                   if(w == LYMAN_WERNER)
                     {
-                      double child_dtau_N = SphP[child].Volume * SphP[child].Density * SphP[child].GrackleSpecies(GRACKLE_H2I);
+                      double child_dtau_N = SphP[child].Volume * Density * SphP[child].GrackleSpecies(GRACKLE_H2I);
                     }
                   else
                     {
-                      double child_dtau_N = SphP[child].Volume * SphP[child].Density * SphP[child].Kappa_N[w];
+                      double child_dtau_N = SphP[child].Volume * Density * SphP[child].Kappa_N[w];
                     }
 
                   double frac_N = child_dtau_N / node_dtau_N[w];
@@ -645,6 +649,9 @@ static void radiation_feedback(void)
       if(P[i].Type != 0 || P[i].Mass == 0 || P[i].ID == 0)
         continue;
       
+      /* Density */
+      double Density = P[i].Mass / SphP[i].Volume;
+      
       /* Volume, timestep */
       double V = SphP[i].Volume;
       double dt = (P[i].TimeBinHydro ? (((integertime)1) << P[i].TimeBinHydro) : 0) * All.Timebase_interval; 
@@ -668,7 +675,7 @@ static void radiation_feedback(void)
 #ifdef DISSOCIATION
       /* H2 Dissociation */
       /* Number density */
-      double n_H2 = SphP[i].GrackleSpecies(GRACKLE_H2I) * SphP[i].Density / (2 * PROTONMASS / All.cf_UnitMass_in_g);
+      double n_H2 = SphP[i].GrackleSpecies(GRACKLE_H2I) * Density / (2 * PROTONMASS / All.cf_UnitMass_in_g);
 
       /* In cgs */
       double n_H2_cgs = n_H2 / (All.cf_UnitLength_in_cm * All.cf_UnitLength_in_cm * All.cf_UnitLength_in_cm);
@@ -683,9 +690,9 @@ static void radiation_feedback(void)
 #ifdef PHOTOIONIZATION
       /* Photoionization */     
       /* Number densities */
-      double n_HI = SphP[i].GrackleSpecies(GRACKLE_HI) * SphP[i].Density / (PROTONMASS / All.cf_UnitMass_in_g);
-      double n_HeI = SphP[i].GrackleSpecies(GRACKLE_HeI) * SphP[i].Density / (4 * PROTONMASS / All.cf_UnitMass_in_g);
-      double n_HeII = SphP[i].GrackleSpecies(GRACKLE_HeII) * SphP[i].Density / (4 * PROTONMASS / All.cf_UnitMass_in_g);
+      double n_HI = SphP[i].GrackleSpecies(GRACKLE_HI) * Density / (PROTONMASS / All.cf_UnitMass_in_g);
+      double n_HeI = SphP[i].GrackleSpecies(GRACKLE_HeI) * Density / (4 * PROTONMASS / All.cf_UnitMass_in_g);
+      double n_HeII = SphP[i].GrackleSpecies(GRACKLE_HeII) * Density / (4 * PROTONMASS / All.cf_UnitMass_in_g);
 
       /* In cgs */
       double n_HI_cgs = n_HI / (All.cf_UnitLength_in_cm * All.cf_UnitLength_in_cm * All.cf_UnitLength_in_cm);
