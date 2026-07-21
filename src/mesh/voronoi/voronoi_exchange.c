@@ -280,6 +280,13 @@ void exchange_primitive_variables(void)
               tmpPrimExch[off].Csnd = get_sound_speed(place);
 
 #if defined(WINDS) || defined(SUPERNOVAE) 
+              tmpPrimExch[off].Mass = P[place].Mass;
+#ifdef METALS
+              tmpPrimExch[off].GasMetals = SphP[place].GasMetals;
+#endif
+              for(int k = 0; k < 3; k++)
+                tmpPrimExch[off].Momentum[k] = SphP[place].Momentum[k];
+
               tmpPrimExch[off].MassFeed = SphP[place].StarMassFeed;
 #ifdef METALS
               tmpPrimExch[off].MetalsFeed = SphP[place].StarMetalsFeed;
@@ -398,6 +405,13 @@ void exchange_primitive_variables_and_gradients(void)
               tmpPrimExch[off].Csnd = get_sound_speed(place);
 
 #if defined(WINDS) || defined(SUPERNOVAE) 
+              tmpPrimExch[off].Mass = P[place].Mass;
+#ifdef METALS
+              tmpPrimExch[off].GasMetals = SphP[place].GassMetals;
+#endif
+              for(int k = 0; k < 3; k++)
+                tmpPrimExch[off].Momentum[k] = SphP[place].Momentum[k];
+
               tmpPrimExch[off].MassFeed = SphP[place].StarMassFeed;
 #ifdef METALS
               tmpPrimExch[off].MetalsFeed = SphP[place].StarMetalsFeed;

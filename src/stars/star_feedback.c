@@ -603,11 +603,10 @@ void star_feedback(void)
                     }
                   else
                     {
-                      mj = PrimExch[particle].Density * PrimExch[particle].Volume + PrimExch[particle].MassFeed;
+                      mj = PrimExch[particle].Mass + PrimExch[particle].MassFeed;
 
                       for(k = 0; k < 3; k++)
-                        vj[k] = (PrimExch[particle].Density * PrimExch[particle].Volume * PrimExch[particle].VelGas[k]
-                        + PrimExch[particle].MomentumFeed[k]) / mj;
+                        vj[k] = (PrimExch[particle].Momentum[k] + PrimExch[particle].MomentumFeed[k]) / mj;
                     }
 
                   double sq_vj = vj[0]*vj[0] + vj[1]*vj[1] + vj[2]*vj[2];
@@ -652,8 +651,7 @@ void star_feedback(void)
                     {
                       NgbsDensity += mj / PrimExch[particle].Volume * sqrtsq_wbar;
 #ifdef METALS
-                      NgbsMetallicity += (PrimExch[particle].Density * PrimExch[particle].Volume * PrimExch[particle].Scalars[METALS_INDEX]
-                      + PrimExch[particle].MetalsFeed) / mj * sqrtsq_wbar;
+                      NgbsMetallicity += (PrimExch[particle].GasMetals + PrimExch[particle].MetalsFeed) / mj * sqrtsq_wbar;
 #endif
                     }
                 }
