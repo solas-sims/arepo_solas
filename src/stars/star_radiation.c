@@ -71,7 +71,7 @@ void update_kappa(void)
       double units = All.cf_UnitLength_in_cm * All.cf_UnitLength_in_cm / All.cf_UnitMass_in_g;
       
 #ifdef METALS
-      double Zsol = SphP[i].GasMetallicity / SOLAR_METALLICITY;
+      double Zsol = (SphP[i].GasMetals / P[i].Mass) / SOLAR_METALLICITY;
 #else
       double Zsol = 0;
 #endif
@@ -116,7 +116,7 @@ double density_kappa_IR(int i)
   double units = All.cf_UnitLength_in_cm * All.cf_UnitLength_in_cm / All.cf_UnitMass_in_g;
 
 #ifdef METALS
-  double Zsol = SphP[i].GasMetallicity / SOLAR_METALLICITY;
+  double Zsol = (SphP[i].GasMetals / P[i].Mass) / SOLAR_METALLICITY;
 #else
   double Zsol = 0;
 #endif
