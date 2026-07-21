@@ -58,14 +58,14 @@ extern struct RtNgbNODE
     //float len;
     
     /* number of children */
-    int nchildren;
+    int Nchildren;
 
 #ifdef RAD_OPENING_ANGLE
     /* RT quantities - volume-weighted, accumulated during tree build */
-    MyNgbTreeFloat volume;
-    MyNgbTreeFloat dN_H2_overlength;  
-    MyNgbTreeFloat density_kappa_E[WAVEBANDS];
-    MyNgbTreeFloat density_kappa_N[WAVEBANDS];
+    MyNgbTreeFloat Volume;
+    MyNgbTreeFloat dN_H2_OverLength;  
+    MyNgbTreeFloat DtauOverLength_E[WAVEBANDS];
+    MyNgbTreeFloat DtauOverLength_N[WAVEBANDS];
 
     WavebandData Absorbed[WAVEBANDS];
 #endif

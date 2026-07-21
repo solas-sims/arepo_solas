@@ -556,13 +556,13 @@ static void distribute_node_rad(int no)
     {
       if(w == LYMAN_WERNER)
         {
-          node_dtau_E[w] = RtNgb_Nodes[no].volume * RtNgb_Nodes[no].dtau_over_length_E[w];
-          node_dtau_N[w] = RtNgb_Nodes[no].volume * RtNgb_Nodes[no].dN_H2_overlength;
+          node_dtau_E[w] = RtNgb_Nodes[no].Volume * RtNgb_Nodes[no].DtauOverLength_E[w];
+          node_dtau_N[w] = RtNgb_Nodes[no].Volume * RtNgb_Nodes[no].dN_H2_OverLength;
         }
       else
         {
-          node_dtau_E[w] = RtNgb_Nodes[no].volume * RtNgb_Nodes[no].dtau_over_length_E[w];
-          node_dtau_N[w] = RtNgb_Nodes[no].volume * RtNgb_Nodes[no].dtau_over_length_N[w];
+          node_dtau_E[w] = RtNgb_Nodes[no].Volume * RtNgb_Nodes[no].DtauOverLength_E[w];
+          node_dtau_N[w] = RtNgb_Nodes[no].Volume * RtNgb_Nodes[no].DtauOverLength_N[w];
         }
     }
 
@@ -627,11 +627,11 @@ static void distribute_node_rad(int no)
                   double child_dtau_E;
                   if(w == LYMAN_WERNER)
                     {
-                      child_dtau_E = RtNgb_Nodes[child].volume * RtNgb_Nodes[child].dtau_over_length_E[w];
+                      child_dtau_E = RtNgb_Nodes[child].Volume * RtNgb_Nodes[child].DtauOverLength_E[w];
                     }
                   else
                     {
-                      child_dtau_E = RtNgb_Nodes[child].volume * RtNgb_Nodes[child].dtau_over_length_E[w];
+                      child_dtau_E = RtNgb_Nodes[child].Volume * RtNgb_Nodes[child].DtauOverLength_E[w];
                     }
                   
                   double frac_E = child_dtau_E / node_dtau_E[w];
@@ -644,11 +644,11 @@ static void distribute_node_rad(int no)
                   double child_dtau_N;
                   if(w == LYMAN_WERNER)
                     {
-                      child_dtau_N = RtNgb_Nodes[child].volume * RtNgb_Nodes[child].dN_H2_overlength[w];
+                      child_dtau_N = RtNgb_Nodes[child].volume * RtNgb_Nodes[child].dN_H2_OverLength[w];
                     }
                   else
                     {
-                      child_dtau_N = RtNgb_Nodes[child].volume * RtNgb_Nodes[child].dtau_over_length_N[w];
+                      child_dtau_N = RtNgb_Nodes[child].volume * RtNgb_Nodes[child].DtauOverLength_N[w];
                     }
                   
                   double frac_N = child_dtau_N / node_dtau_N[w];
