@@ -570,6 +570,9 @@ gsl_rng_set(rng, ThisTask + 1);
   load_star_tables(All.StarTablesFile);
 
   feedback_init(&MechanicalFeedbackEvents);
+
+  for(i = 0; i < NumStars; i++)
+    SP[i].WithFeedback = 1;
 #endif
 
 #ifdef STAR_RADIATION_ACTIVE
