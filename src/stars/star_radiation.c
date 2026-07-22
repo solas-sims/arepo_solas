@@ -822,7 +822,7 @@ void star_radiation(void)
   long long n_rays_global;
   sumup_longs(1, &n_rays_local, &n_rays_global);
 
-  mpi_printf("STAR_RADIATION: Initializing radiation with %12lld rays", n_rays_global);
+  mpi_printf("STAR_RADIATION: Initializing radiation with %12lld rays\n", n_rays_global);
 
   /* Floor so ranks with no local stars still have a buffer to receive imports */
   long long work_capacity = n_rays_local > 0 ? 4 * n_rays_local : 1024;
