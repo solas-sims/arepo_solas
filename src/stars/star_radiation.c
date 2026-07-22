@@ -709,7 +709,7 @@ static void radiation_feedback(void)
 
       double N_abs_H2 = SphP[i].Absorbed[LYMAN_WERNER].Photons;
 
-      SphP[i].H2_DissociationRate += n_H2 > 0 ? (N_abs_H2 / (dt/All.cf_hubble_a/All.HubbleParam) / V) / n_H2 : 0.0;
+      SphP[i].H2_DissociationRate += n_H2 > 0 ? (F_DISS * N_abs_H2 / (dt/All.cf_hubble_a/All.HubbleParam) / V) / n_H2 : 0.0;
 #endif
 
 #ifdef PHOTOIONIZATION

@@ -247,7 +247,7 @@ void raytrace_treewalk(RayPacket *ray, RayWorkStack *work, RayExportBuffer *expo
                 dp = absorbed[w].Energy / (CLIGHT / All.cf_UnitVelocity_in_cm_per_s) / All.cf_atime;
               /* IR reradiation (dust only) */
               else if(w == LYMAN_WERNER)
-                dp = absorbed[w].Energy * (1.0 - lw_line[0]) * (1.0 + Dtau_IR * ReradiatedFraction[w]) / (CLIGHT / All.cf_UnitVelocity_in_cm_per_s) / All.cf_atime;
+                dp = absorbed[w].Energy * (1.0 + (1.0 - lw_line[0]) * Dtau_IR * ReradiatedFraction[w]) / (CLIGHT / All.cf_UnitVelocity_in_cm_per_s) / All.cf_atime;
               /* IR reradiation (full) */
               else
                 dp = absorbed[w].Energy * (1.0 + Dtau_IR * ReradiatedFraction[w]) / (CLIGHT / All.cf_UnitVelocity_in_cm_per_s) / All.cf_atime;        
@@ -284,7 +284,7 @@ void raytrace_treewalk(RayPacket *ray, RayWorkStack *work, RayExportBuffer *expo
           
           /* Deposit absorbed photons into cells, one band at a time */
           /* Dissociating Photons */
-           SphP[no].Absorbed[LYMAN_WERNER].Photons += F_DISS * lw_line[1] * absorbed[LYMAN_WERNER].Photons; 
+           SphP[no].Absorbed[LYMAN_WERNER].Photons += lw_line[1] * absorbed[LYMAN_WERNER].Photons; 
 
           /* Ionizing Photons */
           SphP[no].Absorbed[IONIZING_HI].Photons += absorbed[IONIZING_HI].Photons;
@@ -374,7 +374,7 @@ void raytrace_treewalk(RayPacket *ray, RayWorkStack *work, RayExportBuffer *expo
                           if(w == LYMAN_WERNER)
                             {
                               RtNgb_Nodes[no].Absorbed[w].Energy += (1.0 - lw_line[0]) * absorbed[w].Energy;
-                              RtNgb_Nodes[no].Absorbed[w].Photons += F_DISS * lw_line[1] * absorbed[w].Photons;
+                              RtNgb_Nodes[no].Absorbed[w].Photons += lw_line[1] * absorbed[w].Photons;
                             }
                           else
                             {
