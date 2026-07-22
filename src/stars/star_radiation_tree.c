@@ -354,16 +354,16 @@ void raytrace_treewalk(RayPacket *ray, RayWorkStack *work, RayExportBuffer *expo
                       double Dtau_E[WAVEBANDS];
                       for(int w = 0; w < WAVEBANDS; w++)
                         /* Volume-weighted mean kappa * density */
-                        Dtau_E[w] = RtNgb_Nodes[no].dtau_over_length_E[w] * length;
+                        Dtau_E[w] = RtNgb_Nodes[no].DtauOverLength_E[w] * length;
                         
                       double Dtau_N[WAVEBANDS];
                       for(int w = 0; w < WAVEBANDS; w++)
                         /* Volume-weighted mean kappa * density */
-                        Dtau_N[w] = RtNgb_Nodes[no].dtau_over_length_N[w] * length;
+                        Dtau_N[w] = RtNgb_Nodes[no].DtauOverLength_N[w] * length;
 
                       WavebandData absorbed[WAVEBANDS];
 
-                      double dN_H2 = RtNgb_Nodes[no].dN_H2_overlength * length;
+                      double dN_H2 = RtNgb_Nodes[no].dN_H2_OverLength * length;
                       double lw_line[2] = {0.0, 0.0};
 
                       int still_alive = ray_absorb(ray, Dtau_E, Dtau_N, absorbed, dN_H2, lw_line);

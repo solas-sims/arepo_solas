@@ -914,7 +914,7 @@ void ngb_exchange_topleafdata(void)
 #ifdef RAD_OPENING_ANGLE
           loc_DomainMoment[idx].Volume = RtNgb_Nodes[no].Volume;
           
-          loc_DomainMoment[idx].dN_H2_OverLength; = RtNgb_Nodes[no].dN_H2_OverLength;
+          loc_DomainMoment[idx].dN_H2_OverLength = RtNgb_Nodes[no].dN_H2_OverLength;
           
           for(int w = 0; w < WAVEBANDS; w++)
             {

@@ -644,11 +644,11 @@ static void distribute_node_rad(int no)
                   double child_dtau_N;
                   if(w == LYMAN_WERNER)
                     {
-                      child_dtau_N = RtNgb_Nodes[child].volume * RtNgb_Nodes[child].dN_H2_OverLength[w];
+                      child_dtau_N = RtNgb_Nodes[child].Volume * RtNgb_Nodes[child].dN_H2_OverLength;
                     }
                   else
                     {
-                      child_dtau_N = RtNgb_Nodes[child].volume * RtNgb_Nodes[child].DtauOverLength_N[w];
+                      child_dtau_N = RtNgb_Nodes[child].Volume * RtNgb_Nodes[child].DtauOverLength_N[w];
                     }
                   
                   double frac_N = child_dtau_N / node_dtau_N[w];
