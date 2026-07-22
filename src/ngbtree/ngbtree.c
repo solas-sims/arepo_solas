@@ -85,7 +85,7 @@ int *Ngb_Nextnode;
 struct NgbNODE *Ngb_Nodes;
 struct ExtNgbNODE *ExtNgb_Nodes;
 
-#ifdef RAD_OPENING_ANGLE
+#ifdef STAR_RADIATION_ACTIVE
 struct RtNgbNODE *RtNgb_Nodes;
 #endif
 
@@ -764,13 +764,13 @@ void ngb_update_node_recursive(int no, int sib, int father, int *last, int mode)
 
 #ifdef STAR_RADIATION_ACTIVE
           /* count direct children */
-          int nchildren = 0;
+          int Nchildren = 0;
           
           for(int j = 0; j < 8; j++)
             if(suns[j] >= 0) 
-              nchildren++;
+              Nchildren++;
               
-          RtNgb_Nodes[no].nchildren = nchildren;
+          RtNgb_Nodes[no].Nchildren = Nchildren;
 #endif
 
           Ngb_Nodes[no].u.d.sibling = sib;

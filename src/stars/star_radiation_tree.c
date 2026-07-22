@@ -409,7 +409,7 @@ void raytrace_treewalk(RayPacket *ray, RayWorkStack *work, RayExportBuffer *expo
                 {
                   /* Use number of actual children for adaptive f */
                   /* At least 1 ray per child */
-                  double f_eff = All.RaySplitFactor * (double)RtNgb_Nodes[no].nchildren; 
+                  double f_eff = All.RaySplitFactor * (double)RtNgb_Nodes[no].Nchildren; 
 
                   /* Ray is too coarse - push split children to split_buf, consume parent */
                   /* Criterion: Omega_node = A_proj / dist2 < f * Omega_ray = f * 4pi/(12*nside^2) */

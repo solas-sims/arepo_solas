@@ -72,11 +72,11 @@ void star_density(void);
 /* Radiation */
 #include "../stars/star_radiation.h"
 
-void update_kappa(void);
-double density_kappa_IR(int i);
+void update_dtau(void);
+double dtau_IR(int i, double length);
 
 void init_h2shield(void);
-double h2_shield_dtau(double N_H2, double dN_H2);
+double h2shield_dtau(double N_H2, double dN_H2);
 
 void start_healpix(void);
 void append_ray(RayWorkStack *w, const RayPacket *ray);

@@ -53,7 +53,7 @@ extern struct ExtNgbNODE
 #ifdef STAR_RADIATION_ACTIVE
 extern struct RtNgbNODE
 {
-    /* geometric cell bounds — opening angle + intersection */
+    /* geometric cell bounds - opening angle + intersection */
     //float center[3];
     //float len;
     
