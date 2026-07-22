@@ -450,7 +450,6 @@ void calculate_non_standard_physics_end_of_step(void)
 {
   if(All.Time > 0)
     { 
-
 #ifdef STAR_RADIATION_ACTIVE
       star_radiation();
 #endif
