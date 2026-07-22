@@ -763,7 +763,7 @@ void ngb_update_node_recursive(int no, int sib, int father, int *last, int mode)
 #endif
 
 #ifdef STAR_RADIATION_ACTIVE
-          /* count direct children */
+          /* Count direct children */
           int Nchildren = 0;
           
           for(int j = 0; j < 8; j++)
@@ -1445,7 +1445,7 @@ void ngb_treemodifylength(int delta_NgbMaxPart)
   ExtNgb_Nodes -= delta_NgbMaxPart;
 #endif /* #ifdef TREE_BASED_TIMESTEPS */
 
-#ifdef RAD_OPENING_ANGLE
+#ifdef STAR_RADIATION_ACTIVE
   RtNgb_Nodes -= delta_NgbMaxPart;
 #endif
 
@@ -1484,7 +1484,7 @@ void ngb_treeallocate(void)
   ExtNgb_Nodes -= Ngb_MaxPart;
 #endif /* #ifdef TREE_BASED_TIMESTEPS */
 
-#ifdef RAD_OPENING_ANGLE
+#ifdef STAR_RADIATION_ACTIVE
   RtNgb_Nodes = (struct RtNgbNODE *)mymalloc_movable(&RtNgb_Nodes, "RtNgb_Nodes", (Ngb_MaxNodes + 1) * sizeof(struct RtNgbNODE));
   RtNgb_Nodes -= Ngb_MaxPart;
 #endif
@@ -1510,7 +1510,7 @@ void ngb_treefree(void)
       myfree_movable(Ngb_Father);
       myfree_movable(Ngb_Nextnode);
 
-#ifdef RAD_OPENING_ANGLE
+#ifdef STAR_RADIATION_ACTIVE
       myfree_movable(RtNgb_Nodes + Ngb_MaxPart);
       RtNgb_Nodes = NULL;
 #endif
