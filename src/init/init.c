@@ -566,12 +566,6 @@ gsl_rng_set(rng, ThisTask + 1);
 #endif
 
 #ifdef STAR_FEEDBACK_ACTIVE  
-  for(i=0; i < 6; i++)
-    All.StarFeedbackLocal[i] = 0;
-  
-  double *sfg = All.StarFeedbackGlobal;
-  sfg = malloc(6 * sizeof(double));
-
   mpi_printf("Loading star evolution tables\n");
   load_star_tables(All.StarTablesFile);
 
