@@ -506,7 +506,7 @@ integertime get_timestep_hydro(int p)
 #ifdef PHOTOIONIZATION
   double dt_rad = SphP[p].RT_Timestep;
   
-  if(dt_rad < dt) 
+  if(dt_rad != 0 && dt_rad < dt) 
     dt = dt_rad;
 #endif
 

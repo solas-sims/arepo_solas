@@ -527,13 +527,16 @@ void ngb_update_node_recursive(int no, int sib, int father, int *last, int mode)
   MyNgbTreeFloat vmin[3], vmax[3], maxcsnd;
 #endif /* #ifdef TREE_BASED_TIMESTEPS */
 
-#ifdef STAR_RADIATION_ACTIVE
-  MyNgbTreeFloat volume, density_kappa[WAVEBANDS];
+#ifdef RAD_OPENING_ANGLE
+  MyNgbTreeFloat Volume, dN_H2_OverLength, DtauOverLength_E[WAVEBANDS], DtauOverLength_N[WAVEBANDS];
 
-  volume = 0;
+  Volume = 0, dN_H2_OverLength = 0;
   
   for(int w = 0; w < WAVEBANDS; w++)
-    density_kappa[w] = 0;
+    {
+      DtauOverLength_E[w] = 0;
+      DtauOverLength_N[w] = 0;
+    }
 #endif
 
   if(no >= Ngb_MaxPart && no < Ngb_MaxPart + Ngb_MaxNodes) /* internal node */
@@ -663,11 +666,16 @@ void ngb_update_node_recursive(int no, int sib, int father, int *last, int mode)
                                 vmax[k] = ExtNgb_Nodes[p].vmax[k];
 #endif /* #ifdef TREE_BASED_TIMESTEPS */
                             }
-#ifdef STAR_RADIATION_ACTIVE  
-                          volume += RtNgb_Nodes[p].volume;
+#ifdef RAD_OPENING_ANGLE  
+                          Volume += RtNgb_Nodes[p].Volume;
+                          
+                          dN_H2_OverLength += RtNgb_Nodes[p].Volume * RtNgb_Nodes[p].dN_H2_OverLength;
                           
                           for(int w = 0; w < WAVEBANDS; w++)
-                            density_kappa[w] += RtNgb_Nodes[p].volume * RtNgb_Nodes[p].density_kappa[w];
+                            {
+                              DtauOverLength_E[w] += RtNgb_Nodes[p].Volume * RtNgb_Nodes[p].DtauOverLength_E[w];
+                              DtauOverLength_N[w] += RtNgb_Nodes[p].Volume * RtNgb_Nodes[p].DtauOverLength_N[w];
+                            }
 #endif
                         }
                     }
@@ -703,11 +711,16 @@ void ngb_update_node_recursive(int no, int sib, int father, int *last, int mode)
 #endif /* #ifdef TREE_BASED_TIMESTEPS */
 
                         }
-#ifdef STAR_RADIATION_ACTIVE  
-                      volume += SphP[p].Volume;
+#ifdef RAD_OPENING_ANGLE  
+                      Volume += SphP[p].Volume;
+                      
+                      dN_H2_OverLength += SphP[p].Volume * SphP[p].GrackleSpeciesConserved(GRACKLE_H2I) / SphP[p].Volume;
                       
                       for(int w = 0; w < WAVEBANDS; w++)
-                        density_kappa[w] += SphP[p].Volume * SphP[p].Density * SphP[p].Kappa[w];
+                        {
+                          DtauOverLength_E[w] += SphP[p].Volume * SphP[p].DtauOverLength_E[w];
+                          DtauOverLength_N[w] += SphP[p].Volume * SphP[p].DtauOverLength_N[w];
+                        }
 #endif
                     }
                 }
@@ -728,24 +741,36 @@ void ngb_update_node_recursive(int no, int sib, int father, int *last, int mode)
               ExtNgb_Nodes[no].vmax[k] = vmax[k];
 #endif /* #ifdef TREE_BASED_TIMESTEPS */
             }
-#ifdef STAR_RADIATION_ACTIVE  
-          RtNgb_Nodes[no].volume = volume;
+#ifdef RAD_OPENING_ANGLE  
+          RtNgb_Nodes[no].Volume = Volume;
+
+          RtNgb_Nodes[no].dN_H2_OverLength = (Volume > 0) ? dN_H2_OverLength / Volume : 0;
           
-          if(volume > 0)
-            for(int w = 0; w < WAVEBANDS; w++)
-              density_kappa[w] /= volume;
+          if(Volume > 0)
+            {
+              for(int w = 0; w < WAVEBANDS; w++)
+                {
+                  DtauOverLength_E[w] /= Volume;
+                  DtauOverLength_N[w] /= Volume;
+                }
+            }
 
           for(int w = 0; w < WAVEBANDS; w++)
-            RtNgb_Nodes[no].density_kappa[w] = density_kappa[w];
+            {
+              RtNgb_Nodes[no].DtauOverLength_E[w] = DtauOverLength_E[w];
+              RtNgb_Nodes[no].DtauOverLength_N[w] = DtauOverLength_N[w];
+            }
+#endif
 
-          /* count direct children */
-          int nchildren = 0;
+#ifdef STAR_RADIATION_ACTIVE
+          /* Count direct children */
+          int Nchildren = 0;
           
           for(int j = 0; j < 8; j++)
             if(suns[j] >= 0) 
-              nchildren++;
+              Nchildren++;
               
-          RtNgb_Nodes[no].nchildren = nchildren;
+          RtNgb_Nodes[no].Nchildren = Nchildren;
 #endif
 
           Ngb_Nodes[no].u.d.sibling = sib;
@@ -832,8 +857,8 @@ void ngb_exchange_topleafdata(void)
     MyNgbTreeFloat MaxCsnd, vmin[3], vmax[3];
 #endif /* #ifdef TREE_BASED_TIMESTEPS */
 
-#ifdef STAR_RADIATION_ACTIVE
-    MyNgbTreeFloat volume, density_kappa[WAVEBANDS];
+#ifdef RAD_OPENING_ANGLE
+    MyNgbTreeFloat Volume, dN_H2_OverLength, DtauOverLength_E[WAVEBANDS], DtauOverLength_N[WAVEBANDS];
 #endif
   };
 
@@ -886,11 +911,16 @@ void ngb_exchange_topleafdata(void)
               loc_DomainMoment[idx].vmax[k] = ExtNgb_Nodes[no].vmax[k];
 #endif /* #ifdef TREE_BASED_TIMESTEPS */
             }
-#ifdef STAR_RADIATION_ACTIVE
-          loc_DomainMoment[idx].volume = RtNgb_Nodes[no].volume;
+#ifdef RAD_OPENING_ANGLE
+          loc_DomainMoment[idx].Volume = RtNgb_Nodes[no].Volume;
+          
+          loc_DomainMoment[idx].dN_H2_OverLength = RtNgb_Nodes[no].dN_H2_OverLength;
           
           for(int w = 0; w < WAVEBANDS; w++)
-            loc_DomainMoment[idx].density_kappa[w] = RtNgb_Nodes[no].density_kappa[w];
+            {
+              loc_DomainMoment[idx].DtauOverLength_E[w] = RtNgb_Nodes[no].DtauOverLength_E[w];
+              loc_DomainMoment[idx].DtauOverLength_N[w] = RtNgb_Nodes[no].DtauOverLength_N[w];
+            }
 #endif
 
           idx++;
@@ -924,11 +954,16 @@ void ngb_exchange_topleafdata(void)
               ExtNgb_Nodes[no].vmax[k] = DomainMoment[idx].vmax[k];
 #endif /* #ifdef TREE_BASED_TIMESTEPS */
             }
-#ifdef STAR_RADIATION_ACTIVE
-          RtNgb_Nodes[no].volume = DomainMoment[idx].volume;
+#ifdef RAD_OPENING_ANGLE
+          RtNgb_Nodes[no].Volume = DomainMoment[idx].Volume;
+
+          RtNgb_Nodes[no].dN_H2_OverLength = DomainMoment[idx].dN_H2_OverLength;
           
           for(int w = 0; w < WAVEBANDS; w++)
-            RtNgb_Nodes[no].density_kappa[w] = DomainMoment[idx].density_kappa[w];
+            {
+              RtNgb_Nodes[no].DtauOverLength_E[w] = DomainMoment[idx].DtauOverLength_E[w];
+              RtNgb_Nodes[no].DtauOverLength_N[w] = DomainMoment[idx].DtauOverLength_N[w];
+            }
 #endif
 
           Ngb_Nodes[no].Ti_Current = All.Ti_Current;

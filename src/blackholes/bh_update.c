@@ -188,6 +188,11 @@ void bh_perform_end_of_step_physics(void)
       SphP[i].Momentum[1] *= factor;
       SphP[i].Momentum[2] *= factor;
 
+#ifdef MAXSCALARS
+      for(int s = 0; s < N_Scalar; s++)
+        *(MyFloat *)(((char *)(&SphP[i])) + scalar_elements[s].offset_mass) *= factor;
+#endif
+
       SphP[i].BhMassDrain = 0;
     }
 #endif

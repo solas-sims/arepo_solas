@@ -242,9 +242,9 @@ void individual_starbystar_formation(void)
               SphP[i].Momentum[1] *= factor;
               SphP[i].Momentum[2] *= factor;
 #ifdef MAXSCALARS
-              for(int s = 0; s < N_Scalar; s++) /* Note, the changes in MATERIALS, HIGHRESGASMASS, etc., are treated as part of the Scalars */
+              for(int s = 0; s < N_Scalar; s++)
               *(MyFloat *)(((char *)(&SphP[i])) + scalar_elements[s].offset_mass) *= factor;
-#endif /* #ifdef MAXSCALARS */
+#endif
             }
           SphP[i].StarMassDrain = 0;
         }
@@ -358,9 +358,9 @@ static void spawn_light(int igas, double birthtime, int istar, MyDouble mass_of_
 //#endif /* #ifdef MHD */
 
 #ifdef MAXSCALARS
-  for(int s = 0; s < N_Scalar; s++) /* Note, the changes in MATERIALS, HIGHRESGASMASS, etc., are treated as part of the Scalars */
+  for(int s = 0; s < N_Scalar; s++) 
     *(MyFloat *)(((char *)(&SphP[igas])) + scalar_elements[s].offset_mass) *= fac;
-#endif /* #ifdef MAXSCALARS */
+#endif 
 
   /* Zero star struct */
   memset(&SP[NumStars], 0, sizeof(Star_Particle_Data));

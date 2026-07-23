@@ -1437,6 +1437,10 @@ double InitMetallicityinSolar;
                                    * against a FIXED potential, without the live FDM solver running). */
 #endif /* #ifdef STATICTABULATEDPOTENTIAL */
 
+#ifdef SUPERNOVAE
+  double SNHostShellSweepFrac;
+#endif
+
 #ifdef STAR_RADIATION_ACTIVE
   double RaySplitFactor;
 #endif
@@ -1786,7 +1790,8 @@ extern struct sph_particle_data
 #endif
 
 #ifdef STAR_RADIATION_ACTIVE
-  MyDouble Kappa[WAVEBANDS];
+  MyDouble DtauOverLength_E[WAVEBANDS];
+  MyDouble DtauOverLength_N[WAVEBANDS];
   WavebandData Absorbed[WAVEBANDS];
 #endif
 

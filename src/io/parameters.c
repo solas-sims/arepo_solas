@@ -601,7 +601,7 @@ void read_parameter_file(char *fname)
 
 #ifdef STAR_FEEDBACK_ACTIVE
       strcpy(tag[nt], "StarTablesFile");
-      addr[nt] = All.StarTablesFile;
+      addr[nt] = &All.StarTablesFile;
       id[nt++] = STRING;
 #endif
 
@@ -616,11 +616,6 @@ void read_parameter_file(char *fname)
 #endif
 
 #ifdef SIDM
-      /* Mirrors the StarDesNgb/StarDesDev pattern above. SidmDesNumNgb
-       * and SidmDesNumNgbDev may already exist in your param.txt/tree
-       * from earlier -- this is a single reference block covering all
-       * three SIDM parameters together, so there's one place to
-       * reconcile against whatever you already added independently. */
       strcpy(tag[nt], "SidmDesNumNgb");
       addr[nt] = &All.SidmDesNumNgb;
       id[nt++] = REAL;
@@ -661,6 +656,12 @@ void read_parameter_file(char *fname)
       addr[nt] = &All.StaticPotentialCenter;
       id[nt++] = REAL;
 #endif /* #ifdef STATICTABULATEDPOTENTIAL */
+
+#ifdef SUPERNOVAE
+      strcpy(tag[nt], "SNHostShellSweepFrac");
+      addr[nt] = &All.SNHostShellSweepFrac;
+      id[nt++] = REAL;
+#endif
 
 #ifdef STAR_RADIATION_ACTIVE
       strcpy(tag[nt], "RaySplitFactor");
