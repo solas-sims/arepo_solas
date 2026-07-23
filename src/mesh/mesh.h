@@ -139,7 +139,7 @@ extern struct primexch
 #if defined(WINDS) || defined(SUPERNOVAE)
   MyDouble Mass;
 #ifdef METALS
-  MyDouble GasMetals;
+  MyDouble Metals;
 #endif
   MyDouble Momentum[3];
 

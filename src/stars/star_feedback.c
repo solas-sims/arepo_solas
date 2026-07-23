@@ -651,7 +651,7 @@ void star_feedback(void)
                     {
                       NgbsDensity += mj / PrimExch[particle].Volume * sqrtsq_wbar;
 #ifdef METALS
-                      NgbsMetallicity += (PrimExch[particle].GasMetals + PrimExch[particle].MetalsFeed) / mj * sqrtsq_wbar;
+                      NgbsMetallicity += (PrimExch[particle].Metals + PrimExch[particle].MetalsFeed) / mj * sqrtsq_wbar;
 #endif
                     }
                 }

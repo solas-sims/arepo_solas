@@ -282,7 +282,7 @@ void exchange_primitive_variables(void)
 #if defined(WINDS) || defined(SUPERNOVAE) 
               tmpPrimExch[off].Mass = P[place].Mass;
 #ifdef METALS
-              tmpPrimExch[off].GasMetals = SphP[place].GasMetals;
+              tmpPrimExch[off].Metals = SphP[place].GasMetals;
 #endif
               for(int k = 0; k < 3; k++)
                 tmpPrimExch[off].Momentum[k] = SphP[place].Momentum[k];
@@ -407,7 +407,7 @@ void exchange_primitive_variables_and_gradients(void)
 #if defined(WINDS) || defined(SUPERNOVAE) 
               tmpPrimExch[off].Mass = P[place].Mass;
 #ifdef METALS
-              tmpPrimExch[off].GasMetals = SphP[place].GassMetals;
+              tmpPrimExch[off].Metals = SphP[place].GasMetals;
 #endif
               for(int k = 0; k < 3; k++)
                 tmpPrimExch[off].Momentum[k] = SphP[place].Momentum[k];
