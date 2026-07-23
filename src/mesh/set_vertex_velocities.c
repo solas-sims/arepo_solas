@@ -188,7 +188,7 @@ void set_vertex_velocities(void)
 
           v = All.cf_atime * get_sound_speed(i);
 
-#if defined(SELFGRAVITY) || defined(EXTERNALGRAVITY) || defined(EXACT_GRAVITY_FOR_PARTICLE_TYPE)
+#if defined(SELFGRAVITY) || defined(EXTERNALGRAVITY) || defined(EXACT_GRAVITY_FOR_PARTICLE_TYPE) || defined(FDM)
           /* calculate gravitational velocity scale */
           double ax, ay, az, ac, vgrav;
 #ifdef HIERARCHICAL_GRAVITY
@@ -209,7 +209,7 @@ void set_vertex_velocities(void)
           vgrav = 4 * sqrt(All.cf_atime * cellrad * ac);
           if(v < vgrav)
             v = vgrav;
-#endif /* #if defined(SELFGRAVITY) || defined(EXTERNALGRAVITY) || defined(EXACT_GRAVITY_FOR_PARTICLE_TYPE) */
+#endif /* #if defined(SELFGRAVITY) || defined(EXTERNALGRAVITY) || defined(EXACT_GRAVITY_FOR_PARTICLE_TYPE) || defined(FDM) */
 
           double vcurl = cellrad * SphP[i].CurlVel;
           if(v < vcurl)

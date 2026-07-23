@@ -202,6 +202,40 @@ void pm_init_regionsize(void)
         All.UpperCorner[j][i] = All.Corner[j][i] + (GRID / 2 - 1) * (All.TotalMeshSize[j] / GRID);
       }
 
+  /* All.Asmth[0]/All.Rcut[0]: the DEFAULT short-range/long-range
+   * splitting scale, used unconditionally in forcetree_walk.c's
+   * force_treeevaluate()/force_evaluate_direct() (whenever
+   * PLACEHIGHRESREGION is not defined, or a particle is not in the
+   * zoom region) -- AND, right below, by the PLACEHIGHRESREGION block
+   * itself (comparing against All.Rcut[0] to size the zoom region),
+   * so this must be set BEFORE that block, not after.
+   *
+   * Two real bugs found getting this right, worth recording both:
+   * (1) An earlier version set this in pm_init_nonperiodic() instead
+   *     of here -- that function runs once, early, before this
+   *     function has ever computed a real TotalMeshSize[0] from actual
+   *     particle positions, so Asmth[0] silently got set from
+   *     TotalMeshSize[0]'s own zero-initialized default. Moved here so
+   *     it's recomputed every time this function runs (i.e. every time
+   *     the non-periodic PM region gets resized as particles move) --
+   *     which is also more correct than a one-time value for a
+   *     dynamically-sized, non-periodic mesh anyway.
+   * (2) Before that, this was set via All.BoxSize directly (mirroring
+   *     pm_periodic.c's own formula) -- wrong for this project's own
+   *     convention of BoxSize=0 for GRAVITY_NOT_PERIODIC runs; the
+   *     non-periodic PM mesh's own spatial extent is computed
+   *     DYNAMICALLY from the particle distribution (the loops just
+   *     above), never tied to All.BoxSize at all.
+   * Both produce the exact same failure: asmth=0, propagating through
+   * asmthinv=0.5/asmth to an infinite/undefined table index and a
+   * segfault the first time any particle pair's short-range force gets
+   * evaluated. Mirrors All.Asmth[1]/All.Rcut[1]'s own, already-correct
+   * pattern just below -- same formula, just for the base mesh
+   * (index 0) rather than the zoom region (index 1), and not gated by
+   * PLACEHIGHRESREGION since the base mesh always exists. */
+  All.Asmth[0] = ASMTH * All.TotalMeshSize[0] / GRID;
+  All.Rcut[0]  = RCUT * All.Asmth[0];
+
 #ifdef PLACEHIGHRESREGION
   All.Asmth[1] = ASMTH * All.TotalMeshSize[1] / GRID;
   All.Rcut[1]  = RCUT * All.Asmth[1];
@@ -321,25 +355,20 @@ void pm_init_nonperiodic(void)
   bytes_tot += bytes;
   fft_of_kernel[0] = (fft_complex *)kernel[0];
 
-  /* All.Asmth[0]/All.Rcut[0] are used unconditionally as the DEFAULT
-   * short-range/long-range splitting scale in forcetree_walk.c's
-   * force_treeevaluate()/force_evaluate_direct() (used whenever
-   * PLACEHIGHRESREGION is not defined, or a particle is not in the
-   * zoom region), for ANY PMGRID+GRAVITY_NOT_PERIODIC run -- but,
-   * unlike pm_periodic.c (which explicitly computes
-   * All.Asmth[0]=ASMTH*All.BoxSize/GRID), this file never actually set
-   * them for the plain non-periodic, no-zoom-region case: only
-   * All.Asmth[1]/All.Rcut[1] get set below, gated by
-   * PLACEHIGHRESREGION specifically. Left at their zero-initialized
-   * default, this causes a division by zero (asmthinv=0.5/asmth)
-   * propagating to an infinite/NaN table index and a segfault the
-   * first time ANY particle pair's force gets evaluated -- not
-   * specific to FDM, but only actually triggered by a
-   * PMGRID+GRAVITY_NOT_PERIODIC+no-PLACEHIGHRESREGION combination,
-   * apparently not exercised elsewhere. Mirrors pm_periodic.c's own
-   * formula exactly. */
-  All.Asmth[0] = ASMTH * All.BoxSize / GRID;
-  All.Rcut[0]  = RCUT * All.Asmth[0];
+  /* All.Asmth[0]/All.Rcut[0] are set in pm_init_regionsize(), right
+   * after All.TotalMeshSize[0] is actually computed there -- NOT here.
+   * An earlier version of this fix lived in THIS function
+   * (pm_init_nonperiodic()), which runs once, early, before
+   * pm_init_regionsize() has ever computed a real TotalMeshSize from
+   * actual particle positions -- so Asmth[0] got set using
+   * TotalMeshSize[0]'s own zero-initialized default, which is exactly
+   * the same asmth=0 failure this fix exists to prevent, just reached
+   * via the wrong function rather than no fix at all. See
+   * pm_init_regionsize()'s own comment for the full explanation. Found
+   * from a real segfault persisting even after the first attempted
+   * fix, by directly inspecting asmth/All.Asmth[0]/All.TotalMeshSize[0]
+   * under gdb rather than assuming the first fix's location was
+   * correct. */
 #endif /* #if defined(GRAVITY_NOT_PERIODIC) */
 
 #if defined(PLACEHIGHRESREGION)
@@ -1560,7 +1589,28 @@ int pmforce_nonperiodic(int grnr)
         {
           for(j = 0; j < 3; j++)
             {
-              if(pos[j] < All.Xmintot[grnr][j] || pos[j] > All.Xmaxtot[grnr][j])
+              /* Corner/UpperCorner, NOT Xmintot/Xmaxtot -- this is the
+               * actual, padded mesh region the CIC deposit/readout code
+               * itself uses as its own bounds (see e.g. the slab_x/y/z
+               * computations a few hundred lines below, all indexed off
+               * All.Corner[grnr]). Xmintot/Xmaxtot are the raw particle
+               * min/max extent BEFORE the zero-padding enlargement
+               * factor gets applied (pm_init_regionsize(), a few
+               * hundred lines above: Xmintot/Xmaxtot get "symmetrized"
+               * into a cube using the PRE-enlargement TotalMeshSize,
+               * then TotalMeshSize itself gets enlarged afterward for
+               * Corner/UpperCorner specifically) -- meaning whichever
+               * particle happens to define the raw extent in the
+               * dominant dimension sits almost exactly AT the
+               * Xmintot/Xmaxtot boundary by construction, genuinely
+               * fragile to floating-point rounding, even though the
+               * real, padded mesh comfortably contains it. A
+               * pre-existing Arepo inconsistency (not GRAVITY_NOT_PERIODIC/
+               * FDM-specific, just apparently never exercised elsewhere),
+               * found from a real "particle lies outside PM mesh"
+               * termination for a particle that was, in fact, safely
+               * within the domain the actual PM solve itself uses. */
+              if(pos[j] < All.Corner[grnr][j] || pos[j] > All.UpperCorner[grnr][j])
                 {
                   if(flag == 0)
                     {
@@ -1658,6 +1708,37 @@ int pmforce_nonperiodic(int grnr)
 #ifndef FFT_COLUMN_BASED
       if(dim == 0)
         my_slab_transposeA(&myplan, rhogrid, forcegrid); /* compute the transpose of the potential field for finite differencing */
+
+      /* forcegrid is a reused buffer across dim=2,1,0 and is only ever
+       * WRITTEN by the derivative loop below (never read as an input --
+       * the transpose above uses rhogrid/forcegrid purely as in-place
+       * field/scratch for its own MPI exchange, and the derivative
+       * formula itself reads only from rhogrid) -- so zeroing it here
+       * is always safe, for every dim, including right after the
+       * dim==0 transpose.
+       *
+       * Needed because the derivative loop's own bounds (y,z in
+       * [2,GRID/2-2), and the equivalent check on the global x index)
+       * skip a 2-cell-wide border at the mesh edges entirely -- cells
+       * in that border are never assigned a value by this loop, at
+       * any dim, and previously kept whatever forcegrid already held
+       * from an earlier pass or a prior sync point's own computation.
+       * A particle whose position maps into that border -- which any
+       * particle at or near the edge of the whole distribution is
+       * structurally likely to do, since the mesh's own extent is
+       * built from that same particle distribution's min/max -- would
+       * then have its force read out from that stale memory instead
+       * of a genuine value. Confirmed directly: a real, escaping
+       * particle's slab index landed at 0-1, outside the computed
+       * [2,GRID/2-2) range, with GravPM blowing up to ~10^4 from a
+       * baseline of ~1 right as it happened, reproduced independent
+       * of FDM (self-gravity alone, FDM not even compiled in).
+       * Zeroing here means that border safely reads as zero force
+       * instead -- still imprecise right at the domain edge (a
+       * genuine, if secondary, accuracy limitation of this whole
+       * scheme), but no longer capable of returning an arbitrarily
+       * large, unbounded value. */
+      memset(forcegrid, 0, maxfftsize * sizeof(fft_real));
 
       for(int y = 2; y < GRID / 2 - 2; y++)
         for(int x = 0; x < myplan.nslab_x; x++)

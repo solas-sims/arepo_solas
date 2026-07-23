@@ -99,8 +99,6 @@ void long_range_force(void)
 {
   int i;
 
-  TIMER_START(CPU_PM_GRAVITY);
-
 #ifdef GRAVITY_NOT_PERIODIC
   int j;
   double fac;
@@ -114,9 +112,48 @@ void long_range_force(void)
 #endif /* #ifdef EVALPOTENTIAL */
     }
 
+  /* Moved here (before the SELFGRAVITY early-return just below), not
+   * left at this function's own end where it originally lived -- a
+   * real, confirmed bug: this function is the ONLY place
+   * All.DtDisplacement ever gets computed, and get_timestep_gravity()
+   * (timestep.c) unconditionally clamps every particle's timestep to
+   * All.DtDisplacement whenever PMGRID is compiled in, regardless of
+   * SELFGRAVITY. FDM requires PMGRID for its own FFT infrastructure
+   * without necessarily needing SELFGRAVITY's own PM force computation
+   * -- exactly this project's own SELFGRAVITY-off configuration -- so
+   * leaving this call after the early return meant All.DtDisplacement
+   * stayed at its zero-initialized default forever, clamping every
+   * timestep to zero regardless of how good the actual force
+   * computation was (confirmed directly: GravAccel was genuinely
+   * correct and substantial, dt was still 0). Calling it here instead
+   * is safe with SELFGRAVITY off too: find_long_range_step_constraint()
+   * computes its own acceleration from GravPM directly (zeroed just
+   * above, for every particle, unconditionally), floors that at
+   * MIN_FLOAT_NUMBER, and the resulting (very large) dt gets clamped
+   * to All.MaxSizeTimestep by this same function's own bounds-checking
+   * -- exactly the correct behaviour when there's no PM force to
+   * constrain the displacement timestep by. */
+  find_long_range_step_constraint();
+
 #ifndef SELFGRAVITY
   return;
 #endif /* #ifndef SELFGRAVITY */
+
+  /* TIMER_START moved to here (after the SELFGRAVITY early-return
+   * check above), not at this function's own top -- without this,
+   * the timer starts unconditionally, but the early return above skips
+   * the matching TIMER_STOP at this function's own end whenever
+   * SELFGRAVITY isn't compiled in, leaving CPU_PM_GRAVITY stuck
+   * "running" on the timer stack -- the NEXT call to this function
+   * (there are two calls per sync point: once from the one-time
+   * startup bootstrap, once from the main loop) then fails its own
+   * TIMER_START with "already running". PMGRID has historically only
+   * ever been used alongside SELFGRAVITY (its own tree-PM force
+   * split); FDM also requires PMGRID (for the FFT/fft_plan
+   * infrastructure it reuses) without necessarily needing
+   * SELFGRAVITY's own PM force computation at all -- exactly this
+   * project's own SELFGRAVITY-off configuration. */
+  TIMER_START(CPU_PM_GRAVITY);
 
 #ifndef GRAVITY_NOT_PERIODIC
 
@@ -193,7 +230,5 @@ void long_range_force(void)
 #endif /* #ifdef GRAVITY_NOT_PERIODIC */
 
   TIMER_STOP(CPU_PM_GRAVITY);
-
-  find_long_range_step_constraint();
 }
 #endif /* #ifdef PMGRID */

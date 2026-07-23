@@ -161,9 +161,9 @@ void find_next_sync_point(void)
     {
       int active = TimeBinsHydro.TimeBinCount[n];
 
-#if(defined(SELFGRAVITY) || defined(EXTERNALGRAVITY) || defined(EXACT_GRAVITY_FOR_PARTICLE_TYPE)) && !defined(MESHRELAX)
+#if(defined(SELFGRAVITY) || defined(EXTERNALGRAVITY) || defined(EXACT_GRAVITY_FOR_PARTICLE_TYPE) || defined(FDM)) && !defined(MESHRELAX)
       active += TimeBinsGravity.TimeBinCount[n];
-#endif /* #if (defined(SELFGRAVITY) || defined(EXTERNALGRAVITY) || defined(EXACT_GRAVITY_FOR_PARTICLE_TYPE)) && !defined(MESHRELAX) \
+#endif /* #if (defined(SELFGRAVITY) || defined(EXTERNALGRAVITY) || defined(EXACT_GRAVITY_FOR_PARTICLE_TYPE) || defined(FDM)) && !defined(MESHRELAX) \
         */
       if(active)
         {

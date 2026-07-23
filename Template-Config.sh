@@ -208,6 +208,11 @@
 #HQ_C=10.0                     # concentration parameter of Hernquist potential
 #HQ_DARKFRACTION=0.9           # fraction in dark matter in Hernquist potential
 
+#---------------------------------------- Static Tabulated Potential 
+#STATICTABULATEDPOTENTIAL      # static potential from an arbitrary tabulated 
+                               # r/M(<r), read from All.StaticPotentialFile 
+			       # (param.txt) at startup
+
 #---------------------------------------- Time integration options
 #FORCE_EQUAL_TIMESTEPS         # variable but global timestep
 #TREE_BASED_TIMESTEPS          # non-local timestep criterion (take 'signal speed' into account)

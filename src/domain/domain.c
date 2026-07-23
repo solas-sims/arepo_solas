@@ -652,14 +652,14 @@ void domain_report_balance(void)
 
       for(int i = TIMEBINS - 1; i >= 0; i--)
         {
-#if(defined(SELFGRAVITY) || defined(EXTERNALGRAVITY) || defined(EXACT_GRAVITY_FOR_PARTICLE_TYPE)) && !defined(MESHRELAX)
+#if(defined(SELFGRAVITY) || defined(EXTERNALGRAVITY) || defined(EXACT_GRAVITY_FOR_PARTICLE_TYPE) || defined(FDM)) && !defined(MESHRELAX)
           if(tot_count_sph[i] > 0 || tot_count[i] > 0)
-#else  /* #if (defined(SELFGRAVITY) || defined(EXTERNALGRAVITY) || defined(EXACT_GRAVITY_FOR_PARTICLE_TYPE)) && !defined(MESHRELAX) */
+#else  /* #if (defined(SELFGRAVITY) || defined(EXTERNALGRAVITY) || defined(EXACT_GRAVITY_FOR_PARTICLE_TYPE) || defined(FDM)) && !defined(MESHRELAX) */
           if(tot_count[i] > 0)
             tot += tot_count[i];
 
           if(tot_count_sph[i] > 0)
-#endif /* #if (defined(SELFGRAVITY) || defined(EXTERNALGRAVITY) || defined(EXACT_GRAVITY_FOR_PARTICLE_TYPE)) && !defined(MESHRELAX) \
+#endif /* #if (defined(SELFGRAVITY) || defined(EXTERNALGRAVITY) || defined(EXACT_GRAVITY_FOR_PARTICLE_TYPE) || defined(FDM)) && !defined(MESHRELAX) \
           #else */
             {
               char buf[1000];

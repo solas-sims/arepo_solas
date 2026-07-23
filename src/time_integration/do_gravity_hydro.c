@@ -46,6 +46,9 @@
 
 #include "../main/allvars.h"
 #include "../main/proto.h"
+#ifdef SIDM
+#include "../sidm/sidm.h"
+#endif /* #ifdef SIDM */
 
 #include "../mesh/voronoi/voronoi.h"
 
@@ -94,7 +97,7 @@ static inline void kick_particle(int i, double dt_gravkick, MySingle* Grav)
  */
 void find_gravity_timesteps_and_do_gravity_step_first_half(void)
 {
-#if(defined(SELFGRAVITY) || defined(EXTERNALGRAVITY) || defined(EXACT_GRAVITY_FOR_PARTICLE_TYPE)) && !defined(MESHRELAX)
+#if(defined(SELFGRAVITY) || defined(EXTERNALGRAVITY) || defined(EXACT_GRAVITY_FOR_PARTICLE_TYPE) || defined(FDM)) && !defined(MESHRELAX)
 
   TIMER_START(CPU_DRIFTS);
 
@@ -358,7 +361,7 @@ void find_gravity_timesteps_and_do_gravity_step_first_half(void)
  */
 void do_gravity_step_second_half(void)
 {
-#if(defined(SELFGRAVITY) || defined(EXTERNALGRAVITY) || defined(EXACT_GRAVITY_FOR_PARTICLE_TYPE)) && !defined(MESHRELAX)
+#if(defined(SELFGRAVITY) || defined(EXTERNALGRAVITY) || defined(EXACT_GRAVITY_FOR_PARTICLE_TYPE) || defined(FDM)) && !defined(MESHRELAX)
   TIMER_START(CPU_DRIFTS);
   int idx;
   char fullmark[8];
@@ -443,11 +446,29 @@ void do_gravity_step_second_half(void)
                           SphP[i].FullGravAccel[j] = P[i].GravAccel[j];
                     }
                 }
+
+#ifdef SIDM
+              /* Scatter/kick evaluated once per timebin here, after the
+               * gravity kick for this timebin completes -- operates on
+               * post-gravity-kick velocities. sidm_scatter() itself
+               * filters to P[i].TimeBinGrav == timebin internally, so
+               * each particle rolls its scatter dice exactly once per
+               * its own actual step, not once per coarser timebin this
+               * cumulative active-list pass also includes it in. */
+              sidm_scatter(timebin);
+#endif /* #ifdef SIDM */
             }
         }
     }
 
 #else  /* #ifdef HIERARCHICAL_GRAVITY */
+  /* NOTE: SIDM scattering is not wired into this branch. This codepath
+   * isn't exercised by any Config in use for SIDM development (which
+   * requires HIERARCHICAL_GRAVITY) and its active-list/timebin
+   * structure differs enough from the hierarchical branch above that
+   * writing an untested call here risked more than it was worth.
+   * Needs its own wiring if SIDM is ever built without
+   * HIERARCHICAL_GRAVITY. */
   timebin_make_list_of_active_particles_up_to_timebin(&TimeBinsGravity, All.HighestActiveTimeBin);
   sumup_large_ints(1, &TimeBinsGravity.NActiveParticles, &TimeBinsGravity.GlobalNActiveParticles);
 

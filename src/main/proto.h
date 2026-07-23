@@ -413,6 +413,8 @@ void do_box_wrapping(void);
 
 void domain_Decomposition(void);
 double enclosed_mass(double R);
+void load_static_tabulated_potential(void);
+double static_tabulated_mass(double r);
 void endrun(void);
 void energy_statistics(void);
 void ewald_corr(double dx, double dy, double dz, double *fper);

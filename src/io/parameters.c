@@ -652,6 +652,16 @@ void read_parameter_file(char *fname)
       id[nt++] = STRING;
 #endif /* #ifdef FDM */
 
+#ifdef STATICTABULATEDPOTENTIAL
+      strcpy(tag[nt], "StaticPotentialFile");
+      addr[nt] = All.StaticPotentialFile;
+      id[nt++] = STRING;
+
+      strcpy(tag[nt], "StaticPotentialCenter");
+      addr[nt] = &All.StaticPotentialCenter;
+      id[nt++] = REAL;
+#endif /* #ifdef STATICTABULATEDPOTENTIAL */
+
 #ifdef STAR_RADIATION_ACTIVE
       strcpy(tag[nt], "RaySplitFactor");
       addr[nt] = &All.RaySplitFactor;

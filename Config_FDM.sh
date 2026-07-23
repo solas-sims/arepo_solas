@@ -9,12 +9,14 @@
 FDM
 
 #--------------------------------------- Gravity treatment
-SELFGRAVITY                              # gravitational intraction between simulation particles/cells  	 
+#SELFGRAVITY                              # gravitational intraction between simulation particles/cells  	 
 HIERARCHICAL_GRAVITY                     # use hierarchical splitting of the time integration of the gravity
 CELL_CENTER_GRAVITY                      # uses geometric centers to calculate gravity of cells, only possible with HIERARCHICAL_GRAVITY
-ALLOW_DIRECT_SUMMATION                   # Performed direct summation instead of tree-based gravity if number of active particles < DIRECT_SUMMATION_THRESHOLD (= 3000 unless specified differently here)
-DIRECT_SUMMATION_THRESHOLD=500           # Overrides maximum number of active particles for which direct summation is performed instead of tree based calculation
+#ALLOW_DIRECT_SUMMATION                   # Performed direct summation instead of tree-based gravity if number of active particles < DIRECT_SUMMATION_THRESHOLD (= 3000 unless specified differently here)
+#DIRECT_SUMMATION_THRESHOLD=500           # Overrides maximum number of active particles for which direct summation is performed instead of tree based calculation
 GRAVITY_NOT_PERIODIC                     # gravity is not treated periodically
+#EXTERNALGRAVITY                          # master switch for external potential
+#STATICTABULATEDPOTENTIAL                 # static potential from an arbitrary tabulated mass profile 
 
 #--------------------------------------- Gravity softening
 NSOFTTYPES=2                             # Number of different softening values to which particle types can be mapped.
@@ -34,17 +36,6 @@ DOUBLEPRECISION=1                        # Mode of double precision: not defined
 DOUBLEPRECISION_FFTW                     # FFTW calculation in double precision
 OUTPUT_COORDINATES_IN_DOUBLEPRECISION    # will always output coordinates in double precision
 NGB_TREE_DOUBLEPRECISION                 # if this is enabled, double precision is used for the neighbor node extension
-
-#--------------------------------------- On the fly FOF groupfinder
-#FOF                                      # enable FoF output
-#FOF_PRIMARY_LINK_TYPES=2                 # 2^type for the primary dark matter type
-#FOF_SECONDARY_LINK_TYPES=1+16+32         # 2^type for the types linked to nearest primaries
-
-#--------------------------------------- Subfind
-#SUBFIND                                  # enables substructure finder
-#SAVE_HSML_IN_SNAPSHOT                    # stores hsml, density, and velocity dispersion values in the snapshot files
-#SUBFIND_CALC_MORE                        # calculates also the velocity dispersion in the local density estimate (this is automatically enabled by several other options, e.g. SAVE_HSML_IN_SNAPSHOT)
-#SUBFIND_EXTENDED_PROPERTIES              # adds calculation of further quantities related to angular momentum in different components
 
 #-------------------------------------------- Things for special behaviour
 #PROCESS_TIMES_OF_OUTPUTLIST              # goes through times of output list prior to starting the simulaiton to ensure that outputs are written as close to the desired time as possible (as opposed to at next possible time if this flag is not active)

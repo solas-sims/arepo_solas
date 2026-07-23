@@ -1419,6 +1419,24 @@ double InitMetallicityinSolar;
                                    * from; empty string means start from psi=0 (fdm_allocate()'s own zero-init) */
 #endif /* #ifdef FDM */
 
+#ifdef STATICTABULATEDPOTENTIAL
+  char StaticPotentialFile[MAXLEN_PATH]; /*!< path to an HDF5 file (halo_ic.py's write_mass_table_hdf5 format)
+                                           * giving a tabulated r(code units)/M(<r)(code units) for an arbitrary
+                                           * spherical external potential -- read once at startup, see
+                                           * grav_external.c's load_static_tabulated_potential() */
+  double StaticPotentialCenter;  /*!< the (single, applied to all 3 axes -- this project's own convention
+                                   * throughout, e.g. make_halo_ic.py/make_star_ic.py always center a halo at
+                                   * (L/2,L/2,L/2) for whatever L was used) center of the tabulated potential,
+                                   * in code length units. Deliberately its OWN, independent parameter --
+                                   * NOT tied to All.BoxSize (boxHalf_X/Y/Z, which STATICNFW/STATICHQ use, but
+                                   * which is 0 for this project's own GRAVITY_NOT_PERIODIC/BoxSize=0 runs --
+                                   * a real bug this project's own first attempt at this feature had, found
+                                   * from a genuine NaN crash rather than anticipated) and NOT tied to
+                                   * All.FDMBoxSize either, since STATICTABULATEDPOTENTIAL must work even when
+                                   * FDM itself isn't compiled in at all (the whole point of testing stars
+                                   * against a FIXED potential, without the live FDM solver running). */
+#endif /* #ifdef STATICTABULATEDPOTENTIAL */
+
 #ifdef STAR_RADIATION_ACTIVE
   double RaySplitFactor;
 #endif

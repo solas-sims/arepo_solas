@@ -146,6 +146,13 @@ void begrun1(void)
     fdm_read_field(All.FDMICFile); /* otherwise psi stays at fdm_allocate()'s own zero-init */
 #endif /* #ifdef FDM */
 
+#ifdef STATICTABULATEDPOTENTIAL
+  load_static_tabulated_potential(); /* unconditional -- unlike FDMICFile, there is no meaningful
+                                       * "empty means skip" case: if this flag is compiled in, the
+                                       * table is required for gravity_external_get_force() to do
+                                       * anything at all */
+#endif /* #ifdef STATICTABULATEDPOTENTIAL */
+
   if(RestartFlag == 1) /* this is needed here to allow domain decomposition right after restart */
     if(All.ComovingIntegrationOn)
       init_drift_table();

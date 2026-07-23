@@ -305,6 +305,27 @@ void fdm_advance_to_time(integertime target_ti)
       FDM_CurrentTime += dt;
     }
 
+  /* fdm_compute_force() computes FDM_ForceX/Y/Z from the potential
+   * fdm_update_potential() just left in FDM_Potential -- needed here
+   * because fdm_interpolate_to_stars() below reads those force arrays
+   * directly. fdm_step()'s own internal fdm_update_potential() calls
+   * don't need a matching force computation: fdm_kick() (the FDM
+   * field's own evolution) uses the potential directly (the standard
+   * Schrodinger-Poisson kick, psi *= exp(-i*V*dt/hbar)), never its
+   * gradient -- the force is only ever consumed by the star coupling
+   * below, so computing it once here, from the final, fully-updated
+   * potential after all sub-cycling above has completed, is both
+   * correct and sufficient. A real, confirmed regression: this call
+   * was missing entirely from this function -- found from stars
+   * showing a genuinely nonzero, reasonable FDM_Potential but an
+   * exactly-zero force at their own position, which is not physically
+   * consistent for a real, spatially-varying potential (a nonzero,
+   * varying potential must have a nonzero gradient almost everywhere)
+   * -- confirmed by grep showing fdm_compute_force() was called only
+   * from this project's own standalone test files, never from the
+   * actual simulation's own call path. */
+  fdm_compute_force();
+
   /* Phase 2a: interpolate the now-current potential/force to stars,
    * once, after sub-cycling has fully caught up to target_ti -- ready
    * for Arepo's own gravity accumulation to pick up FDM_StarResult
@@ -313,21 +334,34 @@ void fdm_advance_to_time(integertime target_ti)
    * anything finer-grained during the sub-cycling in between. */
   fdm_interpolate_to_stars();
 
-  /* Basic output -- every call to this function (i.e. every outer
-   * sync point) writes a file, tagged by a monotonic counter. This is
-   * a genuine "basic version first" simplification, not a considered
-   * choice about output frequency: it does not check against Arepo's
-   * own output-time-list mechanism (All.Ti_nextoutput and friends,
-   * used to schedule particle-side snapshots) at all, so it may write
-   * far more often than actually wanted for a real run. Deliberately
-   * not integrated with that mechanism yet -- worth revisiting once
-   * this is used for anything beyond initial testing. */
+  /* Output, rate-limited to roughly All.TimeBetSnapshot -- the same
+   * cadence particle snapshots use, tracked independently rather than
+   * reusing All.Ti_nextoutput directly (that variable has ALREADY been
+   * advanced past the current time by create_snapshot_if_desired(),
+   * which runs earlier in the same run.c loop iteration -- checking it
+   * here would never fire). Genuinely needed, not a nicety: writing a
+   * full field snapshot every single sync point (this function's own
+   * previous behaviour) accumulates fast -- N=128 real+imag doubles is
+   * ~34MB per snapshot, and several hundred sync points, easily
+   * reached during a real run, means tens of GB -- confirmed as the
+   * actual cause of a real "unable to write dataset" HDF5 failure,
+   * traced to exhausted disk quota, not any actual data corruption. */
   {
-    static int fdm_output_counter = 0;
-    char fname[MAXLEN_PATH];
-    snprintf(fname, MAXLEN_PATH, "%s/fdm_field_%03d.hdf5", All.OutputDir, fdm_output_counter);
-    fdm_write_field(fname);
-    fdm_output_counter++;
+    static double fdm_next_output_time = -1.0;
+    static int fdm_output_counter      = 0;
+
+    if(fdm_next_output_time < 0.0)
+      fdm_next_output_time = All.TimeBegin;
+
+    if(FDM_CurrentTime >= fdm_next_output_time)
+      {
+        char fname[MAXLEN_PATH];
+        snprintf(fname, MAXLEN_PATH, "%s/fdm_field_%03d.hdf5", All.OutputDir, fdm_output_counter);
+        fdm_write_field(fname);
+        fdm_output_counter++;
+
+        fdm_next_output_time += All.TimeBetSnapshot;
+      }
   }
 }
 

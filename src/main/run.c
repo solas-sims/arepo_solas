@@ -146,6 +146,26 @@ void run(void)
 
       do_second_order_source_terms_second_half();
 
+#ifdef FDM
+      /* Same fix as the main loop's own call (further down in this
+       * function) -- this bootstrap sequence (RestartFlag != 1, i.e. a
+       * fresh start) has its OWN, separate call to
+       * do_gravity_step_second_half(), which runs BEFORE the main loop
+       * has even started iterating. Missing this call here left
+       * FDM_StarResult[] as genuinely uninitialized memory the very
+       * first time gravity consumed it -- found from a real crash
+       * (a huge, nonsensical FDM force on the very first sync point)
+       * traced with targeted instrumentation showing the "populate"
+       * side (fdm_interpolate_to_stars()) never ran at all before the
+       * "consume" side (gravity_force_finalize()) read it, not a
+       * staleness/reordering issue as originally suspected. This
+       * bootstrap's own domain_Decomposition() (above) has already
+       * run, so no reordering-timing hazard here, unlike the reasoning
+       * that placed the main loop's own call after ITS domain
+       * decomposition specifically. */
+      fdm_advance_to_time(All.Ti_Current);
+#endif /* #ifdef FDM */
+
       do_gravity_step_second_half();
     }
 
@@ -209,9 +229,9 @@ void run(void)
           find_gravity_timesteps_and_do_gravity_step_first_half(); /* gravity half-step for hydrodynamics */
                                                                    /* kicks collisionless particles by half a step */
 
-#if(defined(SELFGRAVITY) || defined(EXTERNALGRAVITY) || defined(EXACT_GRAVITY_FOR_PARTICLE_TYPE)) && !defined(MESHRELAX)
+#if(defined(SELFGRAVITY) || defined(EXTERNALGRAVITY) || defined(EXACT_GRAVITY_FOR_PARTICLE_TYPE) || defined(FDM)) && !defined(MESHRELAX)
           update_timesteps_from_gravity();
-#endif /* #if (defined(SELFGRAVITY) || defined(EXTERNALGRAVITY) || defined(EXACT_GRAVITY_FOR_PARTICLE_TYPE)) && !defined(MESHRELAX) \
+#endif /* #if (defined(SELFGRAVITY) || defined(EXTERNALGRAVITY) || defined(EXACT_GRAVITY_FOR_PARTICLE_TYPE) || defined(FDM)) && !defined(MESHRELAX) \
         */
 
           do_second_order_source_terms_first_half();
@@ -246,11 +266,6 @@ void run(void)
                               sync-point) */
 
           find_next_sync_point(); /* find next synchronization time */
-
-#ifdef FDM
-          fdm_advance_to_time(All.Ti_Current); /* advance FDM's own independent clock to catch up --
-                                                 * see fdm_integrator.c for the full reasoning */
-#endif /* #ifdef FDM */
 
           make_list_of_active_particles();
 
@@ -333,6 +348,26 @@ void run(void)
       update_primitive_variables(); /* this effectively closes off the hydro step */
 
       /* the masses and positions are updated, let's get new forces and potentials */
+
+#ifdef FDM
+      /* Moved here (not right after find_next_sync_point(), where this
+       * was originally called) after a real crash traced to a genuine
+       * bug: FDM_StarResult[] is indexed by particle array position,
+       * but domain_Decomposition() (called further up in this same
+       * function, after drift_all_particles()) reshuffles/exchanges
+       * particles across tasks and reorders local indices -- P[] itself
+       * gets actively moved by that process, but FDM_StarResult[]'s own
+       * CONTENTS were not (only its allocated SIZE tracks P[] via
+       * reallocate_memory_maxpart() -- growing correctly is not the
+       * same as staying correctly permuted). Calling this here, after
+       * every domain decomposition for this sync point has already
+       * happened and immediately before do_gravity_step_second_half()
+       * actually reads FDM_StarResult[], closes that window entirely.
+       * FDM runs on its own independent clock (fdm_integrator.c) --
+       * moving WHEN WITHIN THIS LOOP ITERATION this gets called changes
+       * nothing physically, only removes the reordering hazard. */
+      fdm_advance_to_time(All.Ti_Current);
+#endif /* #ifdef FDM */
 
       do_second_order_source_terms_second_half();
 
