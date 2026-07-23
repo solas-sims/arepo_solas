@@ -601,17 +601,13 @@ void read_parameter_file(char *fname)
 
 #ifdef STAR_FEEDBACK_ACTIVE
       strcpy(tag[nt], "StarTablesFile");
-      addr[nt] = All.StarTablesFile;
+      addr[nt] = &All.StarTablesFile;
       id[nt++] = STRING;
 #endif
 
-#ifdef STAR_FEEDBACK_SPH
-      strcpy(tag[nt], "StarDesNgb");
-      addr[nt] = &All.StarDesNgb;
-      id[nt++] = REAL;
-      
-      strcpy(tag[nt], "StarDesDev");
-      addr[nt] = &All.StarDesDev;
+#ifdef SUPERNOVAE
+      strcpy(tag[nt], "SNHostShellSweepFrac");
+      addr[nt] = &All.SNHostShellSweepFrac;
       id[nt++] = REAL;
 #endif
 

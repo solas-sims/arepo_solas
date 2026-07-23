@@ -59,7 +59,7 @@ BoxSize                                 1200
 
 %---- Output frequency and output parameters
 OutputListOn                            0
-TimeBetSnapshot                         0.005
+TimeBetSnapshot                         0.01
 TimeOfFirstSnapshot                     0.0
 TimeBetStatistics                       0.0234375
 NumFilesPerSnapshot                     1
@@ -73,13 +73,12 @@ MaxSizeTimestep                         0.0234375
 MinSizeTimestep                         2.0e-8
 
 %---- Treatment of empty space and temperature limits
-InitGasTemp                             1.e4
-MinGasTemp                              1.e4
-%IsoSoundSpeed                           1.e1
+InitGasTemp                             1.0e4
+MinGasTemp                              10.0
 MinimumDensityOnStartUp                 1.0e-10  %% very important for this setup!
 LimitUBelowThisDensity                  0.0
 LimitUBelowCertainDensityToThisValue    0.0
-MinEgySpec                              1.0e2
+MinEgySpec                              0.0
 
 %---- Tree algorithm, force accuracy, domain update frequency
 TypeOfOpeningCriterion                  1
@@ -119,7 +118,7 @@ ActivePartFracForNewDomainDecomp        0.01
  SofteningTypeOfPartType4                3
  SofteningTypeOfPartType5                1
 
- MinimumComovingHydroSoftening           1.0
+ MinimumComovingHydroSoftening           0.08
  AdaptiveHydroSofteningSpacing           1.2
 
  %---- Mesh regularization options
@@ -129,7 +128,7 @@ ActivePartFracForNewDomainDecomp        0.01
  TargetGasMassFactor                     1
  RefinementCriterion                     1
  DerefinementCriterion                   1
- MeanVolume                              421875
- MaxVolumeDiff                           10      % avoid strong resolution gradients
- MinVolume                               1 
- MaxVolume                               1.0e9   % no limits
+ MeanVolume                              52734.4
+ MaxVolumeDiff                           10  
+ MinVolume                               2.14e-3    % dx >= 80 pc limit
+ MaxVolume                               1.0e9      % no limits

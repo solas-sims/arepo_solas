@@ -8,61 +8,200 @@ double HealpixDirs[MAX_NUM_RAYS][3];
 
 int NRays; 
 
-/* Reference opacity coefficients [cm^2/g of gas] at solar metallicity */
-double Kappa[WAVEBANDS] = 
+/* Effective attenuation kappa_ext*(1 - a*<g>) [cm^2/g gas, solar Z]
+   Band-averaged over Draine 2003 (renorm. WD01) MW R_V=3.1 model,
+   kext_albedo_WD_MW_3.1_60_D03.all, energy and photon-weighted 4e4 K BB.
+   Gas mass per H = 2.311e-24 g (M_dust/H = 1.398e-26, M_gas/M_dust = 165.3) */
+double Kappa_E[WAVEBANDS] =
 {
-  /* Per gram of gas at solar Z (= kappa_dust * dust_to_gas_ratio_solar) */
-  /* Representative wavelengths: IR~2um, OPT~0.51um, UV~0.15um */
-  /* Draine & Li (2007) MW dust model, Cardelli+89 extinction law */
-  [INFRARED] = 3.0, /* mid/far-IR dust, cm^2/g, solar Z  */
-  [OPTICAL] = 25.0, /* optical-NIR dust, cm^2/g, solar Z */
-  [ULTRAVIOLET] = 180.0, /* FUV/photoelectric dust, cm^2/g, solar Z */
-  [LYMAN_WERNER] = 0.0, /* DISSOCIATING H2 -> Computed directly from H2 */
-  [IONIZING_HI] = 0.0, /* IONIZING_HI -> Computed directly from HI */
-  [IONIZING_HeI] = 0.0, /* IONIZING_HeI -> Computed directly from HeI */
-  [IONIZING_HeII] = 0.0, /* IONIZING_HeII -> Computed directly from HeII */
+  [INFRARED] = 34.9, 
+  [OPTICAL] = 278.3, 
+  [ULTRAVIOLET] = 417.7,  
+  [LYMAN_WERNER] = 736.6, /* Dust component */
+  [IONIZING_HI] = 1.0,
+  [IONIZING_HeI] = 1.0,
+  [IONIZING_HeII] = 1.0,
+};
+
+double Kappa_N[WAVEBANDS] =
+{
+  [INFRARED] = 30.0, 
+  [OPTICAL] = 242.3, 
+  [ULTRAVIOLET] = 406.9,  
+  [LYMAN_WERNER] = 731.4, /* Dust component */
+  [IONIZING_HI] = 1.0,
+  [IONIZING_HeI] = 1.0,
+  [IONIZING_HeII] = 1.0,
+};
+
+/* Fraction of kappa_eff-attenuated energy that is truly absorbed (heats grains):
+   f_abs = kappa_abs/kappa_eff = (1-a)/(1-a<g>), D03 MW dust, band-averaged.
+   Remainder is non-forward-scattered light: removed from the ray and it does
+   deliver momentum (kappa_eff is exactly the momentum-transfer opacity), but
+   it must NOT contribute to heating. */
+double TrueAbsorbedFraction[WAVEBANDS] =
+{
+  [INFRARED] = 0.54,
+  [OPTICAL] = 0.62,
+  [ULTRAVIOLET] = 0.81,
+  [LYMAN_WERNER] = 0.88, /* Dust share only; H2 line share is pure absorption */
+  [IONIZING_HI] = 1.0,
+  [IONIZING_HeI] = 1.0,
+  [IONIZING_HeII] = 1.0,
 };
 
 double ReradiatedFraction[WAVEBANDS] = 
 {
-  [INFRARED] = 1.0,
-  [OPTICAL] = 1.0,
-  [ULTRAVIOLET] = 0.95, /* 5% goes to pe heating */
-  [LYMAN_WERNER] = 0.0, /* No reradiation->dissociation instead */
-  [IONIZING_HI] = 0.0, /* No reradiation->photoionization instead */
-  [IONIZING_HeI] = 0.0, /* No reradiation->photoionization instead */
-  [IONIZING_HeII] = 0.0, /* No reradiation->photoionization instead */
+  [INFRARED] = 0.54,
+  [OPTICAL] = 0.62,
+  [ULTRAVIOLET] = 0.77, /* 5% goes to pe heating */
+  [LYMAN_WERNER] = 0.84, /* 5% goes to pe heating */
+  [IONIZING_HI] = 0.0, /* No reradiation */
+  [IONIZING_HeI] = 0.0, /* No reradiation */
+  [IONIZING_HeII] = 0.0, /* No reradiation */
 };
 
-void update_kappa(void)
+void update_dtau(void)
 {
   for(int i = 0; i < NumGas; i++)
     {
       if(P[i].Type != 0 || P[i].Mass == 0 || P[i].ID == 0)
         continue;
+
+      double Units = All.cf_UnitLength_in_cm * All.cf_UnitLength_in_cm / All.cf_UnitMass_in_g;
       
 #ifdef METALS
-      double Zsol = SphP[i].GasMetallicity / SOLAR_METALLICITY;
+      double Zsol = ((SphP[i].GasMetals + SphP[i].StarMetalsFeed) / (P[i].Mass + SphP[i].StarMassFeed)) / SOLAR_METALLICITY;
 #else
       double Zsol = 0;
 #endif
-      
-      double units = All.cf_UnitLength_in_cm * All.cf_UnitLength_in_cm / All.cf_UnitMass_in_g;
-      
-      SphP[i].Kappa[INFRARED] = (Kappa[INFRARED] / units) * Zsol;
-      SphP[i].Kappa[OPTICAL] = (Kappa[OPTICAL] / units) * Zsol;
-      SphP[i].Kappa[ULTRAVIOLET] = (Kappa[ULTRAVIOLET] / units) * Zsol;      
 
-      const double sigma_H2 = 2.47e-18; /* cm^2, effective Solomon-process cross section (Baczynski+15) */ 
-      SphP[i].Kappa[LYMAN_WERNER] = (sigma_H2 / (2.0 * PROTONMASS) / units) * SphP[i].GrackleSpecies(GRACKLE_H2I);
+      double Density = (P[i].Mass + SphP[i].StarMassFeed) / SphP[i].Volume;
+
+      double sigma_HI, sigma_HeI, sigma_HeII;
+
+      SphP[i].DtauOverLength_E[INFRARED] = (Kappa_E[INFRARED] / Units) * Zsol * Density;
+      SphP[i].DtauOverLength_E[OPTICAL] = (Kappa_E[OPTICAL] / Units) * Zsol * Density;
+      SphP[i].DtauOverLength_E[ULTRAVIOLET] = (Kappa_E[ULTRAVIOLET] / Units) * Zsol * Density;      
+
+      /* Dust only */
+      SphP[i].DtauOverLength_E[LYMAN_WERNER] = (Kappa_E[LYMAN_WERNER] / Units) * Zsol * Density;
       
-      const double sigma_HI = 6.30e-18; /* cm^2, HI threshold, 13.6 eV */
-      const double sigma_HeI = 7.83e-18; /* cm^2, HeI threshold, 24.6 eV */
-      const double sigma_HeII = 1.58e-18; /* cm^2, HeII threshold, 54.4 eV */
-      SphP[i].Kappa[IONIZING_HI] = (sigma_HI / (PROTONMASS) / units) * SphP[i].GrackleSpecies(GRACKLE_HI);
-      SphP[i].Kappa[IONIZING_HeI] = (sigma_HeI / (4.0 * PROTONMASS) / units) * SphP[i].GrackleSpecies(GRACKLE_HeI);
-      SphP[i].Kappa[IONIZING_HeII] = (sigma_HeII / (4.0 * PROTONMASS) / units) * SphP[i].GrackleSpecies(GRACKLE_HeII);  
+      /* Band averaged sigma0*(v/v0)^(-3), in cm^2 */
+      sigma_HI = 3.25e-18;
+      sigma_HeI = 5.04e-18;
+      sigma_HeII = 1.30e-18; 
+      SphP[i].DtauOverLength_E[IONIZING_HI] = (sigma_HI / (PROTONMASS) / Units) * SphP[i].GrackleSpeciesConserved(GRACKLE_HI) / SphP[i].Volume;
+      SphP[i].DtauOverLength_E[IONIZING_HeI] = (sigma_HeI / (4.0 * PROTONMASS) / Units) * SphP[i].GrackleSpeciesConserved(GRACKLE_HeI) / SphP[i].Volume;
+      SphP[i].DtauOverLength_E[IONIZING_HeII] = (sigma_HeII / (4.0 * PROTONMASS) / Units) * SphP[i].GrackleSpeciesConserved(GRACKLE_HeII) / SphP[i].Volume;  
+      
+
+      SphP[i].DtauOverLength_N[INFRARED] = (Kappa_N[INFRARED] / Units) * Zsol * Density;
+      SphP[i].DtauOverLength_N[OPTICAL] = (Kappa_N[OPTICAL] / Units) * Zsol * Density;
+      SphP[i].DtauOverLength_N[ULTRAVIOLET] = (Kappa_N[ULTRAVIOLET] / Units) * Zsol * Density;      
+
+      /* Dust only */
+      SphP[i].DtauOverLength_N[LYMAN_WERNER] = (Kappa_N[LYMAN_WERNER] / Units) * Zsol * Density;
+      
+      /* Band averaged sigma0*(v/v0)^(-3), in cm^2 */
+      sigma_HI = 3.48e-18; 
+      sigma_HeI = 5.27e-18;
+      sigma_HeII = 1.31e-18; 
+      SphP[i].DtauOverLength_N[IONIZING_HI] = (sigma_HI / (PROTONMASS) / Units) * SphP[i].GrackleSpeciesConserved(GRACKLE_HI) / SphP[i].Volume;
+      SphP[i].DtauOverLength_N[IONIZING_HeI] = (sigma_HeI / (4.0 * PROTONMASS) / Units) * SphP[i].GrackleSpeciesConserved(GRACKLE_HeI) / SphP[i].Volume;
+      SphP[i].DtauOverLength_N[IONIZING_HeII] = (sigma_HeII / (4.0 * PROTONMASS) / Units) * SphP[i].GrackleSpeciesConserved(GRACKLE_HeII) / SphP[i].Volume;  
     }
+}
+
+double dtau_IR(int i, double length)
+{
+  double Units = All.cf_UnitLength_in_cm * All.cf_UnitLength_in_cm / All.cf_UnitMass_in_g;
+      
+#ifdef METALS
+  double Zsol = ((SphP[i].GasMetals + SphP[i].StarMetalsFeed) / (P[i].Mass + SphP[i].StarMassFeed)) / SOLAR_METALLICITY;
+#else
+  double Zsol = 0;
+#endif
+
+ double Density = (P[i].Mass + SphP[i].StarMassFeed) / SphP[i].Volume;
+
+  double Dtau_IR = (1.0 / Units) * Zsol * Density * length;
+
+  return Dtau_IR;
+}
+
+static double H2Tab_A[H2TAB_N]; /* A at table nodes */
+static double H2Tab_dlogN; /* log10 spacing */
+static double H2Tab_A_thinmin; /* A(NMIN) = SIGMA_PUMP * NMIN */
+ 
+/* Wolcott-Green et al. (2011) self-shielding function */
+static inline double f_selfshield_H2(double N_H2)
+{
+  double x  = N_H2 / 5.0e14;
+  double sq = sqrt(1.0 + x);
+  return 0.965 / pow(1.0 + x / H2_SHIELD_B5, 1.1)
+       + 0.035 / sq * exp(-8.5e-4 * sq);
+}
+ 
+/* Build A(N) once at startup (trapezoid, log-spaced with linear-N areas,
+   16 sub-steps per interval so table error << fit error) */
+void init_h2shield(void)
+{
+  H2Tab_dlogN = (H2TAB_LOGNMAX - H2TAB_LOGNMIN) / (H2TAB_N - 1);
+  H2Tab_A_thinmin = SIGMA_PUMP * pow(10.0, H2TAB_LOGNMIN);
+ 
+  /* Thin part below NMIN: f_sh=1 */
+  double A = H2Tab_A_thinmin;          
+  H2Tab_A[0] = A;
+ 
+  for(int i = 1; i < H2TAB_N; i++)
+    {
+      double N0 = pow(10.0, H2TAB_LOGNMIN + (i - 1) * H2Tab_dlogN);
+      double N1 = pow(10.0, H2TAB_LOGNMIN + i * H2Tab_dlogN);
+ 
+      const int nsub = 16;
+      double dN = (N1 - N0) / nsub;
+      for(int k = 0; k < nsub; k++)
+        {
+          double Na = N0 + k * dN;
+          A += 0.5 * (f_selfshield_H2(Na) + f_selfshield_H2(Na + dN)) * dN * SIGMA_PUMP;
+        }
+      H2Tab_A[i] = A;
+    }
+}
+ 
+/* A(N): thin analytic below NMIN, clamp above NMAX, linear-in-logN inside */
+static inline double h2shield_A(double N_H2)
+{
+  if(N_H2 <= 0.0)
+    return 0.0;
+ 
+  double logN = log10(N_H2);
+ 
+  /* f_sh = 1 exactly */
+  if(logN <= H2TAB_LOGNMIN)
+    return SIGMA_PUMP * N_H2; 
+ 
+  /* Lines exhausted */
+  if(logN >= H2TAB_LOGNMAX)
+    return H2Tab_A[H2TAB_N - 1];     
+ 
+  double u = (logN - H2TAB_LOGNMIN) / H2Tab_dlogN;
+  int    j = (int)u;
+  double f = u - j;
+ 
+  return H2Tab_A[j] * (1.0 - f) + H2Tab_A[j + 1] * f;
+}
+ 
+/* Exact per-cell line optical depth for a cell adding dN_H2 to a ray
+   that has already accumulated N_H2 */
+double h2shield_dtau(double N_H2, double dN_H2)
+{
+  double N_H2_cgs = N_H2 * (All.cf_UnitMass_in_g / (All.cf_UnitLength_in_cm * All.cf_UnitLength_in_cm)) / (2.0 * PROTONMASS);
+  double dN_H2_cgs = dN_H2 * (All.cf_UnitMass_in_g / (All.cf_UnitLength_in_cm * All.cf_UnitLength_in_cm)) / (2.0 * PROTONMASS);
+
+  double dtau = h2shield_A(N_H2_cgs + dN_H2_cgs) - h2shield_A(N_H2_cgs);
+  return dtau > 0.0 ? dtau : 0.0;
 }
 
 void start_healpix(void) 
@@ -161,7 +300,7 @@ static void init_rays(RayWorkStack *work)
     }
 }
 
-/* Returns 4 child rays by value - returns 0 if at NSIDE_MAX */
+/* Splits to 4 child rays */
 void split_ray(const RayPacket *parent, RayPacket children[4])
 {
   int new_nside = parent->nside * 2;
@@ -244,7 +383,10 @@ static void sort_by_task(RayExportBuffer *buf)
   memcpy(buf->task, sorted_task, buf->n * sizeof(int));
   memcpy(buf->rays, sorted_rays, buf->n * sizeof(RayPacket));
 
-  free(sorted_rays); free(sorted_task); free(cursor); free(count); 
+  free(sorted_rays); 
+  free(sorted_task); 
+  free(cursor); 
+  free(count); 
 }
 
 static void exchange_rays(RayExportBuffer *send, RayWorkStack *work)
@@ -283,7 +425,7 @@ static void exchange_rays(RayExportBuffer *send, RayWorkStack *work)
       work->rays = realloc(work->rays, work->capacity * sizeof(RayPacket));
     }
 
-  /* In ray units */
+  /* In ray Units */
   sort_by_task(send);   
 
   MPI_Alltoallv(send->rays, send_count, send_offset, MPI_RAYPACKET,
@@ -292,7 +434,10 @@ static void exchange_rays(RayExportBuffer *send, RayWorkStack *work)
 
   work->n += total_recv;
 
-  free(recv_offset); free(send_offset); free(recv_count); free(send_count);
+  free(recv_offset); 
+  free(send_offset); 
+  free(recv_count); 
+  free(send_count);
 }
 
 #ifdef TREEPOINTS
@@ -405,9 +550,21 @@ static void distribute_node_rad(int no)
   if(!has_rad) 
     return;
   
-  double node_tau[WAVEBANDS];
+  double node_dtau_E[WAVEBANDS], node_dtau_N[WAVEBANDS];
+
   for(int w = 0; w < WAVEBANDS; w++)
-    node_tau[w] = RtNgb_Nodes[no].volume * RtNgb_Nodes[no].density_kappa[w];
+    {
+      if(w == LYMAN_WERNER)
+        {
+          node_dtau_E[w] = RtNgb_Nodes[no].Volume * RtNgb_Nodes[no].DtauOverLength_E[w];
+          node_dtau_N[w] = RtNgb_Nodes[no].Volume * RtNgb_Nodes[no].dN_H2_OverLength;
+        }
+      else
+        {
+          node_dtau_E[w] = RtNgb_Nodes[no].Volume * RtNgb_Nodes[no].DtauOverLength_E[w];
+          node_dtau_N[w] = RtNgb_Nodes[no].Volume * RtNgb_Nodes[no].DtauOverLength_N[w];
+        }
+    }
 
   int child = Ngb_Nodes[no].u.d.nextnode;
   while(child != Ngb_Nodes[no].u.d.sibling && child >= 0)
@@ -423,15 +580,41 @@ static void distribute_node_rad(int no)
           
           for(int w = 0; w < WAVEBANDS; w++)
             {
-              if(node_tau[w] > 0)
+              if(node_dtau_E[w] > 0)
                 {
-                  double child_tau = SphP[child].Volume * SphP[child].Density * SphP[child].Kappa[w];
-                  double frac = child_tau / node_tau[w];
+                  double child_dtau_E;
+                  if(w == LYMAN_WERNER)
+                    {
+                       child_dtau_E = SphP[child].Volume * SphP[child].DtauOverLength_E[w];
+                    }
+                  else
+                    {
+                       child_dtau_E = SphP[child].Volume * SphP[child].DtauOverLength_E[w];
+                    }
                   
-                  SphP[child].Absorbed[w].Energy += frac * RtNgb_Nodes[no].Absorbed[w].Energy;
-                  SphP[child].Absorbed[w].Photons += frac * RtNgb_Nodes[no].Absorbed[w].Photons;
+                  double frac_E = child_dtau_E / node_dtau_E[w];
+                  
+                  SphP[child].Absorbed[w].Energy += frac_E * RtNgb_Nodes[no].Absorbed[w].Energy;
+                }
+              
+              if(node_dtau_N[w] > 0)
+                {
+                  double child_dtau_N;
+                  if(w == LYMAN_WERNER)
+                    {
+                      child_dtau_N = SphP[child].Volume * SphP[child].GrackleSpeciesConserved(GRACKLE_H2I) / SphP[child].Volume;
+                    }
+                  else
+                    {
+                      child_dtau_N = SphP[child].Volume * SphP[child].DtauOverLength_N[w];
+                    }
+
+                  double frac_N = child_dtau_N / node_dtau_N[w];
+                  
+                  SphP[child].Absorbed[w].Photons += frac_N * RtNgb_Nodes[no].Absorbed[w].Photons;
                 }
             }
+
           child = Ngb_Nextnode[child];
         }
       /* Internal node - pass fraction down recursively */
@@ -439,15 +622,41 @@ static void distribute_node_rad(int no)
         {
           for(int w = 0; w < WAVEBANDS; w++)
             {
-              if(node_tau[w] > 0)
+              if(node_dtau_E[w] > 0)
                 {
-                  double child_tau = RtNgb_Nodes[child].volume * RtNgb_Nodes[child].density_kappa[w];
-                  double frac = child_tau / node_tau[w];
+                  double child_dtau_E;
+                  if(w == LYMAN_WERNER)
+                    {
+                      child_dtau_E = RtNgb_Nodes[child].Volume * RtNgb_Nodes[child].DtauOverLength_E[w];
+                    }
+                  else
+                    {
+                      child_dtau_E = RtNgb_Nodes[child].Volume * RtNgb_Nodes[child].DtauOverLength_E[w];
+                    }
                   
-                  RtNgb_Nodes[child].Absorbed[w].Energy += frac * RtNgb_Nodes[no].Absorbed[w].Energy;
-                  RtNgb_Nodes[child].Absorbed[w].Photons += frac * RtNgb_Nodes[no].Absorbed[w].Photons;
+                  double frac_E = child_dtau_E / node_dtau_E[w];
+                  
+                  RtNgb_Nodes[child].Absorbed[w].Energy += frac_E * RtNgb_Nodes[no].Absorbed[w].Energy;
+                }
+              
+              if(node_dtau_N[w] > 0)
+                {
+                  double child_dtau_N;
+                  if(w == LYMAN_WERNER)
+                    {
+                      child_dtau_N = RtNgb_Nodes[child].Volume * RtNgb_Nodes[child].dN_H2_OverLength;
+                    }
+                  else
+                    {
+                      child_dtau_N = RtNgb_Nodes[child].Volume * RtNgb_Nodes[child].DtauOverLength_N[w];
+                    }
+                  
+                  double frac_N = child_dtau_N / node_dtau_N[w];
+                  
+                  RtNgb_Nodes[child].Absorbed[w].Photons += frac_N * RtNgb_Nodes[no].Absorbed[w].Photons;
                 }
             }
+
           distribute_node_rad(child);
           child = Ngb_Nodes[child].u.d.sibling;
         }
@@ -485,7 +694,9 @@ static void radiation_feedback(void)
       /* Photoelectric heating */
       double epsilon_pe = 0.05;
 
-      double E_pe = SphP[i].Absorbed[ULTRAVIOLET].Energy * epsilon_pe * All.cf_UnitEnergy_in_cgs; 
+      double E_pe = (SphP[i].Absorbed[ULTRAVIOLET].Energy  * TrueAbsorbedFraction[ULTRAVIOLET]
+                     + SphP[i].Absorbed[LYMAN_WERNER].Energy * TrueAbsorbedFraction[LYMAN_WERNER])
+                     * epsilon_pe * All.cf_UnitEnergy_in_cgs;
       
       /* Volumetric_heating_rate: grackle docs say erg/(s cm^3), straight CGS, no conversion */
       SphP[i].PE_VolHeatingRate +=  E_pe / dt_cgs / V_cgs;
@@ -494,33 +705,19 @@ static void radiation_feedback(void)
 #ifdef DISSOCIATION
       /* H2 Dissociation */
       /* Number density */
-      double n_H2 = SphP[i].GrackleSpecies(GRACKLE_H2I) * SphP[i].Density / (2 * PROTONMASS / All.cf_UnitMass_in_g);
-
-      /* In cgs */
-      double n_H2_cgs = n_H2 / (All.cf_UnitLength_in_cm * All.cf_UnitLength_in_cm * All.cf_UnitLength_in_cm);
-
-      /* Threshold energy */
-      //double energy_thresh_H2 = ;
-
-      double E_abs_H2 = SphP[i].Absorbed[LYMAN_WERNER].Energy * All.cf_UnitEnergy_in_cgs;
+      double n_H2 = SphP[i].GrackleSpeciesConserved(GRACKLE_H2I) / V / (2 * PROTONMASS / All.cf_UnitMass_in_g);
 
       double N_abs_H2 = SphP[i].Absorbed[LYMAN_WERNER].Photons;
 
-      /* RT_heating_rate: grackle docs say erg/(s cm^3) / n, straight CGS, no conversion */
-      //double E_threshold_H2 = N_abs_H2 * energy_thresh_H2; 
-      
-      //if(n_H2_cgs)
-      //  SphP[i].H2_HeatingRate += (E_abs_H2 - E_threshold_H2) > 0 ? ((E_abs_H2 - E_threshold_H2) / dt_cgs / V_cgs) / n_H2_cgs : 0.0;
-      
-      SphP[i].H2_DissociationRate += n_H2 > 0 ? (N_abs_H2 / (dt/All.cf_hubble_a/All.HubbleParam) / V) / n_H2 : 0.0;
+      SphP[i].H2_DissociationRate += n_H2 > 0 ? (F_DISS * N_abs_H2 / (dt/All.cf_hubble_a/All.HubbleParam) / V) / n_H2 : 0.0;
 #endif
 
 #ifdef PHOTOIONIZATION
       /* Photoionization */     
       /* Number densities */
-      double n_HI = SphP[i].GrackleSpecies(GRACKLE_HI) * SphP[i].Density / (PROTONMASS / All.cf_UnitMass_in_g);
-      double n_HeI = SphP[i].GrackleSpecies(GRACKLE_HeI) * SphP[i].Density / (4 * PROTONMASS / All.cf_UnitMass_in_g);
-      double n_HeII = SphP[i].GrackleSpecies(GRACKLE_HeII) * SphP[i].Density / (4 * PROTONMASS / All.cf_UnitMass_in_g);
+      double n_HI = SphP[i].GrackleSpeciesConserved(GRACKLE_HI) / V / (PROTONMASS / All.cf_UnitMass_in_g);
+      double n_HeI = SphP[i].GrackleSpeciesConserved(GRACKLE_HeI) / V / (4 * PROTONMASS / All.cf_UnitMass_in_g);
+      double n_HeII = SphP[i].GrackleSpeciesConserved(GRACKLE_HeII) / V / (4 * PROTONMASS / All.cf_UnitMass_in_g);
 
       /* In cgs */
       double n_HI_cgs = n_HI / (All.cf_UnitLength_in_cm * All.cf_UnitLength_in_cm * All.cf_UnitLength_in_cm);
@@ -556,7 +753,7 @@ static void radiation_feedback(void)
       if(n_HeII_cgs)
         SphP[i].HeII_HeatingRate += (E_abs_HeII - E_threshold_HeII) > 0 ? ((E_abs_HeII - E_threshold_HeII) / dt_cgs / V_cgs) / n_HeII_cgs : 0.0;
 
-      /* RT_ionization_rate: 1 / (time units) */
+      /* RT_ionization_rate: 1 / (time Units) */
       SphP[i].HI_IonizationRate += n_HI > 0 ? (N_abs_HI / (dt/All.cf_hubble_a/All.HubbleParam) / V) / n_HI : 0.0;     
       
       SphP[i].HeI_IonizationRate += n_HeI > 0 ? (N_abs_HeI / (dt/All.cf_hubble_a/All.HubbleParam) / V) / n_HeI : 0.0;
@@ -597,6 +794,8 @@ void star_radiation(void)
 
   double t0, t1;
 
+  update_dtau();
+
 #ifdef RAD_OPENING_ANGLE
   /* Zero accumulator on all nodes before treewalk - important for top nodes! */
   for(int no = Ngb_MaxPart; no < Ngb_MaxPart + Ngb_NumNodes; no++)
@@ -617,11 +816,13 @@ void star_radiation(void)
         }
     }
  
-  int n_stars = TimeBinsStar.NActiveParticles;
+  int n_stars = MechanicalFeedbackEvents.NumEvents;
   long long n_rays_local = (long long)n_stars * NRays;
 
   long long n_rays_global;
   sumup_longs(1, &n_rays_local, &n_rays_global);
+
+  mpi_printf("STAR_RADIATION: Initializing radiation with %12lld rays\n", n_rays_global);
 
   /* Floor so ranks with no local stars still have a buffer to receive imports */
   long long work_capacity = n_rays_local > 0 ? 4 * n_rays_local : 1024;

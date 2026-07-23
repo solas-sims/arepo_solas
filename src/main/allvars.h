@@ -470,7 +470,7 @@ typedef unsigned long long peano1D;
 #define GAMMA_MINUS1 (GAMMA - 1.)
 #define GAMMA_PLUS1 (GAMMA + 1.)
 
-#define HYDROGEN_MASSFRAC 0.76 /*!< mass fraction of hydrogen, relevant only for radiative cooling */
+#define HYDROGEN_MASSFRAC 0.76 /*!< mass fraction of hydrogen */
 #define HE_ABUND ((1. / HYDROGEN_MASSFRAC - 1.) / 4.)
 
 /* ... often used physical constants (cgs units; NIST 2010) */
@@ -1400,9 +1400,8 @@ double InitMetallicityinSolar;
   char StarTablesFile[MAXLEN_PATH];
 #endif 
 
-#ifdef STAR_FEEDBACK_SPH
-  double StarDesNgb;
-  double StarDesDev;
+#ifdef SUPERNOVAE
+  double SNHostShellSweepFrac;
 #endif
 
 #ifdef SIDM
@@ -1760,7 +1759,8 @@ extern struct sph_particle_data
 #endif
 
 #ifdef STAR_RADIATION_ACTIVE
-  MyDouble Kappa[WAVEBANDS];
+  MyDouble DtauOverLength_E[WAVEBANDS];
+  MyDouble DtauOverLength_N[WAVEBANDS];
   WavebandData Absorbed[WAVEBANDS];
 #endif
 
