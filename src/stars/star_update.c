@@ -108,7 +108,7 @@ integertime star_timestep(int i)
     dt = dt_star;
 
   /* Park dead or low mass stars */
-  if(SP[i].WithFeedback == 0)
+  if(SP[i].Active < 0)
     dt = TIMEBASE * All.Timebase_interval;
     
   integertime ti_step = (integertime)(dt / All.Timebase_interval);
@@ -124,6 +124,13 @@ void star_update_timesteps(void)
     {
       i = TimeBinsStar.ActiveParticleList[idx];
 
+      /* Park dead or low mass stars */
+      if(SP[i].Active < 0)
+        {
+          SP[i].TimeBinStar = TIMEBINS;
+          continue;
+        }
+
 #if defined(SELFGRAVITY) ||  defined(EXTERNALGRAVITY) || defined(EXACT_GRAVITY_FOR_PARTICLE_TYPE)
       SP[i].TimeBinStar = PPS(i).TimeBinGrav;
 #else
@@ -131,10 +138,6 @@ void star_update_timesteps(void)
       timebins_get_bin_and_do_validity_checks(star_timestep(i), &bin, SP[i].TimeBinStar);
       SP[i].TimeBinStar = bin;
 #endif
-      
-      /* Park dead or low mass stars */
-      if(SP[i].WithFeedback == 0)
-        SP[i].TimeBinStar = TIMEBINS;
     }
     
   star_reconstruct_timebins();
@@ -210,16 +213,13 @@ void star_prep(void)
     {
       i = TimeBinsStar.ActiveParticleList[idx];
 
-      if(SP[i].Active == 0)
-        //if(TimeBinSynchronized[SP[i].HostHydroBin])
-          {
-            SP[i].Active = 1;
-            SP[i].PhysicalAge_yr = 0.0;
-            SP[i].MassOfStar = PPS(i).Mass;
-          }
-      
-      if(SP[i].Active == 0)
-        continue;
+      /* Put star on the main sequence */
+      if(SP[i].Active == STAR_UNBORN)
+        {
+          SP[i].Active = STAR_ACTIVE;
+          SP[i].PhysicalAge_yr = 0.0;
+          SP[i].MassOfStar = PPS(i).Mass;
+        }
       
       MyDouble star_timestep = (SP[i].TimeBinStar ? (((integertime)1) << SP[i].TimeBinStar) : 0) * All.Timebase_interval * All.cf_UnitTime_in_yr;
 
@@ -240,6 +240,15 @@ void star_prep(void)
 #elif STAR_PARTICLES == 2     
       StarFeedback = units_for_feedback(star_feedback_compute(star_timestep, star_metallicity, star_mass, SP[i].PhysicalAge_yr));
 #endif
+
+      /* Give no feedback to inactive stars */
+      if(StarFeedback.State == -1)
+        {
+          SP[i].Active = STAR_INACTIVE;
+          SP[i].WithFeedback = 0;
+          continue;
+        }
+
 
 #if defined(TREE_BASED_TIMESTEPS) && defined(SUPERNOVAE)
       SP[i].TimeSN_yr = StarFeedback.TimeSN;
@@ -280,7 +289,7 @@ void star_prep(void)
       int with_feedback = 0;
 
 #ifdef WINDS 
-      if(SP[i].MechanicalFeedback.MassLoss)
+      if(SP[i].MechanicalFeedback.MassLoss > 0)
         with_feedback++;
 #endif
 
@@ -295,12 +304,11 @@ void star_prep(void)
 #endif
 
 #ifdef SUPERNOVAE
-      if(SP[i].MechanicalFeedback.SN_MassLoss || SP[i].MechanicalFeedback.SN_EnergyInject)
+      if(SP[i].MechanicalFeedback.SN_MassLoss > 0 || SP[i].MechanicalFeedback.SN_EnergyInject > 0)
         with_feedback++;
 #endif
 
       SP[i].WithFeedback = with_feedback;
-      SP[i].HostHydroBin = TIMEBINS;
     }
 
   TIMER_STOP(CPU_STARS_PREP);

@@ -20,8 +20,18 @@
 extern int NumStars;
 
 #ifdef STAR_FEEDBACK_ACTIVE
-/* Lowest stellar mass (in Msolar) for which feedback is computed */
-LOWEST_MASS_FEEDBACK 2 
+/* Lowest stellar mass (in Msolar) which contributes to feedback */
+#define LOWEST_MASS_FEEDBACK 2 
+/* Lowest stellar mass (in Msolar) which explodes as an SN */
+#define LOWEST_MASS_SN 8
+
+#define STAR_MS 0
+#define STAR_SN 1
+#define STAR_POST_SN 2
+
+#define STAR_UNBORN 0
+#define STAR_ACTIVE 1
+#define STAR_INACTIVE (-1)  
 
 extern struct TimeBinData TimeBinsStar;
 
@@ -56,8 +66,14 @@ typedef struct Star_Feedback
 #if defined(TREE_BASED_TIMESTEPS) && defined(SUPERNOVAE)
   double TimeSN;
 #endif
-  
-  int Stage; // 0:preSN, 1:SN, 2:postSN
+
+  /* 
+    STAR_MS: Main sequence, STAR_SN: Supernova (if any), STAR_POST_SN: After main sequence/Supernova
+  */  
+  int Stage; 
+
+  /* 1: Active, -1: Inactive */
+  int State;
 
 #ifdef WINDS
   MyDouble MassLoss;
@@ -154,8 +170,13 @@ typedef struct Star_Particle_Data
 #endif
 
 #ifdef STAR_FEEDBACK_ACTIVE
-  int Active;
-  int WithFeedback;
+  /* 
+    Permanent flag
+    STAR_UNBORN: before activation, STAR_ACTIVE: post activation, STAR_INACTIVE: inactive
+  */  
+  int Active; 
+  /* Per timestep-> 0: no feedback, 1: feedback (of any type) */
+  int WithFeedback; 
   MyDouble Hsml;
   MyDouble NgbsMass;
   MyDouble NgbsVolume;

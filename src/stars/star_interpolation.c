@@ -30,7 +30,7 @@ static Star_Interpolate SN_interpolate_metallicity(double z_val, double m_val);
 /* Linear interpolation helper function */
 static inline double linear_interpolation(double x, double x0, double x1, double y0, double y1) 
 {
-  // avoid divide by zero
+  /* Avoid divide by zero */
   if(x1 == x0) return y0;
 
   return y0 + (y1 - y0) * (x - x0) / (x1 - x0);
@@ -38,10 +38,9 @@ static inline double linear_interpolation(double x, double x0, double x1, double
 
 static inline double star_lifetime(int z_idx, double m_val)
 {
-  // Lifetime for a given metallicity and mass is just the last entry
-  // in the corresponding mass-loss table
+  /* Lifetime for a given metallicity and mass is just the last entry in the corresponding mass-loss table */
   
-  // Handle mass interpolation
+  /* Handle mass interpolation */
   if(m_val <= M_VALUES[0]) 
     {
       int N_last = N[z_idx][0];
@@ -67,6 +66,7 @@ static inline double star_lifetime(int z_idx, double m_val)
           return linear_interpolation(m_val, m0, m1, t0, t1);
         }
     }
+  
   terminate("Star_lifetime: failed to bracket mass");
 }
 
@@ -74,6 +74,7 @@ static double lifetime(double z_val, double m_val)
 {
   if(z_val <= Z_VALUES[0])
     return star_lifetime(0, m_val);
+
   if(z_val >= Z_VALUES[Z_COUNT - 1])
     return star_lifetime(Z_COUNT - 1, m_val);
 
@@ -88,19 +89,26 @@ static double lifetime(double z_val, double m_val)
           return linear_interpolation(z_val, z0, z1, t0, t1);
         }
     }
+  
   terminate("Lifetime: failed to bracket metallicity");
 }
 
 #if defined(TREE_BASED_TIMESTEPS) && defined(SUPERNOVAE)
 static double next_SN_time(double tau, double z_val, double m_val, double a)
 { 
-  if(m_val >= 8 && tau > a)
+  if(m_val >= LOWEST_MASS_SN) 
     {
-      Star_Interpolate SN_Feedback = SN_interpolate_metallicity(z_val, m_val);
-      if(SN_Feedback.SN_MassLoss > 0.0)
-        return tau;
+      if(tau > a)
+        {
+          Star_Interpolate SN_Feedback = SN_interpolate_metallicity(z_val, m_val);
+      
+          if(SN_Feedback.SN_MassLoss > 0.0)
+            return tau;
+        }
     }
-  return MAX_REAL_NUMBER; /* No SN or already past SN */
+
+  /* No SN or already past SN */
+  return MAX_REAL_NUMBER; 
 }
 #endif
 
@@ -198,6 +206,7 @@ static inline Star_Interpolate interpolate_age(int z_idx, int m_idx, double a)
           return Feedback;
         } 
     }
+  
   terminate("Interpolate_age: failed to bracket age");
 }
 
@@ -206,12 +215,13 @@ static Star_Interpolate interpolate_mass(int z_idx, double m_val, double a)
 {
   if(m_val <= M_VALUES[0])
     return interpolate_age(z_idx, 0, a);
+
   if(m_val >= M_VALUES[M_COUNT - 1])
     return interpolate_age(z_idx, M_COUNT - 1, a);
 
   for(int m = 0; m < M_COUNT - 1; m++)
     {
-    double m0 = M_VALUES[m];
+      double m0 = M_VALUES[m];
       double m1 = M_VALUES[m + 1];
       if(m_val >= m0 && m_val <= m1)
         {
@@ -241,14 +251,18 @@ static Star_Interpolate interpolate_mass(int z_idx, double m_val, double a)
           return Feedback;
         }
     }
+  
   terminate("Interpolate_mass: failed to bracket mass");
 }
 
 /* Linear interpolation in metallicity */
 static Star_Interpolate interpolate_metallicity(double z_val, double m_val, double a)
 {
+
+
   if(z_val <= Z_VALUES[0])
     return interpolate_mass(0, m_val, a);
+
   if(z_val >= Z_VALUES[Z_COUNT - 1])
     return interpolate_mass(Z_COUNT - 1, m_val, a);
 
@@ -284,6 +298,7 @@ static Star_Interpolate interpolate_metallicity(double z_val, double m_val, doub
           return Feedback;
         }
     }
+  
   terminate("Interpolate_metallicity: failed to bracket metallicity");
 }
 #endif
@@ -293,6 +308,9 @@ static Star_Interpolate interpolate_metallicity(double z_val, double m_val, doub
 static inline Star_Interpolate SN_interpolate_mass(int z_idx, double m_val) 
 {
   Star_Interpolate SN_Feedback = {0};
+
+  if(m_val < LOWEST_MASS_SN)
+    return SN_Feedback;
   
   const double *SN_massloss  = SN_MassLoss[z_idx];
 #ifdef METALS
@@ -305,7 +323,7 @@ static inline Star_Interpolate SN_interpolate_mass(int z_idx, double m_val)
 #ifdef METALS
       SN_Feedback.SN_MetalsLoss = SN_metalsloss[0];
 #endif
-      SN_Feedback.SN_EnergyInject = (SN_Feedback.SN_MassLoss > 0.0) ? 1e51 : 0.0;
+      SN_Feedback.SN_EnergyInject = (SN_Feedback.SN_MassLoss > 0.0) ? 1.0e51 : 0.0;
       
       return SN_Feedback;
     }       
@@ -316,7 +334,7 @@ static inline Star_Interpolate SN_interpolate_mass(int z_idx, double m_val)
 #ifdef METALS
       SN_Feedback.SN_MetalsLoss = SN_metalsloss[M_COUNT - 1];
 #endif
-      SN_Feedback.SN_EnergyInject = (SN_Feedback.SN_MassLoss > 0.0) ? 1e51 : 0.0;
+      SN_Feedback.SN_EnergyInject = (SN_Feedback.SN_MassLoss > 0.0) ? 1.0e51 : 0.0;
       
       return SN_Feedback;
     } 
@@ -327,18 +345,19 @@ static inline Star_Interpolate SN_interpolate_mass(int z_idx, double m_val)
       double m1 = M_VALUES[m + 1];
       if(m_val >= m0 && m_val <= m1)
         {
-          if(SN_massloss[m] > 0 && SN_massloss[m + 1] > 0)
+          if(SN_massloss[m] > 0.0 && SN_massloss[m + 1] > 0.0)
             {
               SN_Feedback.SN_MassLoss = linear_interpolation(m_val, m0, m1, SN_massloss[m], SN_massloss[m + 1]);
 #ifdef METALS
               SN_Feedback.SN_MetalsLoss = linear_interpolation(m_val, m0, m1, SN_metalsloss[m], SN_metalsloss[m + 1]);
 #endif
-              SN_Feedback.SN_EnergyInject = (SN_Feedback.SN_MassLoss > 0.0) ? 1e51 : 0.0;
+              SN_Feedback.SN_EnergyInject = (SN_Feedback.SN_MassLoss > 0.0) ? 1.0e51 : 0.0;
             }
           
           return SN_Feedback;
         } 
     }
+  
   terminate("SN_interpolate_mass: failed to bracket mass");
 }
 
@@ -347,6 +366,7 @@ static Star_Interpolate SN_interpolate_metallicity(double z_val, double m_val)
 {
   if(z_val <= Z_VALUES[0])
     return SN_interpolate_mass(0, m_val);
+  
   if(z_val >= Z_VALUES[Z_COUNT - 1])
     return SN_interpolate_mass(Z_COUNT - 1, m_val);
 
@@ -366,12 +386,13 @@ static Star_Interpolate SN_interpolate_metallicity(double z_val, double m_val)
 #ifdef METALS
               SN_Feedback.SN_MetalsLoss = linear_interpolation(z_val, z0, z1, SNfeedback0.SN_MetalsLoss, SNfeedback1.SN_MetalsLoss);
 #endif
-              SN_Feedback.SN_EnergyInject = (SN_Feedback.SN_MassLoss > 0.0) ? 1e51 : 0.0;
+              SN_Feedback.SN_EnergyInject = (SN_Feedback.SN_MassLoss > 0.0) ? 1.0e51 : 0.0;
             }
           
           return SN_Feedback;
         }
     }
+
   terminate("SN_interpolate_metallicity: failed to bracket metallicity");
 }
 #endif
@@ -379,23 +400,36 @@ static Star_Interpolate SN_interpolate_metallicity(double z_val, double m_val)
 /* Wrapper function */
 Star_Feedback star_feedback_compute(double dt, double z_val, double m_val, double a)
 {
-  double tau = lifetime(z_val, m_val);
   Star_Feedback Star = {0};
 
+  Star.State = -1;
+
 #if defined(TREE_BASED_TIMESTEPS) && defined(SUPERNOVAE)
-  Star.TimeSN = MAX_REAL_NUMBER;
+      Star.TimeSN = MAX_REAL_NUMBER;
 #endif
 
   if(m_val <= LOWEST_MASS_FEEDBACK)
     return Star;
 
+  double tau = lifetime(z_val, m_val);
+
+  if(a >= tau+dt)
+    {
+      Star.Stage = STAR_POST_SN;
+
+      return Star;
+    }
+
+  Star.State = 1; 
+
 #if defined(TREE_BASED_TIMESTEPS) && defined(SUPERNOVAE)
-  Star.TimeSN = next_SN_time(tau, z_val, m_val, a);
+  if(m_val > LOWEST_MASS_SN)
+    Star.TimeSN = next_SN_time(tau, z_val, m_val, a);
 #endif
 
   if(a < tau)
     {
-      Star.Stage = 0;
+      Star.Stage = STAR_MS;
 
 #if defined(WINDS) || defined(STAR_RADIATION_ACTIVE)
       Star_Interpolate Feedback = interpolate_metallicity(z_val, m_val, a);
@@ -423,10 +457,12 @@ Star_Feedback star_feedback_compute(double dt, double z_val, double m_val, doubl
 
       return Star;
     }
-
-  if(a >= tau && a < (tau+dt)) 
+  else 
     {
-      Star.Stage = 1;
+      Star.Stage = STAR_SN;
+
+      if(m_val < LOWEST_MASS_SN)
+        return Star;
 
 #ifdef SUPERNOVAE
       Star_Interpolate SN_Feedback = SN_interpolate_metallicity(z_val, m_val);
@@ -439,14 +475,6 @@ Star_Feedback star_feedback_compute(double dt, double z_val, double m_val, doubl
 
       return Star;
     }
-  
-  if(a >= tau+dt)
-    {
-      Star.Stage = 2;
-
-      return Star;
-    }
-  return Star;
 }
 
 Star_Feedback units_for_feedback(Star_Feedback StarFeedback)
@@ -482,11 +510,13 @@ Star_Feedback star_particle_feedback(int index, double dt, double z, double a)
   double m;
   Star_Feedback StarParticle = {0};
 
+  StarParticle.State = -1;
+
 #if defined(TREE_BASED_TIMESTEPS) && defined(SUPERNOVAE)
   StarParticle.TimeSN = MAX_REAL_NUMBER; 
 #endif
 
-  // Add feedback contributions for each bin 
+  /* Add feedback contributions for each bin */ 
   for(i = 0; i < NBINS; i++) 
     {
       if(SP[index].NumOfStarsInBins[i] == 0)
@@ -498,6 +528,11 @@ Star_Feedback star_particle_feedback(int index, double dt, double z, double a)
 
       Star_Feedback Star = star_feedback_compute(dt, z, m, a);
 
+      if(Star.State < 0)
+        continue;
+
+      StarParticle.State = 1;
+
 #if defined(TREE_BASED_TIMESTEPS) && defined(SUPERNOVAE)
       if(Star.TimeSN < StarParticle.TimeSN)
       StarParticle.TimeSN = Star.TimeSN;
@@ -505,7 +540,7 @@ Star_Feedback star_particle_feedback(int index, double dt, double z, double a)
 
       switch(Star.Stage)
         {
-          case 0:
+          case STAR_MS:
 
 #ifdef WINDS
           StarParticle.MassLoss += Nstars * Star.MassLoss;
@@ -524,7 +559,7 @@ Star_Feedback star_particle_feedback(int index, double dt, double z, double a)
 #endif
           break;
 
-          case 1:
+          case STAR_SN:
 
 #ifdef SUPERNOVAE
           StarParticle.SN_MassLoss += Nstars * Star.SN_MassLoss;
@@ -536,11 +571,11 @@ Star_Feedback star_particle_feedback(int index, double dt, double z, double a)
 
           break;
 
-          case 2:
-
-          break;
+          default:
+            terminate("star_particle_feedback: bad stage %d (m=%g, a=%g)", Star.Stage, m, a);
         }
     }
+
   return StarParticle;
 }
 #endif
