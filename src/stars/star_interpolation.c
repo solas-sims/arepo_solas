@@ -94,21 +94,16 @@ static double lifetime(double z_val, double m_val)
 }
 
 #if defined(TREE_BASED_TIMESTEPS) && defined(SUPERNOVAE)
-static double next_SN_time(double tau, double z_val, double m_val, double a)
+static double next_SN_time(double tau, double z_val, double m_val)
 { 
-  if(m_val >= LOWEST_MASS_SN) 
-    {
-      if(tau > a)
-        {
-          Star_Interpolate SN_Feedback = SN_interpolate_metallicity(z_val, m_val);
+  Star_Interpolate SN_Feedback = SN_interpolate_metallicity(z_val, m_val);
       
-          if(SN_Feedback.SN_MassLoss > 0.0)
-            return tau;
-        }
-    }
+  /* Real SN */
+  if(SN_Feedback.SN_MassLoss > 0.0)
+    return tau;
 
-  /* No SN or already past SN */
-  return MAX_REAL_NUMBER; 
+  /* Failed SN or direct-collapse BH */
+  return MAX_REAL_NUMBER;   
 }
 #endif
 
@@ -258,8 +253,6 @@ static Star_Interpolate interpolate_mass(int z_idx, double m_val, double a)
 /* Linear interpolation in metallicity */
 static Star_Interpolate interpolate_metallicity(double z_val, double m_val, double a)
 {
-
-
   if(z_val <= Z_VALUES[0])
     return interpolate_mass(0, m_val, a);
 
@@ -308,9 +301,6 @@ static Star_Interpolate interpolate_metallicity(double z_val, double m_val, doub
 static inline Star_Interpolate SN_interpolate_mass(int z_idx, double m_val) 
 {
   Star_Interpolate SN_Feedback = {0};
-
-  if(m_val < LOWEST_MASS_SN)
-    return SN_Feedback;
   
   const double *SN_massloss  = SN_MassLoss[z_idx];
 #ifdef METALS
@@ -345,13 +335,34 @@ static inline Star_Interpolate SN_interpolate_mass(int z_idx, double m_val)
       double m1 = M_VALUES[m + 1];
       if(m_val >= m0 && m_val <= m1)
         {
+          /* Both SN -> interpolate */
           if(SN_massloss[m] > 0.0 && SN_massloss[m + 1] > 0.0)
             {
               SN_Feedback.SN_MassLoss = linear_interpolation(m_val, m0, m1, SN_massloss[m], SN_massloss[m + 1]);
 #ifdef METALS
               SN_Feedback.SN_MetalsLoss = linear_interpolation(m_val, m0, m1, SN_metalsloss[m], SN_metalsloss[m + 1]);
 #endif
-              SN_Feedback.SN_EnergyInject = (SN_Feedback.SN_MassLoss > 0.0) ? 1.0e51 : 0.0;
+              SN_Feedback.SN_EnergyInject = 1.0e51;
+            }
+          /* At least one failed SN or direct-collapse BH -> clamp to nearest */
+          else
+            {
+              if(m_val - m0 < m1 - m_val)
+                {
+                  SN_Feedback.SN_MassLoss = SN_massloss[m];
+#ifdef METALS
+                  SN_Feedback.SN_MetalsLoss = SN_metalsloss[m];
+#endif
+                  SN_Feedback.SN_EnergyInject = (SN_Feedback.SN_MassLoss > 0.0) ? 1.0e51 : 0.0;
+                }
+              else 
+                {
+                  SN_Feedback.SN_MassLoss = SN_massloss[m + 1];
+#ifdef METALS
+                  SN_Feedback.SN_MetalsLoss = SN_metalsloss[m + 1];
+#endif
+                  SN_Feedback.SN_EnergyInject = (SN_Feedback.SN_MassLoss > 0.0) ? 1.0e51 : 0.0;
+                }
             }
           
           return SN_Feedback;
@@ -380,13 +391,22 @@ static Star_Interpolate SN_interpolate_metallicity(double z_val, double m_val)
           Star_Interpolate SNfeedback1 = SN_interpolate_mass(z + 1, m_val);
           Star_Interpolate SN_Feedback = {0};
 
+          /* Both SN -> interpolate */
           if(SNfeedback0.SN_MassLoss > 0.0 && SNfeedback1.SN_MassLoss > 0.0)
             {
               SN_Feedback.SN_MassLoss = linear_interpolation(z_val, z0, z1, SNfeedback0.SN_MassLoss, SNfeedback1.SN_MassLoss);
 #ifdef METALS
               SN_Feedback.SN_MetalsLoss = linear_interpolation(z_val, z0, z1, SNfeedback0.SN_MetalsLoss, SNfeedback1.SN_MetalsLoss);
 #endif
-              SN_Feedback.SN_EnergyInject = (SN_Feedback.SN_MassLoss > 0.0) ? 1.0e51 : 0.0;
+              SN_Feedback.SN_EnergyInject = 1.0e51;
+            }
+          /* At least one failed SN or direct-collapse BH -> clamp to nearest */
+          else
+            {
+              if(z_val - z0 < z1 - z_val)
+                SN_Feedback = SNfeedback0;
+              else
+                SN_Feedback = SNfeedback1;
             }
           
           return SN_Feedback;
@@ -405,7 +425,7 @@ Star_Feedback star_feedback_compute(double dt, double z_val, double m_val, doubl
   Star.State = -1;
 
 #if defined(TREE_BASED_TIMESTEPS) && defined(SUPERNOVAE)
-      Star.TimeSN = MAX_REAL_NUMBER;
+  Star.TimeSN = MAX_REAL_NUMBER;
 #endif
 
   if(m_val <= LOWEST_MASS_FEEDBACK)
@@ -421,11 +441,6 @@ Star_Feedback star_feedback_compute(double dt, double z_val, double m_val, doubl
     }
 
   Star.State = 1; 
-
-#if defined(TREE_BASED_TIMESTEPS) && defined(SUPERNOVAE)
-  if(m_val > LOWEST_MASS_SN)
-    Star.TimeSN = next_SN_time(tau, z_val, m_val, a);
-#endif
 
   if(a < tau)
     {
@@ -453,6 +468,13 @@ Star_Feedback star_feedback_compute(double dt, double z_val, double m_val, doubl
         }
 #endif
 
+#endif
+
+      if(m_val < LOWEST_MASS_SN)
+        return Star;
+
+#if defined(TREE_BASED_TIMESTEPS) && defined(SUPERNOVAE)
+      Star.TimeSN = next_SN_time(tau, z_val, m_val, a);
 #endif
 
       return Star;
