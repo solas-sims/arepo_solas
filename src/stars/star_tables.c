@@ -10,6 +10,9 @@ int M_COUNT = 0;
 
 double *Z_VALUES = NULL;
 double *M_VALUES = NULL;
+
+double *logZ_VALUES = NULL;
+double *logM_VALUES = NULL;
    
 int **N = NULL;
 
@@ -103,6 +106,9 @@ void free_stellar_tables(void)
 
       free(Z_VALUES);
       free(M_VALUES);
+
+      free(logZ_VALUES);
+      free(logM_VALUES);
       
       free(N);
       
@@ -132,6 +138,9 @@ void free_stellar_tables(void)
 
       Z_VALUES = NULL;
       M_VALUES = NULL;
+
+      logZ_VALUES = NULL;
+      logM_VALUES = NULL;
       
       N = NULL;
       
@@ -180,6 +189,9 @@ void load_star_tables(const char *filename)
 
       Z_VALUES = malloc(Z_COUNT * sizeof(double));
       M_VALUES = malloc(M_COUNT * sizeof(double));
+
+      logZ_VALUES = malloc(Z_COUNT * sizeof(double));
+      logM_VALUES = malloc(M_COUNT * sizeof(double));
       
       hid_t zv = my_H5Dopen(file_id, "Z_VALUES");
       hid_t mv = my_H5Dopen(file_id, "M_VALUES");
@@ -188,6 +200,24 @@ void load_star_tables(const char *filename)
               H5S_ALL, H5S_ALL, H5P_DEFAULT, Z_VALUES, "Z_VALUES");
       my_H5Dread(mv, H5T_NATIVE_DOUBLE, 
               H5S_ALL, H5S_ALL, H5P_DEFAULT, M_VALUES, "M_VALUES");
+
+      for(int z = 0; z < Z_COUNT; z++)
+        {
+          if(z > 0 && Z_VALUES[z] <= Z_VALUES[z - 1])
+            terminate("Z_VALUES not strictly increasing at z=%d (%g <= %g)", z, Z_VALUES[z], Z_VALUES[z - 1]);
+          if(Z_VALUES[z] <= 0.0)
+            terminate("Z_VALUES[%d] = %g; table must not contain Z <= 0", z, Z_VALUES[z]);
+          logZ_VALUES[z] = log10(Z_VALUES[z]);
+        }
+
+      for(int m = 0; m < M_COUNT; m++)
+        {
+          if(m > 0 && M_VALUES[m] <= M_VALUES[m - 1])
+            terminate("M_VALUES not strictly increasing at m=%d", m);
+          if(M_VALUES[m] <= 0.0)
+            terminate("M_VALUES[%d] = %g; table must not contain M <= 0", m, M_VALUES[z]);
+          logM_VALUES[m] = log10(M_VALUES[m]);
+        }
 
       my_H5Dclose(zv, "Z_VALUES");
       my_H5Dclose(mv, "M_VALUES");

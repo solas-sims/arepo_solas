@@ -10,6 +10,9 @@ extern int M_COUNT;
 extern double *Z_VALUES;
 extern double *M_VALUES;
 
+extern double *logZ_VALUES;
+extern double *logM_VALUES;
+
 extern int **N;
 
 extern double ***Age;
