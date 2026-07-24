@@ -20,6 +20,9 @@
 extern int NumStars;
 
 #ifdef STAR_FEEDBACK_ACTIVE
+/* Lowest stellar mass (in Msolar) for which feedback is computed */
+LOWEST_MASS_FEEDBACK 2 
+
 extern struct TimeBinData TimeBinsStar;
 
 typedef struct Star_Interpolate

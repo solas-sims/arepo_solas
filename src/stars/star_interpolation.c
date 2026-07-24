@@ -386,7 +386,7 @@ Star_Feedback star_feedback_compute(double dt, double z_val, double m_val, doubl
   Star.TimeSN = MAX_REAL_NUMBER;
 #endif
 
-  if(m_val <= 2)
+  if(m_val <= LOWEST_MASS_FEEDBACK)
     return Star;
 
 #if defined(TREE_BASED_TIMESTEPS) && defined(SUPERNOVAE)
