@@ -230,10 +230,16 @@ void load_star_tables(const char *filename)
     {
       Z_VALUES = malloc(Z_COUNT * sizeof(double));
       M_VALUES = malloc(M_COUNT * sizeof(double));
+
+      logZ_VALUES = malloc(Z_COUNT * sizeof(double));
+      logM_VALUES = malloc(M_COUNT * sizeof(double));
     }
 
   MPI_Bcast(Z_VALUES, Z_COUNT, MPI_DOUBLE, 0, MPI_COMM_WORLD);
   MPI_Bcast(M_VALUES, M_COUNT, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+
+  MPI_Bcast(logZ_VALUES, Z_COUNT, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+  MPI_Bcast(logM_VALUES, M_COUNT, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
   N = malloc(Z_COUNT * sizeof(int*));
 
