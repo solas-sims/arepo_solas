@@ -46,7 +46,7 @@ void bh_kernel(double u, double hinv3, double hinv4, double *wk, double *dwk)
 
 integertime bh_timestep(int i)
 { 
-  /* Neighbours Minimum Bin */
+  /* Neighbours minimum bin */
   double dt_ngbmin = (BhP[i].NgbsMinBin ? (((integertime)1) << BhP[i].NgbsMinBin) : 0) * All.Timebase_interval;
   
   double dt;

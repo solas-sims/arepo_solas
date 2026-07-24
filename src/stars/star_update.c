@@ -91,7 +91,7 @@ void feedback_free(struct Mechanical_Feedback_Events *MFEvents)
 
 integertime star_timestep(int i)
 { 
-  /* Host Hydro Bin */
+  /* Host hydro bin */
   double dt_host = (SP[i].HostHydroBin ? (((integertime)1) << SP[i].HostHydroBin) : 0) * All.Timebase_interval;
   
   double dt;
@@ -102,7 +102,7 @@ integertime star_timestep(int i)
     dt = TIMEBASE * All.Timebase_interval;
 
   /* Set a maximum star timestep at 0.01 Myr */
-  double dt_star = pow(10,4) / All.cf_UnitTime_in_yr;
+  double dt_star = 1.0e4 / All.cf_UnitTime_in_yr;
 
   if(dt_star < dt)
     dt = dt_star;
