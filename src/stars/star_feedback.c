@@ -126,7 +126,7 @@ static void SN_compute(int ev, int h, double alpha, double beta, double gamma, d
   Mechanical_Feedback *MechanicalFeedback = &MechanicalFeedbackData->MechanicalFeedback;
 
   double E_SN  = MechanicalFeedback->SN_EnergyInject;
-  double E51 = E_SN * All.cf_UnitEnergy_in_cgs / 1.0e51;
+  double E51 = E_SN * All.cf_UnitEnergy_in_cgs / SN_ENERGY;
   
   double n_H = HYDROGEN_MASSFRAC * NgbsDensity * All.cf_UnitDensity_in_cgs / PROTONMASS;
   
@@ -171,7 +171,7 @@ static void Wind_feedback_host(int i, int ev, int h, int mode)
 /* 
  * Sedov/cooling radius check: is the host cell able to resolve the
  * pressure-driven expansion of this SN?
- * Kim & Ostriker (2015)-> r_SN = 22.6 pc * (E_SN / 1e51 erg)^0.29 * (rho_h / (1.4*m_p) / cm^-3)^(-0.42) 
+ * Kim & Ostriker (2015)-> r_SN = 22.6 pc * (E_SN / SN_ENERGY erg)^0.29 * (rho_h / (1.4*m_p) / cm^-3)^(-0.42) 
  */
 static int SN_feedback_radius(int i, int ev, int h)
 {
@@ -182,7 +182,7 @@ static int SN_feedback_radius(int i, int ev, int h)
   
   double E_SN = MechanicalFeedback->SN_EnergyInject;
  
-  double E51 = E_SN * All.cf_UnitEnergy_in_cgs / 1.0e51;
+  double E51 = E_SN * All.cf_UnitEnergy_in_cgs / SN_ENERGY;
   
   double rho = (P[i].Mass + SphP[i].StarMassFeed) / SphP[i].Volume;
   double rho_cgs = rho * All.cf_UnitDensity_in_cgs;

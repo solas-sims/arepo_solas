@@ -325,7 +325,7 @@ static inline Star_Interpolate SN_interpolate_mass(int z_idx, double m_val)
 #ifdef METALS
       SN_Feedback.SN_MetalsLoss = SN_metalsloss[0];
 #endif
-      SN_Feedback.SN_EnergyInject = (SN_Feedback.SN_MassLoss > 0.0) ? 1.0e51 : 0.0;
+      SN_Feedback.SN_EnergyInject = (SN_Feedback.SN_MassLoss > 0.0) ? SN_ENERGY : 0.0;
       
       return SN_Feedback;
     }       
@@ -336,7 +336,7 @@ static inline Star_Interpolate SN_interpolate_mass(int z_idx, double m_val)
 #ifdef METALS
       SN_Feedback.SN_MetalsLoss = SN_metalsloss[M_COUNT - 1];
 #endif
-      SN_Feedback.SN_EnergyInject = (SN_Feedback.SN_MassLoss > 0.0) ? 1.0e51 : 0.0;
+      SN_Feedback.SN_EnergyInject = (SN_Feedback.SN_MassLoss > 0.0) ? SN_ENERGY : 0.0;
       
       return SN_Feedback;
     } 
@@ -356,7 +356,7 @@ static inline Star_Interpolate SN_interpolate_mass(int z_idx, double m_val)
 #ifdef METALS
               SN_Feedback.SN_MetalsLoss = linear_interpolation(lm, lm0, lm1, SN_metalsloss[m], SN_metalsloss[m + 1]);
 #endif
-              SN_Feedback.SN_EnergyInject = 1.0e51;
+              SN_Feedback.SN_EnergyInject = SN_ENERGY;
             }
           /* At least one failed SN or direct-collapse BH -> clamp to nearest */
           else
@@ -367,7 +367,7 @@ static inline Star_Interpolate SN_interpolate_mass(int z_idx, double m_val)
 #ifdef METALS
                   SN_Feedback.SN_MetalsLoss = SN_metalsloss[m];
 #endif
-                  SN_Feedback.SN_EnergyInject = (SN_Feedback.SN_MassLoss > 0.0) ? 1.0e51 : 0.0;
+                  SN_Feedback.SN_EnergyInject = (SN_Feedback.SN_MassLoss > 0.0) ? SN_ENERGY : 0.0;
                 }
               else 
                 {
@@ -375,7 +375,7 @@ static inline Star_Interpolate SN_interpolate_mass(int z_idx, double m_val)
 #ifdef METALS
                   SN_Feedback.SN_MetalsLoss = SN_metalsloss[m + 1];
 #endif
-                  SN_Feedback.SN_EnergyInject = (SN_Feedback.SN_MassLoss > 0.0) ? 1.0e51 : 0.0;
+                  SN_Feedback.SN_EnergyInject = (SN_Feedback.SN_MassLoss > 0.0) ? SN_ENERGY : 0.0;
                 }
             }
           
@@ -414,7 +414,7 @@ static Star_Interpolate SN_interpolate_metallicity(double z_val, double m_val)
 #ifdef METALS
               SN_Feedback.SN_MetalsLoss = linear_interpolation(lz, lz0, lz1, SNfeedback0.SN_MetalsLoss, SNfeedback1.SN_MetalsLoss);
 #endif
-              SN_Feedback.SN_EnergyInject = 1.0e51;
+              SN_Feedback.SN_EnergyInject = SN_ENERGY;
             }
           /* At least one failed SN or direct-collapse BH -> clamp to nearest */
           else

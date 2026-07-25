@@ -531,7 +531,7 @@ static int star_density_evaluate2(int target, int mode, int threadid)
           
               if(time_sn_yr < MAX_REAL_NUMBER)
                 {
-                  double E_inject_code = 1e51 / 
+                  double E_inject_code = SN_ENERGY / 
                   (All.cf_UnitMass_in_g * All.cf_UnitVelocity_in_cm_per_s * All.cf_UnitVelocity_in_cm_per_s);
 
                   double unew = SphP[i].Utherm + E_inject_code / P[i].Mass;

@@ -33,6 +33,8 @@ extern int NumStars;
 #define STAR_ACTIVE 1
 #define STAR_INACTIVE (-1)  
 
+#define SN_ENERGY 1.0e51
+
 extern struct TimeBinData TimeBinsStar;
 
 typedef struct Star_Interpolate
