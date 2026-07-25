@@ -190,6 +190,8 @@ typedef struct Star_Particle_Data
   signed char TimeBinStar;
   
   MyDouble Age;
+  MyDouble Birthtime;
+  
   Mechanical_Feedback MechanicalFeedback;
 #endif
 } Star_Particle_Data;

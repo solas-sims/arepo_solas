@@ -236,12 +236,14 @@ void star_prep(void)
         {
           SP[i].MassOfStar = PPS(i).Mass;
           SP[i].Active = STAR_ACTIVE;
+          
           SP[i].Age = 0.0;
+          SP[i].Birthtime = All.Time;
         }
       
-      /* Advance age */
+      /* Advance timestep and age */
       MyDouble star_timestep = (SP[i].TimeBinStar ? (((integertime)1) << SP[i].TimeBinStar) : 0) * All.Timebase_interval;
-      SP[i].Age += star_timestep;
+      SP[i].Age = All.Time - SP[i].Birthtime;
 
       /* Convert properties to yr and msun */
       MyDouble star_mass_msun = SP[i].MassOfStar * All.cf_UnitMass_in_Msun;
@@ -276,13 +278,11 @@ void star_prep(void)
       SP[i].NextSNEnergy = StarFeedback.NextSNEnergy;
 #endif
 
-#if defined(WINDS) || defined(SUPERNOVAE)
       for(int k = 0; k < 3; k++)
         {
           SP[i].MechanicalFeedback.StarPosition[k] = PPS(i).Pos[k];
           SP[i].MechanicalFeedback.StarVelocity[k] = PPS(i).Vel[k];
-        }
-#endif 
+        } 
 
 #ifdef WINDS
       SP[i].MechanicalFeedback.MassLoss = StarFeedback.MassLoss;

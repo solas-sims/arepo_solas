@@ -450,7 +450,7 @@ Star_Feedback star_feedback_compute(double dt, double z_val, double m_val, doubl
 
   double tau = lifetime(z_val, m_val);
 
-  if(a >= tau+dt)
+  if(a > tau)
     {
       Star.Stage = STAR_POST_SN;
 
@@ -459,7 +459,25 @@ Star_Feedback star_feedback_compute(double dt, double z_val, double m_val, doubl
 
   Star.State = 1; 
 
-  if(a < tau)
+  if(tau < a + dt)
+    {
+      Star.Stage = STAR_SN;
+
+      if(m_val < LOWEST_MASS_SN)
+        return Star;
+
+#ifdef SUPERNOVAE
+      Star_Interpolate SN_Feedback = SN_interpolate_metallicity(z_val, m_val);
+      Star.SN_MassLoss = SN_Feedback.SN_MassLoss;
+#ifdef METALS
+      Star.SN_MetalsLoss = SN_Feedback.SN_MetalsLoss;
+#endif
+      Star.SN_EnergyInject = SN_Feedback.SN_EnergyInject;
+#endif
+
+      return Star;
+    }
+  else 
     {
       Star.Stage = STAR_MS;
 
@@ -495,24 +513,6 @@ Star_Feedback star_feedback_compute(double dt, double z_val, double m_val, doubl
       
       if(Star.TimeToSN < MAX_REAL_NUMBER)
         Star.NextSNEnergy = SN_ENERGY;
-#endif
-
-      return Star;
-    }
-  else 
-    {
-      Star.Stage = STAR_SN;
-
-      if(m_val < LOWEST_MASS_SN)
-        return Star;
-
-#ifdef SUPERNOVAE
-      Star_Interpolate SN_Feedback = SN_interpolate_metallicity(z_val, m_val);
-      Star.SN_MassLoss = SN_Feedback.SN_MassLoss;
-#ifdef METALS
-      Star.SN_MetalsLoss = SN_Feedback.SN_MetalsLoss;
-#endif
-      Star.SN_EnergyInject = SN_Feedback.SN_EnergyInject;
 #endif
 
       return Star;

@@ -34,9 +34,6 @@ static int feedback_compare(const void *a, const void *b)
   const Mechanical_Feedback_Data *da = a;
   const Mechanical_Feedback_Data *db = b;
 
-  if(da->HostTask < db->HostTask) return -1;
-  if(da->HostTask > db->HostTask) return 1;
-
   if(da->HostIndex < db->HostIndex) return -1;
   if(da->HostIndex > db->HostIndex) return 1;
 
