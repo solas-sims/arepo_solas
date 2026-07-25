@@ -404,6 +404,12 @@ $(error STAR_PARTICLES requires USE_SFR or STAR_FEEDBACK_ACTIVE)
 endif
 endif
 
+ifneq (,$(filter STAR_HOST_REFINEMENT,$(CONFIGVARS)))
+ifeq (,$(filter STAR_FEEDBACK_ACTIVE,$(CONFIGVARS)))
+$(error STAR_HOST_REFINEMENT requires STAR_FEEDBACK_ACTIVE)
+endif
+endif
+
 ifneq (,$(filter STAR_RADIATION_ACTIVE,$(CONFIGVARS)))
 ifeq ($(strip $(findstring GRACKLE_CHEMISTRY 2,$(CONFIGVARS))$(findstring GRACKLE_CHEMISTRY 3,$(CONFIGVARS))),)
 $(error STAR_RADIATION_ACTIVE requires GRACKLE_CHEMISTRY >= 2)
