@@ -296,6 +296,9 @@ void star_density(void)
 
   for(i = 0; i < NumStars; i++)
     {
+      if(SP[i].WithFeedback == 0)
+        continue;
+
       SP[i].DensityFlag = 1;
       
       if(SP[i].Hsml <= 0)
@@ -358,11 +361,24 @@ void star_density(void)
 
   /* Re-activate all stars */
   for(i = 0; i < NumStars; i++)
-    SP[i].DensityFlag = 1;
+    {
+      if(SP[i].WithFeedback == 0)
+        continue;
+
+      SP[i].DensityFlag = 1;
+    }
 
   pass++;
 
   generic_comm_pattern(TimeBinsStar.NActiveParticles, kernel_local, kernel_imported);
+
+  /* Clean up */
+  for(idx = 0; idx < TimeBinsStar.NActiveParticles; idx++)
+    {
+      i = TimeBinsStar.ActiveParticleList[idx];
+
+      memset(&SP[i].MechanicalFeedback, 0, sizeof(Mechanical_Feedback));
+    }
 
   /* Sort the hosts list */
   mysort(MechanicalFeedbackEvents.MechanicalFeedbackData, MechanicalFeedbackEvents.NumEvents, 
@@ -371,7 +387,11 @@ void star_density(void)
   /* Find the total number of events */
   sumup_large_ints(1, &MechanicalFeedbackEvents.NumEvents, &MechanicalFeedbackEvents.TotEvents);
 
-  myfree(StarHostDistance); myfree(StarHostTask); myfree(StarHostIndex); myfree(StarNgbs);
+  /* Free arrays */
+  myfree(StarHostDistance); 
+  myfree(StarHostTask); 
+  myfree(StarHostIndex); 
+  myfree(StarNgbs);
   
   /* Collect timing information */
   TIMER_STOP(CPU_STARS_DENSITY);

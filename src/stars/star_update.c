@@ -202,6 +202,24 @@ void star_update_list_of_active_particles(void)
   sumup_large_ints(1, &TimeBinsStar.NActiveParticles, &TimeBinsStar.GlobalNActiveParticles);
 }
 
+static inline void deactivate_star(int i)
+{
+#if defined(TREE_BASED_TIMESTEPS) && defined(SUPERNOVAE)
+  SP[i].TimeToSN = MAX_REAL_NUMBER;
+  SP[i].NextSNEnergy = 0.0;
+#endif
+  
+  SP[i].Active = STAR_INACTIVE; 
+  SP[i].WithFeedback = 0; 
+  
+  SP[i].Hsml = 0.0;
+  SP[i].DensityFlag = -1;
+  SP[i].NgbsMass = 0.0;
+  SP[i].NgbsVolume = 0.0;
+  SP[i].HostHydroBin = TIMEBINS;
+  SP[i].TimeBinStar = TIMEBINS;
+}
+
 /* Compute feedback properties of active stars */
 void star_prep(void)
 {
@@ -248,8 +266,7 @@ void star_prep(void)
       /* Deactivate dead or low mass stars */
       if(StarFeedback.State == -1)
         {
-          SP[i].Active = STAR_INACTIVE;
-          SP[i].WithFeedback = 0;
+          deactivate_star(i);
           continue;
         }
 
