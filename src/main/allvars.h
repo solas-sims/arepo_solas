@@ -1393,7 +1393,7 @@ double InitMetallicityinSolar;
 #endif
 
 #if defined(TREE_BASED_TIMESTEPS) && defined(SUPERNOVAE)
-  double All.SNLeadTime;
+  double SNLeadTime;
 #endif
 
 #ifdef STAR_FEEDBACK_ACTIVE
