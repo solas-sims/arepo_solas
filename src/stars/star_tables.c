@@ -215,7 +215,7 @@ void load_star_tables(const char *filename)
           if(m > 0 && M_VALUES[m] <= M_VALUES[m - 1])
             terminate("M_VALUES not strictly increasing at m=%d", m);
           if(M_VALUES[m] <= 0.0)
-            terminate("M_VALUES[%d] = %g; table must not contain M <= 0", m, M_VALUES[z]);
+            terminate("M_VALUES[%d] = %g; table must not contain M <= 0", m, M_VALUES[m]);
           logM_VALUES[m] = log10(M_VALUES[m]);
         }
 
