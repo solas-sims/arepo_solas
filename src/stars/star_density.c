@@ -73,8 +73,8 @@ typedef struct
   struct Data Data;
 
 #if defined(TREE_BASED_TIMESTEPS) && defined(SUPERNOVAE)
-  MyDouble TimeSN_yr;
-  MyDouble PhysicalAge_yr;
+  MyDouble TimeToSN;
+  MyDouble NextSNEnergy;
 #endif  
 
   Mechanical_Feedback MechanicalFeedback;
@@ -115,8 +115,8 @@ static void particle2in(data_in *in, int i, int firstnode)
     }
 
 #if defined(TREE_BASED_TIMESTEPS) && defined(SUPERNOVAE)
-  in->TimeSN_yr = SP[i].TimeSN_yr;
-  in->PhysicalAge_yr = SP[i].PhysicalAge_yr;
+  in->TimeToSN = SP[i].TimeToSN;
+  in->NextSNEnergy = SP[i].NextSNEnergy;
 #endif  
 
   in->MechanicalFeedback = SP[i].MechanicalFeedback;
@@ -526,20 +526,21 @@ static int star_density_evaluate2(int target, int mode, int threadid)
               hosthydrobin = P[i].TimeBinHydro;
 
 #if defined(TREE_BASED_TIMESTEPS) && defined(SUPERNOVAE)
-              MyDouble time_sn_yr = target_data->TimeSN_yr;
-              MyDouble physical_age_yr = target_data->PhysicalAge_yr;
+              /* Limit timestep to resolve the SN */
+              MyDouble time_to_sn = target_data->TimeToSN;
+              MyDouble next_sn_energy = target_data->NextSNEnergy;
+
+              MyDouble sn_lead_time = All.SNLeadTime / All.UnitTime_in_Megayears;
           
-              if(time_sn_yr < MAX_REAL_NUMBER)
+              if(time_to_sn < sn_lead_time)
                 {
-                  double E_inject_code = SN_ENERGY / 
-                  (All.cf_UnitMass_in_g * All.cf_UnitVelocity_in_cm_per_s * All.cf_UnitVelocity_in_cm_per_s);
+                  /* Boost signal speed leading up to an event */
+                  double E_inject_code = next_sn_energy;
+                 
+                  double f = 1.0 - time_to_sn / sn_lead_time;
+                  f = fmin(fmax(f, 0.0), 1.0);
 
-                  double unew = SphP[i].Utherm + E_inject_code / P[i].Mass;
-
-                  double t_frac = physical_age_yr / time_sn_yr;
-                  t_frac = fmin(fmax(t_frac, 0.0), 1.0);
-
-                  double Csn = SphP[i].Csnd + (sqrt(GAMMA * GAMMA_MINUS1 * unew) - SphP[i].Csnd) * t_frac;
+                  double Csn = sqrt(GAMMA * GAMMA_MINUS1 * E_inject_code / P[i].Mass) * f;
           
                   if(Csn > SphP[i].Csn)
                     SphP[i].Csn = Csn;

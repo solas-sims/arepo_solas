@@ -599,6 +599,12 @@ void read_parameter_file(char *fname)
       id[nt++] = INT;
 #endif
 
+#if defined(TREE_BASED_TIMESTEPS) && defined(SUPERNOVAE)
+      strcpy(tag[nt], "SNLeadTime");
+      addr[nt] = &All.SNLeadTime;
+      id[nt++] = REAL;
+#endif
+
 #ifdef STAR_FEEDBACK_ACTIVE
       strcpy(tag[nt], "StarTablesFile");
       addr[nt] = &All.StarTablesFile;

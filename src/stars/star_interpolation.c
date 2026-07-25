@@ -13,7 +13,7 @@ static inline double star_lifetime(int z_idx, double m_val);
 static double lifetime(double z_val, double m_val);
 
 #if defined(TREE_BASED_TIMESTEPS) && defined(SUPERNOVAE)
-static double next_SN_time(double tau, double z_val, double m_val);
+static double next_SN_time(double tau, double z_val, double m_val, double a);
 #endif
 
 #if defined(WINDS) || defined(STAR_RADIATION_ACTIVE)
@@ -102,13 +102,13 @@ static double lifetime(double z_val, double m_val)
 }
 
 #if defined(TREE_BASED_TIMESTEPS) && defined(SUPERNOVAE)
-static double next_SN_time(double tau, double z_val, double m_val)
+static double next_SN_time(double tau, double z_val, double m_val, double a)
 { 
   Star_Interpolate SN_Feedback = SN_interpolate_metallicity(z_val, m_val);
       
   /* Real SN */
   if(SN_Feedback.SN_MassLoss > 0.0)
-    return tau;
+    return tau - a;
 
   /* Failed SN or direct-collapse BH */
   return MAX_REAL_NUMBER;   
@@ -441,7 +441,8 @@ Star_Feedback star_feedback_compute(double dt, double z_val, double m_val, doubl
   Star.State = -1;
 
 #if defined(TREE_BASED_TIMESTEPS) && defined(SUPERNOVAE)
-  Star.TimeSN = MAX_REAL_NUMBER;
+  Star.TimeToSN = MAX_REAL_NUMBER;
+  Star.NextSNEnergy = 0.0;
 #endif
 
   if(m_val <= LOWEST_MASS_FEEDBACK)
@@ -490,7 +491,10 @@ Star_Feedback star_feedback_compute(double dt, double z_val, double m_val, doubl
         return Star;
 
 #if defined(TREE_BASED_TIMESTEPS) && defined(SUPERNOVAE)
-      Star.TimeSN = next_SN_time(tau, z_val, m_val);
+      Star.TimeToSN = next_SN_time(tau, z_val, m_val, a);
+      
+      if(Star.TimeToSN < MAX_REAL_NUMBER)
+        Star.NextSNEnergy = SN_ENERGY;
 #endif
 
       return Star;
@@ -517,6 +521,15 @@ Star_Feedback star_feedback_compute(double dt, double z_val, double m_val, doubl
 
 Star_Feedback units_for_feedback(Star_Feedback StarFeedback)
 {
+
+#if defined(TREE_BASED_TIMESTEPS) && defined(SUPERNOVAE)
+  if(StarFeedback.TimeToSN < MAX_REAL_NUMBER)
+    {
+      StarFeedback.TimeToSN /= All.cf_UnitTime_in_yr;
+      StarFeedback.NextSNEnergy /= All.cf_UnitEnergy_in_cgs;
+    }
+#endif
+
 #ifdef WINDS
   StarFeedback.MassLoss /= All.cf_UnitMass_in_Msun;
 #ifdef METALS
@@ -551,7 +564,8 @@ Star_Feedback star_particle_feedback(int index, double dt, double z, double a)
   StarParticle.State = -1;
 
 #if defined(TREE_BASED_TIMESTEPS) && defined(SUPERNOVAE)
-  StarParticle.TimeSN = MAX_REAL_NUMBER; 
+  StarParticle.TimeToSN = MAX_REAL_NUMBER;
+  StarParticle.NextSNEnergy = 0.0; 
 #endif
 
   /* Add feedback contributions for each bin */ 
@@ -572,8 +586,11 @@ Star_Feedback star_particle_feedback(int index, double dt, double z, double a)
       StarParticle.State = 1;
 
 #if defined(TREE_BASED_TIMESTEPS) && defined(SUPERNOVAE)
-      if(Star.TimeSN < StarParticle.TimeSN)
-      StarParticle.TimeSN = Star.TimeSN;
+      if(Star.TimeToSN < StarParticle.TimeToSN)
+        {
+          StarParticle.TimeToSN = Star.TimeToSN;
+          StarParticle.NextSNEnergy = Nstars * Star.NextSNEnergy;
+        }
 #endif
 
       switch(Star.Stage)

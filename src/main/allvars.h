@@ -1392,11 +1392,14 @@ double InitMetallicityinSolar;
   int IMF;
 #endif
 
+#if defined(TREE_BASED_TIMESTEPS) && defined(SUPERNOVAE)
+  double All.SNLeadTime;
+#endif
+
 #ifdef STAR_FEEDBACK_ACTIVE
   double StarFeedbackLocal[6];
   double StarFeedbackGlobal[6];
   
-  /* For parameter file */
   char StarTablesFile[MAXLEN_PATH];
 #endif 
 

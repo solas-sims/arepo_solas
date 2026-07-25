@@ -66,7 +66,8 @@ typedef struct Star_Interpolate
 typedef struct Star_Feedback
 {
 #if defined(TREE_BASED_TIMESTEPS) && defined(SUPERNOVAE)
-  double TimeSN;
+  MyDouble TimeToSN;
+  MyDouble NextSNEnergy;
 #endif
 
   /* 
@@ -168,7 +169,8 @@ typedef struct Star_Particle_Data
 #endif
 
 #if defined(TREE_BASED_TIMESTEPS) && defined(SUPERNOVAE)
-  MyDouble TimeSN_yr;
+  MyDouble TimeToSN;
+  MyDouble NextSNEnergy;
 #endif
 
 #ifdef STAR_FEEDBACK_ACTIVE
@@ -179,13 +181,15 @@ typedef struct Star_Particle_Data
   int Active; 
   /* Per timestep-> 0: no feedback, 1: feedback (of any type) */
   int WithFeedback; 
+  
   MyDouble Hsml;
+  int DensityFlag;
   MyDouble NgbsMass;
   MyDouble NgbsVolume;
   int HostHydroBin;
-  int DensityFlag;
   signed char TimeBinStar;
-  MyDouble PhysicalAge_yr;
+  
+  MyDouble Age;
   Mechanical_Feedback MechanicalFeedback;
 #endif
 } Star_Particle_Data;

@@ -213,17 +213,22 @@ void star_prep(void)
     {
       i = TimeBinsStar.ActiveParticleList[idx];
 
-      /* Put star on the main sequence */
+      /* Put newly formed stars on the main sequence */
       if(SP[i].Active == STAR_UNBORN)
         {
-          SP[i].Active = STAR_ACTIVE;
-          SP[i].PhysicalAge_yr = 0.0;
           SP[i].MassOfStar = PPS(i).Mass;
+          SP[i].Active = STAR_ACTIVE;
+          SP[i].Age = 0.0;
         }
       
-      MyDouble star_timestep = (SP[i].TimeBinStar ? (((integertime)1) << SP[i].TimeBinStar) : 0) * All.Timebase_interval * All.cf_UnitTime_in_yr;
+      /* Advance age */
+      MyDouble star_timestep = (SP[i].TimeBinStar ? (((integertime)1) << SP[i].TimeBinStar) : 0) * All.Timebase_interval;
+      SP[i].Age += star_timestep;
 
-      MyDouble star_mass = SP[i].MassOfStar * All.cf_UnitMass_in_Msun;
+      /* Convert properties to yr and msun */
+      MyDouble star_mass_msun = SP[i].MassOfStar * All.cf_UnitMass_in_Msun;
+      MyDouble star_timestep_yr = star_timestep * All.cf_UnitTime_in_yr;
+      MyDouble star_age_yr = SP[i].Age * All.cf_UnitTime_in_yr; 
 
 #ifdef METALS 
       MyDouble star_metallicity = SP[i].Metallicity;
@@ -231,17 +236,16 @@ void star_prep(void)
       MyDouble star_metallicity = 0;
 #endif
 
-      SP[i].PhysicalAge_yr += star_timestep;
-
       Star_Feedback StarFeedback;
 
+      /* Call the interpolation functions */
 #if defined(STAR_PARTICLES) && STAR_PARTICLES < 2
-      StarFeedback = units_for_feedback(star_particle_feedback(i, star_timestep, star_metallicity, SP[i].PhysicalAge_yr));
+      StarFeedback = units_for_feedback(star_particle_feedback(i, star_timestep_yr, star_metallicity, star_age_yr));
 #elif STAR_PARTICLES == 2     
-      StarFeedback = units_for_feedback(star_feedback_compute(star_timestep, star_metallicity, star_mass, SP[i].PhysicalAge_yr));
+      StarFeedback = units_for_feedback(star_feedback_compute(star_timestep_yr, star_metallicity, star_mass_msun, star_age_yr));
 #endif
 
-      /* Give no feedback to inactive stars */
+      /* Deactivate dead or low mass stars */
       if(StarFeedback.State == -1)
         {
           SP[i].Active = STAR_INACTIVE;
@@ -249,9 +253,10 @@ void star_prep(void)
           continue;
         }
 
-
+      /* Assign stellar feedback variables */  
 #if defined(TREE_BASED_TIMESTEPS) && defined(SUPERNOVAE)
-      SP[i].TimeSN_yr = StarFeedback.TimeSN;
+      SP[i].TimeToSN = StarFeedback.TimeToSN;
+      SP[i].NextSNEnergy = StarFeedback.NextSNEnergy;
 #endif
 
 #if defined(WINDS) || defined(SUPERNOVAE)
@@ -286,6 +291,8 @@ void star_prep(void)
       SP[i].MechanicalFeedback.SN_EnergyInject = StarFeedback.SN_EnergyInject;
 #endif
 
+      /* Determine if star provides feedback */
+      /* If with_feedback == 0 the star is skipped in the feedback functions */
       int with_feedback = 0;
 
 #ifdef WINDS 
