@@ -21,6 +21,10 @@ extern double ***Temperature;
 
 #ifdef WINDS
 extern double ***MassLossRate;
+#if GRACKLE_CHEMISTRY >= 1
+extern double ***HLossRate;
+extern double ***HeLossRate;
+#endif
 #ifdef METALS
 extern double ***MetalsLossRate;
 #endif
@@ -33,6 +37,10 @@ extern WavebandData ***Flux[WAVEBANDS];
 
 #ifdef SUPERNOVAE
 extern double **SN_MassLoss; 
+#if GRACKLE_CHEMISTRY >= 1
+extern double **SN_HLoss; 
+extern double **SN_HeLoss; 
+#endif
 #ifdef METALS
 extern double **SN_MetalsLoss; 
 #endif 
