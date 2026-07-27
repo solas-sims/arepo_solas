@@ -44,6 +44,10 @@ typedef struct Star_Interpolate
 
 #ifdef WINDS
   MyDouble MassLossRate;
+#if GRACKLE_CHEMISTRY >= 1
+  MyDouble HLossRate;
+  MyDouble HeLossRate;
+#endif
 #ifdef METALS
   MyDouble MetalsLossRate;
 #endif
@@ -56,6 +60,10 @@ typedef struct Star_Interpolate
 
 #ifdef SUPERNOVAE
   MyDouble SN_MassLoss;
+#if GRACKLE_CHEMISTRY >= 1
+  MyDouble SN_HLoss;
+  MyDouble SN_HeLoss;
+#endif
 #ifdef METALS
   MyDouble SN_MetalsLoss;
 #endif
@@ -80,6 +88,10 @@ typedef struct Star_Feedback
 
 #ifdef WINDS
   MyDouble MassLoss;
+#if GRACKLE_CHEMISTRY >= 1
+  MyDouble HLoss;
+  MyDouble HeLoss;
+#endif
 #ifdef METALS
   MyDouble MetalsLoss;
 #endif
@@ -92,6 +104,10 @@ typedef struct Star_Feedback
 
 #ifdef SUPERNOVAE
   MyDouble SN_MassLoss;
+#if GRACKLE_CHEMISTRY >= 1
+  MyDouble SN_HLoss;
+  MyDouble SN_HeLoss;
+#endif
 #ifdef METALS
   MyDouble SN_MetalsLoss;
 #endif
@@ -106,6 +122,10 @@ typedef struct Mechanical_Feedback
 
 #ifdef WINDS 
   MyDouble MassLoss;
+#if GRACKLE_CHEMISTRY >= 1
+  MyDouble HLoss;
+  MyDouble HeLoss;
+#endif
 #ifdef METALS
   MyDouble MetalsLoss;
 #endif
@@ -118,6 +138,10 @@ typedef struct Mechanical_Feedback
 
 #ifdef SUPERNOVAE
   MyDouble SN_MassLoss;
+#if GRACKLE_CHEMISTRY >= 1
+  MyDouble SN_HLoss;
+  MyDouble SN_HeLoss;
+#endif
 #ifdef METALS
   MyDouble SN_MetalsLoss;
 #endif

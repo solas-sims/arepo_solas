@@ -286,6 +286,10 @@ void star_prep(void)
 
 #ifdef WINDS
       SP[i].MechanicalFeedback.MassLoss = StarFeedback.MassLoss;
+#if GRACKLE_CHEMISTRY >= 1
+      SP[i].MechanicalFeedback.HLoss = StarFeedback.HLoss;
+      SP[i].MechanicalFeedback.HeLoss = StarFeedback.HeLoss;
+#endif
 #ifdef METALS
       SP[i].MechanicalFeedback.MetalsLoss = StarFeedback.MetalsLoss;
 #endif
@@ -302,6 +306,10 @@ void star_prep(void)
 
 #ifdef SUPERNOVAE
       SP[i].MechanicalFeedback.SN_MassLoss = StarFeedback.SN_MassLoss;
+#if GRACKLE_CHEMISTRY >= 1
+      SP[i].MechanicalFeedback.SN_HLoss = StarFeedback.SN_HLoss;
+      SP[i].MechanicalFeedback.SN_HeLoss = StarFeedback.SN_HeLoss;
+#endif
 #ifdef METALS
       SP[i].MechanicalFeedback.SN_MetalsLoss = StarFeedback.SN_MetalsLoss;
 #endif
