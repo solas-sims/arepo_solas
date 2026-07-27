@@ -22,6 +22,9 @@ struct Feedback_Kick
 
 #ifdef WINDS
   MyDouble DeltaMass;
+#if GRACKLE_CHEMISTRY >= 1
+  MyDouble DeltaChem[GRACKLE_SPECIES_NUMBER];
+#endif
 #ifdef METALS
   MyDouble DeltaMetals;
 #endif
@@ -31,6 +34,9 @@ struct Feedback_Kick
 
 #ifdef SUPERNOVAE
   MyDouble SN_DeltaMass;
+#if GRACKLE_CHEMISTRY >= 1
+  MyDouble SN_DeltaChem[GRACKLE_SPECIES_NUMBER];
+#endif
 #ifdef METALS
   MyDouble SN_DeltaMetals;
 #endif
@@ -45,6 +51,10 @@ static void apply_kick(int j, const struct Feedback_Kick *Kick)
 #ifdef WINDS
   SphP[j].StarMassFeed += Kick->DeltaMass;
   All.StarFeedbackLocal[0] += Kick->DeltaMass;
+#if GRACKLE_CHEMISTRY >= 1
+  for(int k = 0; k < GRACKLE_SPECIES_NUMBER; k++)
+    SphP[j].StarChemFeed[k] += Kick->DeltaChem[k];
+#endif
 #ifdef METALS
   SphP[j].StarMetalsFeed += Kick->DeltaMetals;
   All.StarFeedbackLocal[1] += Kick->DeltaMetals;
@@ -59,6 +69,10 @@ static void apply_kick(int j, const struct Feedback_Kick *Kick)
 #ifdef SUPERNOVAE
   SphP[j].StarMassFeed += Kick->SN_DeltaMass;
   All.StarFeedbackLocal[0] += Kick->SN_DeltaMass;
+#if GRACKLE_CHEMISTRY >= 1
+  for(int k = 0; k < GRACKLE_SPECIES_NUMBER; k++)
+    SphP[j].StarChemFeed[k] += Kick->SN_DeltaChem[k];
+#endif
 #ifdef METALS
   SphP[j].StarMetalsFeed += Kick->SN_DeltaMetals;
   All.StarFeedbackLocal[1] += Kick->SN_DeltaMetals;
@@ -234,6 +248,10 @@ static void SN_feedback_host(int i, int ev, int h, int mode)
   Kick.CellIndex = i;
 
   Kick.SN_DeltaMass = m_ej;
+#if GRACKLE_CHEMISTRY >= 1
+  Kick.SN_DeltaChem[CHEM_HII] = MechanicalFeedback->SN_HLoss;
+  Kick.SN_DeltaChem[CHEM_HeIII] = MechanicalFeedback->SN_HeLoss;
+#endif
 #ifdef METALS
   Kick.SN_DeltaMetals = MechanicalFeedback->SN_MetalsLoss;
 #endif
@@ -539,6 +557,12 @@ void star_feedback(void)
           double dm_h = fmin(shell_sweep_frac * m_h, m_h - 0.1 * P[i].Mass); 
           dm_h = fmax(dm_h, 0.0);  
 
+#if GRACKLE_CHEMISTRY >= 1
+          double dmChem_h[GRACKLE_SPECIES_NUMBER];
+            for(int s = 0; s < GRACKLE_SPECIES_NUMBER; s++)
+              dmChem_h[s] = dm_h * (SphP[i].GrackleSpeciesConserved(GRACKLE_SPECIES_INDEX + s) + SphP[i].StarChemFeed[s]) / m_h;
+#endif
+
 #ifdef METALS
           double dmZ_h = dm_h * (SphP[i].GasMetals + SphP[i].StarMetalsFeed) / m_h;
 #endif
@@ -614,9 +638,9 @@ void star_feedback(void)
                   /* Pre-kick momentum: neighbour + advected ejecta (at v_star) + advected swept host (at v_host) */
                   double ptilde[3];
                   for(k = 0; k < 3; k++)
-                    ptilde[k] = mj * vj[k] + sqrtsq_wbar * (m_ej * MechanicalFeedback->StarVelocity[k] + dm_h * v_h[k]);
+                    ptilde[k] = mj * vj[k] + (m_ej * MechanicalFeedback->StarVelocity[k] + dm_h * v_h[k]) * sqrtsq_wbar;
 
-                  double mfj = mj + sqrtsq_wbar * m_feed;
+                  double mfj = mj + m_feed * sqrtsq_wbar;
                   double sq_ptilde = ptilde[0]*ptilde[0] + ptilde[1]*ptilde[1] + ptilde[2]*ptilde[2];
                   double bw_dot_pt = wbar[0]*ptilde[0] + wbar[1]*ptilde[1] + wbar[2]*ptilde[2];
 
@@ -626,7 +650,7 @@ void star_feedback(void)
 
                   /* Kinetic energy dissipated in the inelastic merge of the
                    * (neighbour, ejecta, host) streams; thermalised in place. */
-                  double ke_streams = 0.5 * mj * sq_vj + 0.5 * sqrtsq_wbar * m_ej * sq_vstar + 0.5 * sqrtsq_wbar * dm_h * sq_vh;
+                  double ke_streams = 0.5 * mj * sq_vj + 0.5 * m_ej * sqrtsq_wbar * sq_vstar + 0.5 * dm_h * sqrtsq_wbar * sq_vh;
 
                   double D = ke_streams - 0.5 * sq_ptilde / mfj;
                   
@@ -691,6 +715,10 @@ void star_feedback(void)
               if(flag_wind && !flag_wind_host)
                 {
                   Kick.DeltaMass = MechanicalFeedback->MassLoss * sqrtsq_wbar;
+#if GRACKLE_CHEMISTRY >= 1
+                  Kick.DeltaChem[CHEM_HI] = MechanicalFeedback->HLoss * sqrtsq_wbar;
+                  Kick.DeltaChem[CHEM_HeI] = MechanicalFeedback->HeLoss * sqrtsq_wbar;
+#endif
 #ifdef METALS
                   Kick.DeltaMetals = MechanicalFeedback->MetalsLoss * sqrtsq_wbar;
 #endif    
@@ -712,14 +740,20 @@ void star_feedback(void)
               if(flag_sn && !flag_sn_host)
                 {
                   /* Advected mass = ejecta + swept host, shared by |wbar| */
-                  Kick.SN_DeltaMass = sqrtsq_wbar * m_feed;
+                  Kick.SN_DeltaMass = m_feed * sqrtsq_wbar;
+#if GRACKLE_CHEMISTRY >= 1
+                  for(int s = 0; s < GRACKLE_SPECIES_NUMBER; s++)
+                    Kick.SN_DeltaChem[s] = dmChem_h[s] * sqrtsq_wbar;
+                  Kick.SN_DeltaChem[CHEM_HII] += MechanicalFeedback->SN_HLoss * sqrtsq_wbar;
+                  Kick.SN_DeltaChem[CHEM_HeIII] += MechanicalFeedback->SN_HeLoss * sqrtsq_wbar;
+#endif 
 #ifdef METALS
-                  Kick.SN_DeltaMetals = sqrtsq_wbar * (MechanicalFeedback->SN_MetalsLoss + dmZ_h);
+                  Kick.SN_DeltaMetals = (MechanicalFeedback->SN_MetalsLoss + dmZ_h) * sqrtsq_wbar ;
 #endif
                   /* Momentum = advected (ejecta @ v_star + host @ v_host)
                    * + directed energy-conserving kick p_SN * wbar.          */
                   for(k = 0; k < 3; k++)
-                    Kick.SN_DeltaP[k] = sqrtsq_wbar * (m_ej * MechanicalFeedback->StarVelocity[k] + dm_h * v_h[k])
+                    Kick.SN_DeltaP[k] = (m_ej * MechanicalFeedback->StarVelocity[k] + dm_h * v_h[k]) * sqrtsq_wbar
                     + p_SN * wbar[k];
 
                   /* Total energy = kinetic change + internal-energy gain.
@@ -734,7 +768,7 @@ void star_feedback(void)
                   double sq_pf = pf[0]*pf[0] + pf[1]*pf[1] + pf[2]*pf[2];
 
                   double DKE = sq_pf / (2.0 * SN_mfj[f]) - SN_KEj[f];
-                  double dU  = sqrtsq_wbar * (U_ej + dU_h + dU_SN_th) + SN_Dj[f];
+                  double dU = (U_ej + dU_h + dU_SN_th) * sqrtsq_wbar + SN_Dj[f];
 
                   Kick.SN_DeltaE = DKE + dU;
                 }
@@ -770,6 +804,10 @@ void star_feedback(void)
               Kick_h.CellIndex = i;
 
               Kick_h.SN_DeltaMass = -dm_h;
+#if GRACKLE_CHEMISTRY >= 1
+              for(int s = 0; s < GRACKLE_SPECIES_NUMBER; s++)
+                Kick_h.SN_DeltaChem[s] = -dmChem_h[s];
+#endif
 #ifdef METALS
               Kick_h.SN_DeltaMetals = -dmZ_h;
 #endif

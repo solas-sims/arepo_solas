@@ -514,6 +514,7 @@ typedef unsigned long long peano1D;
 #ifdef USE_GRACKLE
 #define GRACKLE_TINY 1e-20
 
+/* In SphP PASSIVE_SCALARS */
 #if GRACKLE_CHEMISTRY >= 1
 #define GRACKLE_HI    (GRACKLE_SPECIES_INDEX)
 #define GRACKLE_HII   (GRACKLE_SPECIES_INDEX + 1)
@@ -532,6 +533,27 @@ typedef unsigned long long peano1D;
 #define GRACKLE_DI    (GRACKLE_SPECIES_INDEX + 8)
 #define GRACKLE_DII   (GRACKLE_SPECIES_INDEX + 9)
 #define GRACKLE_HDI   (GRACKLE_SPECIES_INDEX + 10)
+#endif
+
+/* Other uses */
+#if GRACKLE_CHEMISTRY >= 1
+#define CHEM_HI    0
+#define CHEM_HII   1
+#define CHEM_HeI   2
+#define CHEM_HeII  3
+#define CHEM_HeIII 4
+#endif
+
+#if GRACKLE_CHEMISTRY >= 2
+#define CHEM_H2I   5
+#define CHEM_H2II  6
+#define CHEM_HM    7
+#endif
+
+#if GRACKLE_CHEMISTRY >= 3
+#define CHEM_DI    8
+#define CHEM_DII   9
+#define CHEM_HDI   10
 #endif
 #endif
 
@@ -1735,13 +1757,13 @@ extern struct sph_particle_data
 /* Feedback */
 #ifdef STAR_FEEDBACK_ACTIVE
   MyDouble StarMassFeed;
-
+#if GRACKLE_CHEMISTRY >= 1
+  MyDouble StarChemFeed[GRACKLE_SPECIES_NUMBER];
+#endif
 #ifdef METALS
   MyDouble StarMetalsFeed;
 #endif
-
   MyDouble StarMomentumFeed[3];
-
   MyDouble StarEnergyFeed;
 #endif
 
