@@ -387,11 +387,22 @@ void star_perform_end_of_step_physics(void)
       All.StarFeedbackLocal[3] += SphP[i].StarMassFeed;
       
       SphP[i].StarMassFeed = 0;
+#if GRACKLE_CHEMISTRY >= 1
+      for(int s = 0; s < GRACKLE_SPECIES_NUMBER; s++)
+        {    
+          SphP[i].GrackleSpeciesConserved(GRACKLE_SPECIES_INDEX + s) += SphP[i].StarChemFeed[s];
+          
+          sync_primitive_from_conserved(i, GRACKLE_SPECIES_INDEX + s);
+
+          SphP[i].StarChemFeed[s] = 0;
+        }
+#endif
 #ifdef METALS
       /* Add metals */
-      SphP[i].GasMetallicity = (SphP[i].GasMetals + SphP[i].StarMetalsFeed) / P[i].Mass;
-      sync_conserved_from_primitive(i, METALS_INDEX);
+      SphP[i].GasMetals += SphP[i].StarMetalsFeed;
       All.StarFeedbackLocal[4] += SphP[i].StarMetalsFeed;
+      
+      sync_primitive_from_conserved(i, METALS_INDEX);
 
       SphP[i].StarMetalsFeed = 0;
 #endif
@@ -402,6 +413,7 @@ void star_perform_end_of_step_physics(void)
       SphP[i].Momentum[0] += SphP[i].StarMomentumFeed[0];
       SphP[i].Momentum[1] += SphP[i].StarMomentumFeed[1];
       SphP[i].Momentum[2] += SphP[i].StarMomentumFeed[2];
+      
       /* Update velocities */ 
       update_primitive_variables_single(P, SphP, i, &pvd);
       
@@ -413,16 +425,16 @@ void star_perform_end_of_step_physics(void)
       SphP[i].Energy += SphP[i].StarEnergyFeed;
       All.StarFeedbackLocal[5] += SphP[i].StarEnergyFeed;
       
-      /* Set feed flags to zero */
-      SphP[i].StarEnergyFeed = 0;
-      
       /* Update internal energy */ 
       update_internal_energy(P, SphP, i, &pvd);
       /* Update pressure */
       set_pressure_of_cell_internal(P, SphP, i);
+
+      /* Set feed flags to zero */
+      SphP[i].StarEnergyFeed = 0;
     } // for(idx...
 
-    MPI_Allreduce(&All.StarFeedbackLocal, &All.StarFeedbackGlobal, 6, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+    MPI_Allreduce(All.StarFeedbackLocal, All.StarFeedbackGlobal, 6, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 
     mpi_printf("STARS: Number of stars = %lld, active stars = %lld, feedback events = %lld \n", 
     All.TotNumStars, TimeBinsStar.GlobalNActiveParticles, MechanicalFeedbackEvents.TotEvents);

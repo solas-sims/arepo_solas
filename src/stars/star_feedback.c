@@ -52,8 +52,8 @@ static void apply_kick(int j, const struct Feedback_Kick *Kick)
   SphP[j].StarMassFeed += Kick->DeltaMass;
   All.StarFeedbackLocal[0] += Kick->DeltaMass;
 #if GRACKLE_CHEMISTRY >= 1
-  for(int k = 0; k < GRACKLE_SPECIES_NUMBER; k++)
-    SphP[j].StarChemFeed[k] += Kick->DeltaChem[k];
+  for(int s = 0; s < GRACKLE_SPECIES_NUMBER; s++)
+    SphP[j].StarChemFeed[s] += Kick->DeltaChem[s];
 #endif
 #ifdef METALS
   SphP[j].StarMetalsFeed += Kick->DeltaMetals;
@@ -70,8 +70,8 @@ static void apply_kick(int j, const struct Feedback_Kick *Kick)
   SphP[j].StarMassFeed += Kick->SN_DeltaMass;
   All.StarFeedbackLocal[0] += Kick->SN_DeltaMass;
 #if GRACKLE_CHEMISTRY >= 1
-  for(int k = 0; k < GRACKLE_SPECIES_NUMBER; k++)
-    SphP[j].StarChemFeed[k] += Kick->SN_DeltaChem[k];
+  for(int s = 0; s < GRACKLE_SPECIES_NUMBER; s++)
+    SphP[j].StarChemFeed[s] += Kick->SN_DeltaChem[s];
 #endif
 #ifdef METALS
   SphP[j].StarMetalsFeed += Kick->SN_DeltaMetals;
