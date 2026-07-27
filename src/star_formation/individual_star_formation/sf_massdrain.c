@@ -91,9 +91,6 @@ static void out2particle(data_out *out, int i, int mode)
       SP[i].Metallicity += out->Metals;
 #endif
     }
-
-  if(mode == MODE_IMPORTED_PARTICLES)
-    SP[i].Metallicity /= SP[i].MassOfStar; 
 }
 
 
@@ -274,11 +271,11 @@ static int sf_massdrain_evaluate(int target, int mode, int threadid)
           cm[1] += P[i].Pos[1] * factor;
           cm[2] += P[i].Pos[2] * factor;
 
-          vm[0] += P[i].Vel[0] * factor;
-          vm[1] += P[i].Vel[1] * factor;
-          vm[2] += P[i].Vel[2] * factor;
+          vm[0] += SphP[i].Momentum[0] / P[i].Mass * factor;
+          vm[1] += SphP[i].Momentum[1] / P[i].Mass * factor;
+          vm[2] += SphP[i].Momentum[2] / P[i].Mass * factor;
 #ifdef METALS
-          metals += SphP[i].GasMetallicity * P[i].Mass * factor;
+          metals += SphP[i].GasMetals * factor;
 #endif
         }
     }
