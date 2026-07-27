@@ -783,7 +783,7 @@ static void rt_timestep(void)
       rate = fmax(rate, SphP[i].HeI_IonizationRate);
       rate = fmax(rate, SphP[i].HeII_IonizationRate);
 
-      SphP[i].RT_Timestep = (rate > 0.0) ? eps_ion / rate : 1;
+      SphP[i].RT_Timestep = (rate > 0.0) ? eps_ion / rate : All.MaxSizeTimestep / All.cf_hubble_a;
     }
 }
 #endif
