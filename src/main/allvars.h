@@ -1415,7 +1415,7 @@ double InitMetallicityinSolar;
 #endif
 
 #if defined(TREE_BASED_TIMESTEPS) && defined(SUPERNOVAE)
-  double SNLeadTime;
+  double SN_LeadTime;
 #endif
 
 #ifdef STAR_FEEDBACK_ACTIVE
@@ -1426,7 +1426,7 @@ double InitMetallicityinSolar;
 #endif 
 
 #ifdef SUPERNOVAE
-  double SNHostShellSweepFrac;
+  double SN_HostShellSweepFrac;
 #endif
 
 #ifdef STAR_RADIATION_ACTIVE

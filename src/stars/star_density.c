@@ -547,7 +547,7 @@ static int star_density_evaluate2(int target, int mode, int threadid)
               MyDouble time_to_sn = target_data->TimeToSN;
               MyDouble next_sn_energy = target_data->NextSNEnergy;
 
-              MyDouble sn_lead_time = All.SNLeadTime / All.UnitTime_in_Megayears;
+              MyDouble sn_lead_time = All.SN_LeadTime / All.UnitTime_in_Megayears;
           
               if(time_to_sn < sn_lead_time)
                 {

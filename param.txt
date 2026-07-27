@@ -18,8 +18,13 @@ TemperatureThreshold        1e6
 IMF                     1
 StarTablesFile          star_feedback_tables.hdf5
 
-%RefStarsPerCell         4 %Refine cells hosting more than this number of stars
+SN_HostShellSweepFrac    0.5
+SN_LeadTime              40
 
+%RaySplitFactor          4
+%RTIonizationTimestepFraction  0.5
+
+%RefStarsPerCell         4 %Refine cells hosting more than this number of stars
 
 %----  Arepo public
 

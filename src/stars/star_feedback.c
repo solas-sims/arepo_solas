@@ -553,7 +553,7 @@ void star_feedback(void)
               v_h[k] = (SphP[i].Momentum[k] + SphP[i].StarMomentumFeed[k]) / m_h;
             }
           
-          double shell_sweep_frac = fmin(All.SNHostShellSweepFrac, 0.9);
+          double shell_sweep_frac = fmin(All.SN_HostShellSweepFrac, 0.9);
           double dm_h = fmin(shell_sweep_frac * m_h, m_h - 0.1 * P[i].Mass); 
           dm_h = fmax(dm_h, 0.0);  
 

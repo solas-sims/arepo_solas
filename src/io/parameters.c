@@ -600,8 +600,8 @@ void read_parameter_file(char *fname)
 #endif
 
 #if defined(TREE_BASED_TIMESTEPS) && defined(SUPERNOVAE)
-      strcpy(tag[nt], "SNLeadTime");
-      addr[nt] = &All.SNLeadTime;
+      strcpy(tag[nt], "SN_LeadTime");
+      addr[nt] = &All.SN_LeadTime;
       id[nt++] = REAL;
 #endif
 
@@ -612,8 +612,8 @@ void read_parameter_file(char *fname)
 #endif
 
 #ifdef SUPERNOVAE
-      strcpy(tag[nt], "SNHostShellSweepFrac");
-      addr[nt] = &All.SNHostShellSweepFrac;
+      strcpy(tag[nt], "SN_HostShellSweepFrac");
+      addr[nt] = &All.SN_HostShellSweepFrac;
       id[nt++] = REAL;
 #endif
 
