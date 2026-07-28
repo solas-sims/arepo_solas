@@ -13,8 +13,10 @@ REGULARIZE_MESH_FACE_ANGLE              # Use maximum face angle as roundness cr
 #--------------------------------------- Refinement and derefinement
 REFINEMENT_SPLIT_CELLS 			 # Refinement
 REFINEMENT_MERGE_CELLS                   # Derefinement
+REFINEMENT_VOLUME_LIMIT
 
 #--------------------------------------- Time integration options
+
 TREE_BASED_TIMESTEPS 			 # non-local timestep criterion (take 'signal speed' into account)
 
 #------------------------------------------------ TreePM Options
@@ -63,19 +65,22 @@ DEBUG # enables core-dumps
 
 #--------------------------------------- non-standard phyiscs
 #ENFORCE_JEANS_STABILITY_OF_CELLS # this imposes an adaptive floor for the temperature
-#COOLING                          # Simple primordial cooling
-#USE_GRACKLE			 # Use Grackle library for cooling
-#GRACKLE_CHEMISTRY=0
+COOLING                          # Simple primordial cooling
+USE_GRACKLE			 # Use Grackle library for cooling
+GRACKLE_CHEMISTRY=3
 #NOUVBACKGROUND			 # Switches off UV background
-#USE_SFR                          # Activate star formation
+USE_SFR                          # Activate star formation
 #EEOS_SF			 # AGORA star formation scheme
 #JEANS_SF
 #JEANS_MASS_BASED
+AGORA_SF
 #USE_CELIB
-#STARS
-#SUPERNOVAE
+STARS
+STAR_PARTICLES=0
+WINDS
+SUPERNOVAE
 #PASSIVE_SCALARS=1
-#METALS
+METALS
 
 #REFINEMENT_AROUND_BH
 #BLACKHOLES
@@ -88,3 +93,5 @@ BH_SEED_ON_MASS                 # seed once halo mass exceeds MinHaloMassForFOFS
                                  # requires METALS above to be enabled. Channels OR together if more than one is active, and a halo
                                  # already hosting a black hole (Type 5) is never reseeded regardless of channel.
 #OUTPUT_EVERY_STEP
+
+OVERRIDE_PEANOGRID_WARNING

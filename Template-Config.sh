@@ -35,6 +35,8 @@
 
 #WINDS                  # Only winds
 
+#AGB                    # AGB star treatment 
+
 #RADIATION              # Full radiation
 #RADIATION_PRESSURE     # Only radiation pressure
 #PHOTOELECTRIC_HEATING  # Only photoelectric
