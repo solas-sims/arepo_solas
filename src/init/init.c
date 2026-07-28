@@ -49,9 +49,13 @@
 #include "../domain/domain.h"
 #include "../mesh/voronoi/voronoi.h"
 
+#ifdef HALO_SEEDING
 #include "../fof/fof_seeding.h"
+#endif
 
+#ifdef USE_CELIB
 #include "../../celib/src/config.h"
+#endif
 
 /*! \brief Prepares the loaded initial conditions for the run.
  *

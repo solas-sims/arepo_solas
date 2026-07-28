@@ -15,6 +15,12 @@ endif
 include config-makefile
 -include Makefile.systype
 
+# Normalize SYSTYPE: Makefile.systype conventionally sets it quoted
+# (SYSTYPE="MACOSX"), but the platform blocks below match on the bare
+# word (via $(filter ...)). Strip any quote characters here so both
+# quoted and unquoted values from Makefile.systype work.
+SYSTYPE := $(strip $(subst ",,$(SYSTYPE)))
+
 $(info Build configuration:)
 $(info SYSTYPE: $(SYSTYPE))
 $(info CONFIG: $(CONFIG))
@@ -63,7 +69,7 @@ ifeq (USE_GRACKLE,$(findstring USE_GRACKLE,$(CONFIGVARS)))
 OPTIONS += -DCONFIG_BFLOAT_8
 GRACKLE_INCL = -I$(HOME)/Codes/grackle/include
 GRACKLE_LIB = -L$(HOME)/Codes/grackle/lib -lgrackle -Wl,-rpath,$(HOME)/Codes/grackle/lib
-ifeq ($(SYSTYPE),"MACOSX")
+ifeq ($(SYSTYPE),MACOSX)
 LDFLAGS += -L$(shell BREW --prefix gcc)/lib/gcc/current -lgfortran -lquadmath
 else
 LDFLAGS += -lgfortran -lquadmath
@@ -117,10 +123,10 @@ HDF5_LIB  = -L$(shell $(BREW) --prefix hdf5)/lib
 HWLOC_INCL= -I$(shell $(BREW) --prefix hwloc)/include
 HWLOC_LIB = -L$(shell $(BREW) --prefix hwloc)/lib -lhwloc
 endif
-# end of Darwin
+# end of MACOSX
 
 #Linux
-ifeq ($(filter LINUX,$(SYSTYPE)),"LINUX")
+ifeq ($(filter LINUX,$(SYSTYPE)),LINUX)
 # compiler and its optimization options
 CC        = mpicc
 OPTIMIZE  = -std=c11 -ggdb -g -O0 -fno-omit-frame-pointer -Wall -Wno-format-security -Wno-unknown-pragmas -Wno-unused-function
@@ -141,7 +147,7 @@ endif
 # end of Linux
 
 #Ngarrgu Tindebeek
-ifeq ($(filter NT,$(SYSTYPE)),"NT")
+ifeq ($(filter NT,$(SYSTYPE)),NT)
 # compiler and its optimization options
 CC        =  mpicc
 OPTIMIZE  =  -std=c11 -ggdb -O3 -Wall -Wno-format-security -Wno-unknown-pragmas -Wno-unused-function
