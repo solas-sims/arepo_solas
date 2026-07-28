@@ -24,6 +24,8 @@ TIMESTEP_H
 VERSION_H
 _QD_DD_H
 _SYS_TREE_H_
+HALO_SEED_REGISTRY_H
+__cplusplus
 
 # defined in code internally
 BINS_PS

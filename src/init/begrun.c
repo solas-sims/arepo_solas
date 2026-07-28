@@ -252,15 +252,16 @@ void begrun2(void)
       All.Ti_nextoutput = find_next_outputtime(All.Ti_Current);
   }
 
+#ifdef HALO_SEEDING
+  if(RestartFlag != 1) /* when restarting from restart files, All.NextTimeOfHaloFinding is restored from them */
+    All.NextTimeOfHaloFinding = All.TimeOfFirstHaloFinding;
+#endif /* #ifdef HALO_SEEDING */
+
   All.TimeLastRestartFile = CPUThisRun;
 
 #ifdef REDUCE_FLUSH
   All.FlushLast = CPUThisRun;
 #endif /* #ifdef REDUCE_FLUSH */
-
-#ifdef FIND_HALOS
-  All.NextTimeOfHaloFinding=All.TimeOfFirstHaloFinding;
-#endif
 
 #if defined(FORCETEST) && defined(FORCETEST_TESTFORCELAW)
   gravity_forcetest_testforcelaw();
