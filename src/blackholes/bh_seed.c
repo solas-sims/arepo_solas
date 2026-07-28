@@ -179,10 +179,6 @@ static void spawn_black_hole_from_cell(int igas, int ibh, double seed_mass)
   SphP[igas].Momentum[1] *= fac;
   SphP[igas].Momentum[2] *= fac;
 
-#ifdef METALS
-  SphP[igas].Metals *= fac;
-#endif /* #ifdef METALS */
-
 #ifdef MAXSCALARS
   for(int s = 0; s < N_Scalar; s++) /* Note, the changes in MATERIALS, HIGHRESGASMASS, etc., are treated as part of the Scalars */
     *(MyFloat *)(((char *)(&SphP[igas])) + scalar_elements[s].offset_mass) *= fac;
@@ -199,16 +195,17 @@ static void spawn_black_hole_from_cell(int igas, int ibh, double seed_mass)
   P[ibh].BhID     = NumBhs;
   BhP[NumBhs].PID = ibh;
 
+#ifdef BH_ACTIVE
   /* initial guess for the smoothing length: radius of the donor cell */
   BhP[NumBhs].Hsml        = cbrt((3.0 * SphP[igas].Volume) / (4.0 * M_PI));
-  BhP[NumBhs].Density     = 0;
-  BhP[NumBhs].NgbMass     = 0;
-  BhP[NumBhs].NgbMassFeed = 0;
-  BhP[NumBhs].NgbMinStep  = 0;
+  BhP[NumBhs].NgbsMass    = 0;
+  BhP[NumBhs].NgbsVolume  = 0;
+  BhP[NumBhs].NgbsMinBin  = 0;
   BhP[NumBhs].DensityFlag = 0;
   BhP[NumBhs].TimeBinBh   = 0;
 
   /* timebin_add_particle(&TimeBinsBh, NumBhs, -1, 0, 1); */
+#endif /* #ifdef BH_ACTIVE */
 
   NumBhs++;
 #endif /* #ifdef BLACKHOLES */

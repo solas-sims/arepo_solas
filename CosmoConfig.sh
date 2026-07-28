@@ -66,8 +66,8 @@ DEBUG # enables core-dumps
 #--------------------------------------- non-standard phyiscs
 #ENFORCE_JEANS_STABILITY_OF_CELLS # this imposes an adaptive floor for the temperature
 COOLING                          # Simple primordial cooling
-USE_GRACKLE			 # Use Grackle library for cooling
-GRACKLE_CHEMISTRY=3
+#USE_GRACKLE			 # Use Grackle library for cooling
+#GRACKLE_CHEMISTRY=3
 #NOUVBACKGROUND			 # Switches off UV background
 USE_SFR                          # Activate star formation
 #EEOS_SF			 # AGORA star formation scheme
@@ -83,8 +83,8 @@ SUPERNOVAE
 METALS
 
 #REFINEMENT_AROUND_BH
-#BLACKHOLES
-#BONDI_ACCRETION
+BLACKHOLES
+BONDI_ACCRETION
 
 HALO_SEEDING
 BLACKHOLE_SEEDING

@@ -375,7 +375,7 @@ static int bh_density_evaluate(int target, int mode, int threadid)
     gas_angular_momentum[j] = 0;
 #endif 
 
-  //MyDouble hinv, hinv3, hinv4, u, dwk;
+  MyDouble hinv, hinv3, hinv4, u, dwk;
 
   //h2   = h * h;
   //hinv = 1.0 / h;
