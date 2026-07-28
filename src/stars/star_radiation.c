@@ -769,19 +769,35 @@ static void radiation_feedback(void)
 #ifdef PHOTOIONIZATION
 static void rt_timestep(void)
 {
-  int i;
+  int idx, i;
   double eps_ion = All.RTIonizationTimestepFraction;
   
-  for(i = 0; i < NumGas; i++)
+  for(idx = 0; idx < TimeBinsHydro.NActiveParticles; idx++)
     {
-      if(P[i].Type != 0 || P[i].Mass == 0 || P[i].ID == 0)
+      i = TimeBinsHydro.ActiveParticleList[idx];
+      if(i < 0)
         continue;
-      
-      double rate = 0.0;
 
-      rate = fmax(rate, SphP[i].HI_IonizationRate);
-      rate = fmax(rate, SphP[i].HeI_IonizationRate);
-      rate = fmax(rate, SphP[i].HeII_IonizationRate);
+      /* Normalize ionization rate by total hydrogen (was normalized by neutral for grackle) */
+      double m_HI = SphP[i].GrackleSpeciesConserved(GRACKLE_HI);
+
+      double m_H = SphP[i].GrackleSpeciesConserved(GRACKLE_HI) + SphP[i].GrackleSpeciesConserved(GRACKLE_HII);
+
+#if GRACKLE_CHEMISTRY >= 2
+      m_H += SphP[i].GrackleSpeciesConserved(GRACKLE_H2I) + SphP[i].GrackleSpeciesConserved(GRACKLE_H2II) 
+          + SphP[i].GrackleSpeciesConserved(GRACKLE_HM);
+#endif
+
+#if GRACKLE_CHEMISTRY >= 3
+      m_H += SphP[i].GrackleSpeciesConserved(GRACKLE_DI) + SphP[i].GrackleSpeciesConserved(GRACKLE_DII) 
+          + SphP[i].GrackleSpeciesConserved(GRACKLE_HDI);
+#endif
+    
+      if(m_H > 0)
+        {
+          double x_HI = m_HI / m_H;
+          rate = fmax(rate, SphP[i].HI_IonizationRate * x_HI);
+        }
 
       SphP[i].RT_Timestep = (rate > 0.0) ? eps_ion / rate : All.MaxSizeTimestep / All.cf_hubble_a;
     }
