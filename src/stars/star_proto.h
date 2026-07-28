@@ -92,12 +92,8 @@ void raytrace_treewalk(RayPacket *ray, RayWorkStack *work, RayExportBuffer *expo
 void star_feedback(void);
 #endif
 
-#if defined(WINDS) || defined(RADIATION_PRESSURE) || defined(SUPERNOVAE)
-void star_perform_end_of_step_physics(void);
-#endif
-
 #ifdef STAR_FEEDBACK_ACTIVE
-void star_exit(void);
+void star_perform_end_of_step_physics(void);
 #endif
 
 #endif

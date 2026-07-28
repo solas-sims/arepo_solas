@@ -454,7 +454,7 @@ void calculate_non_standard_physics_end_of_step(void)
       star_radiation();
 #endif
 
-#if defined(WINDS) || defined(RADIATION_PRESSURE) || defined(SUPERNOVAE)
+#ifdef STAR_FEEDBACK_ACTIVE
       star_perform_end_of_step_physics();
 #endif
 
