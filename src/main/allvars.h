@@ -1087,6 +1087,14 @@ extern struct global_data_all_processes
   double ZeroMetallicityThresholdForFOFSeeding; /*!< metal mass fraction below which a halo's most
                                                       enriched gas cell still counts as "pristine" */
 #endif /* #ifdef BH_SEED_ON_ZERO_METALLICITY */
+#ifdef BH_SEED_ON_VELDISP
+  double MinVelDispForFOFSeeding; /*!< DM-only 3D velocity dispersion (sigma_3D) threshold above which a halo qualifies */
+#endif /* #ifdef BH_SEED_ON_VELDISP */
+#ifdef BH_SEED_ON_POTENTIAL_POSITION
+  double PotentialDonorSearchNSoft; /*!< donor-search cutoff radius around the potential minimum, in units
+                                          of the DM gravitational softening length (a force-resolution scale,
+                                          not a halo-boundary one like LinkL) */
+#endif /* #ifdef BH_SEED_ON_POTENTIAL_POSITION */
 #ifdef BLACKHOLE_SEEDING
   double BlackHoleSeedMass;
 #endif

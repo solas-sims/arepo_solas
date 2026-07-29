@@ -719,6 +719,18 @@ void read_parameter_file(char *fname)
       id[nt++] = REAL;
 #endif /* #ifdef BH_SEED_ON_ZERO_METALLICITY */
 
+#ifdef BH_SEED_ON_VELDISP
+      strcpy(tag[nt], "MinVelDispForFOFSeeding");
+      addr[nt] = &All.MinVelDispForFOFSeeding;
+      id[nt++] = REAL;
+#endif /* #ifdef BH_SEED_ON_VELDISP */
+
+#ifdef BH_SEED_ON_POTENTIAL_POSITION
+      strcpy(tag[nt], "PotentialDonorSearchNSoft");
+      addr[nt] = &All.PotentialDonorSearchNSoft;
+      id[nt++] = REAL;
+#endif /* #ifdef BH_SEED_ON_POTENTIAL_POSITION */
+
 #ifdef BLACKHOLE_SEEDING
       strcpy(tag[nt], "BlackHoleSeedMass");
       addr[nt] = &All.BlackHoleSeedMass;

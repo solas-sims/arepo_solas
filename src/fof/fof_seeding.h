@@ -12,6 +12,7 @@ void fof_seeding_io(int modus);
  *  Bh_Particle_Data.FormationChannel. */
 #define BH_SEED_CHANNEL_MASS             (1u << 0)
 #define BH_SEED_CHANNEL_ZERO_METALLICITY (1u << 1)
+#define BH_SEED_CHANNEL_VELDISP          (1u << 2)
 
 /*! \brief One seeding decision made during an on-the-fly FOF pass.
  *

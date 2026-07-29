@@ -34,6 +34,12 @@
 
 #include "../main/allvars.h"
 
+#ifdef BH_SEED_ON_POTENTIAL_POSITION
+#ifndef EVALPOTENTIAL
+#error "BH_SEED_ON_POTENTIAL_POSITION requires EVALPOTENTIAL (per-particle gravitational potential)"
+#endif /* #ifndef EVALPOTENTIAL */
+#endif /* #ifdef BH_SEED_ON_POTENTIAL_POSITION */
+
 extern int Ngroups, NgroupsExt, MaxNgroups, TotNgroups, Nsubgroups, TotNsubgroups;
 extern int Nids;
 extern long long TotNids;
@@ -78,6 +84,36 @@ extern struct group_properties
                                   -1 if the group has no gas. A halo is "pristine" if this is below
                                   All.ZeroMetallicityThresholdForFOFSeeding. */
 #endif /* #ifdef BH_SEED_ON_ZERO_METALLICITY */
+
+#ifdef BH_SEED_ON_VELDISP
+  MyFloat VelDM[3];  /*!< DM-only mass-weighted velocity sum until fof_finish_group_properties() converts
+                           it in-place to the DM bulk velocity (mirrors Vel[3], DM-only) */
+  MyFloat VelDispDM; /*!< DM-only mass-weighted sum of |v|^2 until fof_finish_group_properties() converts
+                           it in-place to sigma_3D (3D velocity dispersion); -1 if the group has no DM */
+#endif /* #ifdef BH_SEED_ON_VELDISP */
+
+#ifdef BH_SEED_ON_POTENTIAL_POSITION
+  MyFloat MinPotential;        /*!< most-bound (minimum) potential among ALL particle types in the group
+                                     (not DM-only -- gas/stars sink deeper via dissipative collapse) */
+  MyIDType MinPotentialID;
+  int MinPotentialTask;
+  int MinPotentialIndex;
+  MyDouble MinPotentialPos[3]; /*!< stored FirstPos-relative during accumulation (matching CM's own
+                                     convention); converted to an absolute, periodic-wrapped position in
+                                     fof_finish_group_properties() */
+
+  MyFloat MaxGasDensNearPotential;  /*!< densest gas cell within All.PotentialDonorSearchNSoft x (DM
+                                          softening length) of MinPotentialPos; -1 if none found within
+                                          range (including "halo has gas, just none close enough" -- NOT
+                                          the same as MaxGasDens == -1); filled by
+                                          fof_seeding_find_potential_donor(), not by the usual
+                                          fof_compute_group_properties()/fof_exchange_group_data() pair,
+                                          since it depends on MinPotentialPos which isn't known until
+                                          after those have already finished */
+  MyIDType MaxGasDensNearPotentialID;
+  int MaxGasDensNearPotentialTask;
+  int MaxGasDensNearPotentialIndex;
+#endif /* #ifdef BH_SEED_ON_POTENTIAL_POSITION */
 #endif /* #ifdef HALO_SEEDING */
 
 #ifdef SUBFIND

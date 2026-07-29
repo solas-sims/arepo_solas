@@ -86,12 +86,18 @@ METALS
 BLACKHOLES
 BONDI_ACCRETION
 
+EVALPOTENTIAL                   # computes gravitational potential; required by BH_SEED_ON_POTENTIAL_POSITION below
+
 HALO_SEEDING
 BLACKHOLE_SEEDING
 BH_SEED_ON_MASS                 # seed once halo mass exceeds MinHaloMassForFOFSeeding (param.txt); the literature-standard channel
 #BH_SEED_ON_ZERO_METALLICITY     # seed pristine halos (max gas-cell metallicity <= ZeroMetallicityThresholdForFOFSeeding, param.txt);
                                  # requires METALS above to be enabled. Channels OR together if more than one is active, and a halo
                                  # already hosting a black hole (Type 5) is never reseeded regardless of channel.
+BH_SEED_ON_VELDISP               # seed once a halo's DM-only 3D velocity dispersion exceeds MinVelDispForFOFSeeding (param.txt)
+BH_SEED_ON_POTENTIAL_POSITION    # donor cell is the densest gas cell (all particle types) within PotentialDonorSearchNSoft x the
+                                 # DM softening length of the halo's potential minimum, instead of the unrestricted densest gas
+                                 # cell; defers seeding (rather than falling back) if no gas cell qualifies. Requires EVALPOTENTIAL.
 #OUTPUT_EVERY_STEP
 
 OVERRIDE_PEANOGRID_WARNING

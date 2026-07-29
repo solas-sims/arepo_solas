@@ -78,11 +78,19 @@
 #FEEDBACK_TESTING_RESTRICT_SNAPSHOTS     # Only dump snapshots after a feedback event
 
 #BLACKHOLE_SEEDING # Requires HALOS_SEEDING; seeds black holes in halos. Requires at least one of BH_SEED_ON_MASS /
-                   # BH_SEED_ON_ZERO_METALLICITY below (channels OR together if more than one is enabled); a halo already
-                   # hosting a black hole is never reseeded regardless of channel.
+                   # BH_SEED_ON_ZERO_METALLICITY / BH_SEED_ON_VELDISP below (channels OR together if more than one is
+                   # enabled); a halo already hosting a black hole is never reseeded regardless of channel.
 #BH_SEED_ON_MASS # Requires BLACKHOLE_SEEDING; seed once halo mass exceeds MinHaloMassForFOFSeeding (param.txt)
 #BH_SEED_ON_ZERO_METALLICITY # Requires BLACKHOLE_SEEDING and METALS; seed pristine halos, i.e. every gas cell's metal mass
                              # fraction <= ZeroMetallicityThresholdForFOFSeeding (param.txt)
+#BH_SEED_ON_VELDISP # Requires BLACKHOLE_SEEDING; seed once a halo's DM-only 3D velocity dispersion exceeds
+                    # MinVelDispForFOFSeeding (param.txt)
+#BH_SEED_ON_POTENTIAL_POSITION # Requires BLACKHOLE_SEEDING and EVALPOTENTIAL; donor cell for a new black hole is the
+                               # densest gas cell (searched over all particle types, not DM-only) within
+                               # PotentialDonorSearchNSoft (param.txt) x the DM softening length of the halo's
+                               # gravitational-potential minimum, instead of the halo's unrestricted densest gas cell.
+                               # If no gas cell qualifies, seeding is deferred to the next FOF pass rather than falling
+                               # back to the unrestricted donor.
 
 #--------------------------------------- Cooling parameters
 #USE_GRACKLE         # Use the Grackle cooling/chemistry library instead of the simple primordial cooling
