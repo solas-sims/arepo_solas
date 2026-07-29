@@ -835,5 +835,27 @@ void init_io_fields()
   init_field(IO_TIMEBIN_BH, "TBB", "TimebinBh", MEM_INT, FILE_INT, FILE_NONE, 1, A_BH, &BhP[0].TimeBinBh, 0, BHS_ONLY);
   init_units(IO_TIMEBIN_BH, 0., 0., 0., 0., 0., 0.0);
   init_snapshot_type(IO_TIMEBIN_BH, SN_MINI);
-#endif 
+#endif
+
+#if defined(HALO_SEEDING) && defined(BLACKHOLES)
+  init_field(IO_BH_FORMATION_TIME, "BFTI", "BlackHoleFormationTime", MEM_MY_DOUBLE, FILE_MY_IO_FLOAT, FILE_NONE, 1, A_BH,
+             &BhP[0].FormationTime, 0, BHS_ONLY);
+  init_units(IO_BH_FORMATION_TIME, 0., 0., 0., 0., 0., 0.);
+  init_snapshot_type(IO_BH_FORMATION_TIME, SN_MINI);
+
+  init_field(IO_BH_FORMATION_METALLICITY, "BFMZ", "BlackHoleFormationMetallicity", MEM_MY_FLOAT, FILE_MY_IO_FLOAT, FILE_NONE, 1, A_BH,
+             &BhP[0].FormationMetallicity, 0, BHS_ONLY);
+  init_units(IO_BH_FORMATION_METALLICITY, 0., 0., 0., 0., 0., 0.);
+  init_snapshot_type(IO_BH_FORMATION_METALLICITY, SN_MINI);
+
+  init_field(IO_BH_FORMATION_CHANNEL, "BFCH", "BlackHoleFormationChannel", MEM_INT, FILE_INT, FILE_NONE, 1, A_BH,
+             &BhP[0].FormationChannel, 0, BHS_ONLY);
+  init_units(IO_BH_FORMATION_CHANNEL, 0., 0., 0., 0., 0., 0.);
+  init_snapshot_type(IO_BH_FORMATION_CHANNEL, SN_MINI);
+
+  init_field(IO_BH_DONOR_VELOCITY, "BFDV", "BlackHoleDonorVelocity", MEM_MY_FLOAT, FILE_MY_IO_FLOAT, FILE_NONE, 3, A_BH,
+             &BhP[0].DonorVelocity[0], 0, BHS_ONLY);
+  init_units(IO_BH_DONOR_VELOCITY, 0.5, 0., 0., 0., 1., All.UnitVelocity_in_cm_per_s);
+  init_snapshot_type(IO_BH_DONOR_VELOCITY, SN_MINI);
+#endif /* #if defined(HALO_SEEDING) && defined(BLACKHOLES) */
 }

@@ -798,7 +798,7 @@ void fof_compute_group_properties(int gr, int start, int len)
        * is below All.ZeroMetallicityThresholdForFOFSeeding */
       if(type == 0 && P[index].Mass > 0)
         {
-          double Z = SphP[index].Metals / P[index].Mass;
+          double Z = SphP[index].GasMetals / P[index].Mass;
           if(Z > Group[gr].MaxGasMetallicity)
             Group[gr].MaxGasMetallicity = Z;
         }

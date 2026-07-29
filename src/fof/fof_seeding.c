@@ -428,20 +428,29 @@ int fof_seeding_list(HaloSeedEvent *events, int max_events)
       if(Group[n].LenType[5] > 0)
         continue;
 
+      /* every channel is evaluated unconditionally (not short-circuited) so
+       * that FormationChannel below records all channels that fired, not
+       * just whichever happened to be checked first */
       int seed_this = 0;
+      int formation_channel = 0;
 
 #ifdef BH_SEED_ON_MASS
       if(Group[n].Mass >= All.MinHaloMassForFOFSeeding)
-        seed_this = 1;
+        {
+          seed_this = 1;
+          formation_channel |= BH_SEED_CHANNEL_MASS;
+        }
 #endif /* #ifdef BH_SEED_ON_MASS */
 
 #ifdef BH_SEED_ON_ZERO_METALLICITY
       /* whole-halo pristine check: even the most enriched gas cell must be
        * below threshold (MaxGasMetallicity == -1 means no gas at all, handled
        * by the MaxGasDens<0 deferral below) */
-      if(!seed_this && Group[n].MaxGasMetallicity >= 0 &&
-         Group[n].MaxGasMetallicity <= All.ZeroMetallicityThresholdForFOFSeeding)
-        seed_this = 1;
+      if(Group[n].MaxGasMetallicity >= 0 && Group[n].MaxGasMetallicity <= All.ZeroMetallicityThresholdForFOFSeeding)
+        {
+          seed_this = 1;
+          formation_channel |= BH_SEED_CHANNEL_ZERO_METALLICITY;
+        }
 #endif /* #ifdef BH_SEED_ON_ZERO_METALLICITY */
 
       if(!seed_this)
@@ -456,11 +465,12 @@ int fof_seeding_list(HaloSeedEvent *events, int max_events)
           continue;
         }
 
-      local_events[n_local].HaloMinID  = Group[n].MinID;
-      local_events[n_local].HaloMass   = Group[n].Mass;
-      local_events[n_local].DonorID    = Group[n].MaxGasDensID;
-      local_events[n_local].DonorTask  = Group[n].MaxGasDensTask;
-      local_events[n_local].DonorIndex = Group[n].MaxGasDensIndex;
+      local_events[n_local].HaloMinID        = Group[n].MinID;
+      local_events[n_local].HaloMass         = Group[n].Mass;
+      local_events[n_local].DonorID          = Group[n].MaxGasDensID;
+      local_events[n_local].DonorTask        = Group[n].MaxGasDensTask;
+      local_events[n_local].DonorIndex       = Group[n].MaxGasDensIndex;
+      local_events[n_local].FormationChannel = formation_channel;
       n_local++;
     }
 

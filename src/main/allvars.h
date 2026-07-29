@@ -2139,6 +2139,12 @@ enum iofields
 #ifdef OUTPUT_TIMEBIN_BH
   IO_TIMEBIN_BH,
 #endif
+#if defined(HALO_SEEDING) && defined(BLACKHOLES)
+  IO_BH_FORMATION_TIME,
+  IO_BH_FORMATION_METALLICITY,
+  IO_BH_FORMATION_CHANNEL,
+  IO_BH_DONOR_VELOCITY,
+#endif
   IO_LASTENTRY /* This should be kept - it signals the end of the list */
 };
 
