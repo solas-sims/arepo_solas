@@ -377,8 +377,8 @@ static int bh_density_evaluate(int target, int mode, int threadid)
 
   MyDouble hinv, hinv3, hinv4, u, dwk;
 
-  //h2   = h * h;
-  //hinv = 1.0 / h;
+  h2   = h * h;
+  hinv = 1.0 / h;
 //#ifndef TWODIMS
 //  hinv3 = hinv * hinv * hinv;
 //#else  /* #ifndef  TWODIMS */
