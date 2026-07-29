@@ -415,10 +415,6 @@ void raytrace_treewalk(RayPacket *ray, RayWorkStack *work, RayExportBuffer *expo
                   /* Criterion: Omega_node = A_proj / dist2 < f * Omega_ray = f * 4pi/(12*nside^2) */
                   if(dist2 > 0.0 && A_proj / dist2 < f_eff * 4.0 * M_PI / (12 * (double)(ray->nside * ray->nside)))
                     {
-                      /* Pack pending */
-                      if(stack_top >= RAY_STACK_SIZE - 1) 
-                        terminate("Too many pending entries to split!");
-
                       ray->n_pending = stack_top;
                       memcpy(ray->pending, stack, stack_top * sizeof(StackEntry));
 
