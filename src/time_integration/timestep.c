@@ -481,6 +481,11 @@ integertime get_timestep_hydro(int p)
 
   dt *= All.cf_hubble_a;
 
+  if(All.Time == 0)
+    All.MaxSizeTimestep = 1e-5;
+  else
+    All.MaxSizeTimestep = 1e-2;
+
   if(dt >= All.MaxSizeTimestep)
     dt = All.MaxSizeTimestep;
 
