@@ -797,7 +797,7 @@ static void rt_timestep(void)
       if(m_H > 0)
         {
           double x_HI = m_HI / m_H;
-          rate = fmax(rate, SphP[i].HI_IonizationRate * x_HI);
+          rate = SphP[i].HI_IonizationRate * x_HI;
         }
 
       SphP[i].RT_Timestep = (rate > 0.0) ? eps_ion / rate : All.MaxSizeTimestep / All.cf_hubble_a;
