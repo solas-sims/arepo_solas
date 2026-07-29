@@ -5,17 +5,19 @@
 
 
 #define TAG_RAD 18
+
 #define RAD_TRUNC_FRAC 0.01 
+
 #define MAX_NUM_RAYS 12288 
-#define RAY_STACK_SIZE 64
+#define RAY_STACK_SIZE 512
+#define RAY_PENDING_SIZE 64 
 
 #define NSIDE_MIN 1
 #define NSIDE_MAX 32  
 
 /* Dissociation of H2 */
 #define SIGMA_DISS 2.47e-18 /* cm^2, dissociation-weighted eff. cross 
-                               section (Rollig+07 rate / DB96 flux;
-                               Baczynski+15) */
+                               section (DB96, Baczynski+15) */
 
 #define F_DISS 0.15 /* dissociation branching per absorption */
 #define SIGMA_PUMP (SIGMA_DISS / F_DISS) /* total line absorption   */
@@ -108,7 +110,7 @@ typedef struct RayPacket
   int home_task;
   
   /* Pending top-level nodes still to traverse after current domain */
-  StackEntry pending[RAY_STACK_SIZE];
+  StackEntry pending[RAY_PENDING_SIZE];
   int n_pending;
   int target_node;
   int is_paused;
