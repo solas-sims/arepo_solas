@@ -572,7 +572,13 @@ gsl_rng_set(rng, ThisTask + 1);
   feedback_init(&MechanicalFeedbackEvents);
 
   for(i = 0; i < NumStars; i++)
-    SP[i].WithFeedback = 1;
+    {
+#if defined(STAR_PARTICLES) && STAR_PARTICLES < 2
+  for(i = 0; i < NumStars; i++)
+    sample_star_particle(PPS(i).Mass * All.cf_UnitMass_in_Msun, SP[i].NumOfStarsInBins);
+#endif
+      SP[i].WithFeedback = 1;
+    }
 #endif
 
 #ifdef STAR_RADIATION_ACTIVE
