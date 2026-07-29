@@ -456,8 +456,6 @@ static void fof_seeding_find_potential_donor(void)
                        MPI_COMM_WORLD, MPI_STATUS_IGNORE);
     }
 
-  myfree(query);
-
   /* keep the densest candidate received across all fragments/tasks for each owned group */
   for(i = 0; i < nimport; i++)
     {
@@ -495,6 +493,7 @@ static void fof_seeding_find_potential_donor(void)
     }
 
   myfree(candidates);
+  myfree(query);
 }
 #endif /* #ifdef BH_SEED_ON_POTENTIAL_POSITION */
 
