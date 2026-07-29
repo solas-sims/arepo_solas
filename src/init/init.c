@@ -418,7 +418,8 @@ int init(void)
 #ifndef FOF
 #error "HALO_SEEDING is only implemented for FOF."
 #endif /* #ifndef FOF */
-  fof_seeding_init(RestartFlag);
+  if(RestartFlag != 1) /* when restarting from restart files, the halo seed registry is restored from them by loadrestart() */
+    fof_seeding_init(RestartFlag);
 #endif
  
   if(RestartFlag == 3)
