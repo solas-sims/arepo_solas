@@ -639,6 +639,12 @@ void read_parameter_file(char *fname)
       id[nt++] = REAL;
 #endif  
 
+#ifdef RADIATION_PRESSURE
+      strcpy(tag[nt], "IRDtauMomentumBoostCoeff");
+      addr[nt] = &All.IRDtauMomentumBoostCoeff;
+      id[nt++] = REAL;
+#endif  
+
 #ifdef BH_ACTIVE
 #ifdef BH_CONSTANT_RADIUS
       strcpy(tag[nt], "BhRadius");

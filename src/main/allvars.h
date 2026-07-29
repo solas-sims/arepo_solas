@@ -1442,6 +1442,10 @@ double InitMetallicityinSolar;
   double RTIonizationTimestepFraction;
 #endif
 
+#ifdef RADIATION_PRESSURE
+  double IRDtauMomentumBoostCoeff;
+#endif
+
 #if defined (BH_ACCRETION_ACTIVE) || defined(BH_FEEDBACK_ACTIVE)
   /* for parameter file */
 #ifdef BH_CONSTANT_RADIUS

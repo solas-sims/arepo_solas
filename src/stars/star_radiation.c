@@ -113,6 +113,7 @@ void update_dtau(void)
     }
 }
 
+#ifdef RADIATION_PRESSURE
 double dtau_IR(int i, double length)
 {
   double Units = All.cf_UnitLength_in_cm * All.cf_UnitLength_in_cm / All.cf_UnitMass_in_g;
@@ -125,10 +126,11 @@ double dtau_IR(int i, double length)
 
  double Density = (P[i].Mass + SphP[i].StarMassFeed) / SphP[i].Volume;
 
-  double Dtau_IR = (1.0 / Units) * Zsol * Density * length;
+  double Dtau_IR = All.IRDtauMomentumBoostCoeff * (1.0 / Units) * Zsol * Density * length;
 
   return Dtau_IR;
 }
+#endif
 
 static double H2Tab_A[H2TAB_N]; /* A at table nodes */
 static double H2Tab_dlogN; /* log10 spacing */
