@@ -795,7 +795,7 @@ static void rt_timestep(void)
           + SphP[i].GrackleSpeciesConserved(GRACKLE_HDI);
 #endif
     
-      double rate;
+      double rate = 0;
       if(m_H > 0)
         {
           double x_HI = m_HI / m_H;
