@@ -8,10 +8,10 @@
 
 #define RAD_TRUNC_FRAC 0.01 
 
-#define MAX_NUM_RAYS 12288 
 #define RAY_STACK_SIZE 512
 #define RAY_PENDING_SIZE 64 
 
+/* Healpix: Multiples of 2! */
 #define NSIDE_MIN 1
 #define NSIDE_MAX 32  
 
@@ -35,8 +35,7 @@
 #define NO_IONIZING_ACTIVE ((uint8_t)(ALL_BANDS_ACTIVE & ~(1u << IONIZING_HI) & ~(1u << IONIZING_HeI) & ~(1u << IONIZING_HeII)))
 #define ONLY_IONIZING_ACTIVE ((uint8_t)(ALL_BANDS_ACTIVE & ((1u << IONIZING_HI) | (1u << IONIZING_HeI) | (1u << IONIZING_HeII))))
 
-extern double HealpixDirs[MAX_NUM_RAYS][3];
-/* 12*NSIDE^2 */
+extern double HealpixDirs[12 * NSIDE_MIN*NSIDE_MIN][3];
 extern int NRays;
 
 /* 

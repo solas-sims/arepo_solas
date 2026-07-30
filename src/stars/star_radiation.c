@@ -4,9 +4,8 @@
 #include "../extern/chealpix.h"
 
 
-double HealpixDirs[MAX_NUM_RAYS][3];
-
-int NRays; 
+double HealpixDirs[12 * NSIDE_MIN*NSIDE_MIN][3];
+int NRays;
 
 /* Effective attenuation kappa_ext*(1 - a*<g>) [cm^2/g gas, solar Z]
    Band-averaged over Draine 2003 (renorm. WD01) MW R_V=3.1 model,
