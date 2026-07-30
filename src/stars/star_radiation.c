@@ -795,7 +795,7 @@ static void rt_timestep(void)
           + SphP[i].GrackleSpeciesConserved(GRACKLE_HDI);
 #endif
     
-      double rate = 0;
+      double rate = 0.0;
       if(m_H > 0)
         {
           double x_HI = m_HI / m_H;
@@ -880,6 +880,9 @@ void star_radiation(void)
       if(n_global > 0 && iter > 0)
         mpi_printf("STAR_RADIATION: Rad iteration %3d: need to repeat for %12lld rays. (took %g sec)\n", iter, n_global,
         timediff(t0, t1));
+      
+      if(iter > MAXITER)
+        terminate("STAR_RADIATION: %lld rays still in flight after %d iterations\n", n_global, iter);
       
     } while(n_global > 0);
     
