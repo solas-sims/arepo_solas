@@ -13,7 +13,7 @@
 
 /* Healpix: Multiples of 2! */
 #define NSIDE_MIN 1
-#define NSIDE_MAX 32  
+#define NSIDE_MAX 128  
 
 /* Dissociation of H2 */
 #define SIGMA_DISS 2.47e-18 /* cm^2, dissociation-weighted eff. cross 
