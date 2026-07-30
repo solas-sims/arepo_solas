@@ -1,0 +1,265 @@
+#--------------------------------------- SOLAS additions
+stars: ON
+star_by_star: OFF # this flag is broken
+winds: ON
+supernovae: ON
+use_celib: ON
+
+#--------------------------------------- Star Formation parameters
+eeos_sf: ON # Default SF scheme in Arepo
+agora_sf: ON # Agora based SF
+jeans_sf: ON # Jeans length based SF
+jeans_mass_based: ON # Jeans mass based SF
+
+#--------------------------------------- Black Hole parameters
+blackholes: ON
+burst_mode: ON
+bondi_accretion: ON
+infall_accretion: ON
+output_timebin_bh: ON
+# refinement_around_bh: 0 # what are the vaules?!
+min_refinement_bh_mass: ON
+refinement_around_bh_fixed: ON
+refinement_around_bh_hybrid: ON
+bh_jet_feedback: ON
+bh_jet_refinement: ON
+output_refbhcounter: OFF # this is not working, missing relevant code in arepo
+output_timebin_star: ON
+#--------------------------------------- Cooling parameters
+use_grackle: OFF
+grackle_chemistry: 0
+#--------------------------------------- Metal parameters
+metals: ON
+wendland_c2_kernel: ON
+
+#--------------------------------------- Basic operation mode of code; default: 3d with 6 particle types; type 0: gas >0: only gravitationally interacting
+ntypes: 6
+twodims: OFF  # 2d simulation
+onedims: OFF  # 1d simulation
+onedims_spherical: OFF # 1d spherically symmetric simulation
+
+#--------------------------------------- Computational box and boundaries; default: cubic, periodic box
+long_x: 1.0                   # physical size of box in x direction
+long_y: 1.0                   # physical size of box in y direction
+long_z: 1.0                   # physical size of box in z direction
+reflective_x: 1 #=2            # X Boundary; 1: Reflective, 2: Inflow/Outflow; not active: periodic
+reflective_y: 1 #=2            # Y Boundary; 1: Reflective, 2: Inflow/Outflow; not active: periodic
+reflective_z: 1 #=2            # Z Boundary; 1: Reflective, 2: Inflow/Outflow; not active: periodic
+
+#--------------------------------------- Hydrodynamics; default: GAMMA=5/3 ideal hydrodynamics
+nohydro: OFF                   # No hydrodynamics calculation
+gamma: 1.4                     # Adiabatic index of gas; 5/3 if not set
+isotherm_eqs: OFF              # Isothermal gas
+passive_scalars: 3             # number of passive scalar fields advected with fluid (default: 0)
+no_scalar_gradients: OFF       # disables time and spatial extrapolation for passive scalar fields (use only if you know why you're doing this)
+
+#--------------------------------------- Magnetohydrodynamics
+mhd: OFF                       # Master switch for magnetohydrodynamics
+mhd_powell: OFF                # Powell div(B) cleaning scheme for magnetohydrodynamics
+mhd_powell_limit_timestep: OFF # Timestep constraint due to Powell cleaning scheme
+mhd_seedfield: OFF             # Uniform magnetic seed field of specified orientation and strength set up after reading in IC
+
+#--------------------------------------- Riemann solver; default: exact Riemann solver
+riemann_exact: ON               # exact Riemann solver
+riemann_hllc: OFF               # HLLC approximate Riemann solver
+riemann_hlld: OFF               # HLLD approximate Riemann solver (required to use for MHD)
+
+#--------------------------------------- Mesh motion and regularization; default: moving mesh
+voronic_static: OFF            # static mesh
+voronic_static_mesh_do_domain_decomposition: OFF  # for VORONOI_STATIC_MESH force domain decomposition if there exist non-gas particles
+regularize_mesh_cm_drift: ON   # Mesh regularization; Move mesh generating point towards center of mass to make cells rounder.
+regularize_mesh_cm_drift_use_soundspeed: ON  # Limit mesh regularization speed by local sound speed
+regularize_mesh_face_angle: ON    # Use maximum face angle as roundness criterion in mesh regularization
+
+#--------------------------------------- Refinement and derefinement; default: no refinement/derefinement; criterion: target mass
+refinement_split_cells: ON        # Refinement
+refinement_merge_cells: ON        # Derefinement
+refinement_volume_limit: OFF       # Limit the volume of cells and the maximum volume difference between
+# jeans_refinement: 1.0              # Refinement criterion to ensure Jeans stability of cells
+refinement_high_res_gas: OFF       # Refinement criterion for high-resolution region in zoom
+noderefine_background_grid: OFF    # Do not de-refine low-res gas cells in zoom simulations
+optimize_mesh_memory_for_refinement: OFF  # deletes the mesh structures not needed for refinement/derefinemet to lower the peak memory consumption
+
+#--------------------------------------- non-standard phyiscs
+cooling: ON                       # Simple primordial cooling
+low_temp_cooling: OFF              # Maschenko et al. 2008 # Don't use while USE_GRACKLE
+enforce_jeans_stability_of_cells: OFF  # this imposes an adaptive floor for the temperature
+use_sfr: OFF                       # Star formation model, turning dense gas into collisionless partices
+sfr_keep_cells: OFF                # Do not destroy cell out of which a star has formed
+
+#--------------------------------------- Gravity treatment; default: no gravity
+selfgravity: ON              # gravitational intraction between simulation particles/cells
+hierarchical_gravity: ON     # use hierarchical splitting of the time integration of the gravity
+cell_center_gravity: ON     # uses geometric centers to calculate gravity of cells, only possible with HIERARCHICAL_GRAVITY
+no_gas_selfgravity: OFF      # switch off gas self-gravity in tree
+gravity_not_periodic: OFF    # gravity is not treated periodically
+allow_direct_summation: OFF  # Performed direct summation instead of tree-based gravity if number of active particles < DIRECT_SUMMATION_THRESHOLD (= 3000 unless specified differently here)
+direct_summation_threshold: 1000  # Overrides maximum number of active particles for which direct summation is performed instead of tree based calculation
+x: OFF act_gravity_for_particle_type: 4  #N-squared fashion gravity for a small number of particles of the given type
+evalpotential: OFF           # computes gravitational potential
+
+#--------------------------------------- TreePM Options; default: no Particle-Mesh
+pmgrid: 512
+
+#pmgrid=512                    # Enables particle mesh; number of cells used for grid in each dimension
+#asmth=1.25                    # This can be used to override the value assumed for the scale that defines the long-range/short-range force-split in the TreePM algorithm. The default value is 1.25, in mesh-cells.
+#rcut=6.0                      # This can be used to override the maximum radius in which the short-range tree-force is evaluated (in case the TreePM algorithm is used). The default value is 4.5, given in mesh-cells.
+pm_zoom_optimized: OFF              # Particle-mesh calculation that is optimized for cosmological zoom simulations; disable for cosmological volume simulations.
+#placehighresregion=2          # Places a second, high-resolution PM grid; number encodes high-res particle types from which the extent of this second PM grid is calculated.
+#enlargeregion=1.1             # Factor by which high res region is increased with respect to max-min position of high-res particles
+#gridboost=2                   # Factor by which PMGRID is increased in non-periodic (or high res) PM calculation (if not set, code uses 2)
+fft_column_based: OFF               # Use column-based FFT; slightly slower, but necessary to achieve good load-balancing if number of tasks larger than PMGRID (usually the case for very large runs)
+
+#--------------------------------------- Gravity softening
+nsofttypes: 2
+multiple_node_softening: ON
+adaptive_hydro_softening: ON
+#nsofttypes=4                  # Number of different softening values to which particle types can be mapped.
+multiple_node_softening: OFF        # If a tree node is to be used which is softened, this is done with the softenings of its different mass components
+#individual_gravity_softening=2+4  # bitmask with particle types where the softenig type should be chosen with that of parttype 1 as a reference type
+adaptive_hydro_softening: OFF       # Adaptive softening of gas cells depending on their size
+#nsofttypes_hydro=64           # Overrides number of discrete softening values for gas cellls when ADAPTIVE_HYDRO_SOFTENING (default is 64)
+
+#--------------------------------------- External gravity; default: no external potential
+externalgravity: OFF                # master switch for external potential
+#externalgy=0.0                # constant external gravity in y direction
+
+#--------------------------------------- Static NFW Potential
+staticnfw: OFF                      # static gravitational Navarro-Frenk-White (NFW) potential
+#nfw_c=12                      # concentration parameter of NFW potential
+nfw_m: OFF 200=100.0                # mass causing the NFW potential
+nfw_e: OFF ps=0.01                  # softening of NFW potential
+#nfw_darkfraction=0.87         # fraction in dark matter in NFW potential
+
+#--------------------------------------- Static Isothermal Sphere Potential
+staticiso: OFF                      # static gravitational isothermal sphere potential
+iso_m: OFF 200=100.0                # mass causing the isothermal sphere potential
+iso_r: OFF 200=160.0                # radius of the isothermal sphere potential
+iso_e: OFF ps=0.1                   # softening of isothermal sphere potential
+#iso_fraction=0.9              # fraction in dark matter in isothermal sphere potential
+
+#--------------------------------------- Static Hernquist Potential (This is setup for the nuclear star cluster)
+statichq: OFF                       # static gravitational Hernquist potential
+hq_m: OFF 200=186.015773            # mass causing the Hernquist potential
+#hq_c=10.0                     # concentration parameter of Hernquist potential
+#hq_darkfraction=0.9           # fraction in dark matter in Hernquist potential
+
+#--------------------------------------- Time integration options
+tree_based_timesteps: ON
+force_equal_timesteps: OFF
+
+
+force_equal_timesteps: OFF          # variable but global timestep
+tree_based_timesteps: OFF           # non-local timestep criterion (take 'signal speed' into account)
+#pm_timestep_based_on_types=2+4  # particle types that should be considered in setting the PM timestep
+no_pmforce_in_short_range_timestep: OFF   # PM force is not included in short-range timestep criterion
+enlarge_dynamic_range_in_time: OFF  # This extends the dynamic range of the integer timeline from 32 to 64 bit
+
+#--------------------------------------- MPI
+impose_pinning: OFF                 # Enforce pinning of MPI tasks to cores if MPI does not do it
+impose_pinning_override_mode: OFF   # Override MPI pinning, if present
+
+#--------------------------------------- Single/Double Precision
+doubleprecision: 1
+
+#doubleprecision=1             # Mode of double precision: not defined: single; 1: full double precision 2: mixed, 3: mixed, fewer single precisions; unless short of memory, use 1.
+doubleprecision_fftw: OFF           # FFTW calculation in double precision
+output_in_doubleprecision: OFF      # snapshot files will be written in double precision
+input_in_doubleprecision: OFF       # initial conditions are in double precision
+output_coordinates_in_doubleprecision: OFF   # will always output coordinates in double precision
+ngb_tree_doubleprecision: OFF       # if this is enabled, double precision is used for the neighbor node extension
+
+#--------------------------------------- On the fly FOF groupfinder
+fof: OFF                            # enable FoF output
+#fof_primary_link_types=2      # 2^type for the primary dark matter type
+#fof_secondary_link_types=1+16+32  # 2^type for the types linked to nearest primaries
+#fof_secondary_link_target_types=  # should normally be set to a list of all dark matter types (in zoom runs), if not set defaults to FOF_PRIMARY_LINK_TYPES
+#fof_group_min_len=32          # Minimum number of particles in one group (default is 32)
+#fof_linklength=0.16           # Linkinglength for FoF (default=0.2)
+fof_storeids: OFF                   # store IDs in group/subfind catalogue, do not order particles in snapshot files by group order
+
+#--------------------------------------- Subfind
+subfind: OFF                        # enables substructure finder
+save_hsml_in_snapshot: OFF          # stores hsml, density, and velocity dispersion values in the snapshot files
+subfind_calc_more: OFF              # calculates also the velocity dispersion in the local density estimate (this is automatically enabled by several other options, e.g. SAVE_HSML_IN_SNAPSHOT)
+subfind_extended_properties: OFF    # adds calculation of further quantities related to angular momentum in different components
+
+#--------------------------------------- Things for special behaviour
+running_safety_file: OFF            # if file './running' exists, do not start the run
+multiple_restarts: OFF              # Keep restart files instead of just two copies
+extended_ghost_search: OFF          # This extends the ghost search to the full 3x3 domain instead of the principal domain
+double_stencil: OFF                 # this will ensure that the boundary region of the local mesh is deep enough to have a valid double stencil for all local cells
+tetra_index_in_face: OFF            # adds an index to each entry of VF[] and DC[] to one of the tetrahedra that share this edge
+nostop_when_below_mintimestep: OFF  # Simulation does not terminate when timestep drops below minimum timestep
+timestep_output_limit: OFF          # Limit timesteps to write snaps on time for output lists with huge range
+allowextraparams: OFF               # Tolerate extra parameters that are not used
+fix_sph_particles_at_identical_coordinates: OFF   # this can be used to load SPH ICs that contain identical particle coordinates
+recompute_potential_in_snapshot: OFF   # needed for postprocess option 18 that can be used to calculate potential values for a snapshot
+activate_minimum_opening_angle: OFF   # this does not open tree nodes under the relative opening criterion any more if their opening angle has dropped below a minimum angle
+use_direct_io_for_restarts: OFF     # Try to use O_DIRECT for low-level read/write operations of restart files to circumvent the linux kernel page caching
+hugepages: OFF                      # use huge pages for memory allocation, through hugetlbfs library
+detailedtimings: OFF                # creates individual timings entries for primary/secondary kernels to diagnose work-load balancing
+#bits_per_dimension=42         # Peano-Hilbert order
+
+#--------------------------------------- input options
+combinetypes: OFF                   # reads in the IC file types 4+5 as type 3
+#load_types=1+2+4+16+32        # load only specific types sum(2^type)
+read_coordinates_in_double: OFF     # read coordinates in double precision
+longids: OFF                        # Store IDs in type unsigned long long instead of unsigned int
+offset_for_non_contiguous_ids: OFF  # Determines offset of IDs on startup instead of using fixed offset.
+generate_gas_in_ics: OFF            # Generates gas from dark matter only ICs.
+#split_particle_type=4+8       # Overrides splitting particle type 1 in GENERATE_GAS_IN_ICS use sum(2^type)
+shift_by_half_box: OFF              # Shift all positions by half a box size after reading in
+#ntypes_ics=6                  # number of particle types in ICs, if not NTYPES (only works for 6, and non-HDF5 ICs!)
+read_mass_as_density_in_input: OFF  # Reads the mass field in the IC as density
+
+#--------------------------------------- special input options
+#ids_offset=1                  # Override offset for gas particles if created from DM
+read_dm_as_gas: OFF                 # reads in dark matter particles as gas cells
+tile_ics: OFF                       # tile ICs by TileICsFactor in each dimension
+
+#--------------------------------------- output fields in snapshots--Default output filds are: position, velocity, ID, mass, spec. internal energy (gas), density(gas)
+output_task: OFF                    # output MPI task
+output_timebin_hydro: OFF           # output hydrodynamics time-bin
+output_pressure_gradient: OFF       # output pressure gradient
+output_density_gradient: OFF        # output density gradient
+output_velocity_gradient: OFF       # output velocity gradient
+output_bfield_gradient: OFF         # output magnetic field gradient
+output_mesh_face_angle: OFF         # output max. face angle of cells
+output_vertex_velocity: OFF         # output velocity of cell
+output_vertex_velocity_divergence: OFF  # output deivergence of cell velocity
+output_volume: OFF                  # output volume of cells; note that this can always be computat as both, density and mass of cells are by default in output
+output_center_of_mass: OFF          # output center of mass of cells (position is mesh-generating point)
+output_surface_area: OFF            # output surface area of cells
+output_pressure: OFF                # output pressure of gas
+outputpotential: OFF                # output potential at particle position
+outputacceleration: OFF             # output gravitational acceleration
+outputtimestep: OFF                 # output timestep of particle
+output_softenings: OFF              # output particle softenings
+outputgravinteractions: OFF         # output gravitatational interactions (from the tree) of particles
+outputcoolrate: OFF                 # outputs cooling rate, and conduction rate if enabled
+output_divvel: OFF                  # output  velocity divergence
+output_curlvel: OFF                 # output  velocity curl
+output_coolheat: OFF                # output actual energy loss/gain in cooling/heating routine
+output_vorticity: OFF               # output vorticity of gas
+output_csnd: OFF                    # output sound speed. This one is only used for tree-based timesteps! Calculate from hydro quantities in postprocessing if required for science applications.
+
+#--------------------------------------- output options
+process_times_of_outputlist: ON
+have_hdf5: ON
+
+process_times_of_outputlist: OFF    # goes through times of output list prior to starting the simulaiton to ensure that outputs are written as close to the desired time as possible (as opposed to at next possible time if this flag is not active)
+reduce_flush: OFF                   # only flush output to log-files in predefined intervals
+output_every_step: OFF              # Create snapshot on every (global) synchronization point, independent of parameters choosen or output list.
+output_cpu_csv: OFF                 # output of a cpu.csv file on top of cpu.txt
+have_hdf: OFF 5                     # needed when HDF5 I/O support is desired (recommended)
+hdf: OFF 5_FILTERS                  # activate snapshot compression and checksum for HDF5 output
+output_xdmf: OFF                    # writes an .xmf file for each snapshot, which can be read by visit (with the hdf5 snapshot)
+
+#--------------------------------------- Testing and Debugging options
+debug: OFF                          # enables core-dumps
+verbose: OFF                        # reports readjustments of buffer sizes
+
+#--------------------------------------- Mesh-relaxing or mesh-adding (this will not carry out a simulation)
+meshrelax: OFF                      # this keeps the mass constant and only regularizes the mesh
+#addbackgroundgrid=16          # Re-grid hydrodynamics quantities on a Oct-tree AMR grid. This does not perform a simulation.

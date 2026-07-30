@@ -1,0 +1,89 @@
+
+#########################################################
+#  Enable/Disable compile-time options as needed        #
+#  examples/galaxy_merger_star_formation_3d/Config.sh   #
+#########################################################
+
+#--------------------------------------- Mesh motion and regularization
+regularize_mesh_cm_drift: ON                 # Mesh regularization; Move mesh generating point towards center of mass to make cells rounder.
+regularize_mesh_cm_drift_use_soundspeed: ON  # Limit mesh regularization speed by local sound speed
+regularize_mesh_face_angle: ON               # Use maximum face angle as roundness criterion in mesh regularization
+
+#--------------------------------------- Refinement and derefinement
+refinement_split_cells: ON  			 # Refinement
+refinement_merge_cells: ON                    # Derefinement
+
+#--------------------------------------- Time integration options
+tree_based_timesteps: ON  			 # non-local timestep criterion (take 'signal speed' into account)
+
+#------------------------------------------------ TreePM Options
+pmgrid: 64                                       # enables particle mesh; numberof cells used for grid in each dimension
+rcut: 5.0                                         # this can be used to override the maximum radius in which the short-range tree-force is evaluated (in case the treepm algorithm is used). the default value is 4.5, given in mesh-cells.
+
+#--------------------------------------- Gravity treatment
+selfgravity: ON                     # gravitational intraction between simulation particles/cells
+hierarchical_gravity: ON            # use hierarchical splitting of the time integration of the gravity
+cell_center_gravity: ON             # uses geometric centers to calculate gravity of cells, only possible with HIERARCHICAL_GRAVITY
+allow_direct_summation: ON          # Performed direct summation instead of tree-based gravity if number of active particles < DIRECT_SUMMATION_THRESHOLD (= 3000 unless specified differently here)
+direct_summation_threshold: 500 # overrides maximum number of active particles for which direct summation is performed instead of tree based calculation
+
+#--------------------------------------- Gravity softening
+nsofttypes: 6                    # number of different softening values to which particle types can be mapped.
+multiple_node_softening: ON          # If a tree node is to be used which is softened, this is done with the softenings of its different mass components
+individual_gravity_softening: OFF =32 # bitmask with particle types where the softenig type should be chosen with that of parttype 1 as a reference type
+adaptive_hydro_softening: ON         # Adaptive softening of gas cells depending on their size
+
+#--------------------------------------- Single/Double Precision
+doubleprecision: 1        # mode of double precision: not defined: single; 1: full double precision 2: mixed, 3: mixed, fewer single precisions; unless short of memory, use 1.
+ngb_tree_doubleprecision: ON  # if this is enabled, double precision is used for the neighbor node extension
+
+#-------------------------------------------- Things for special behaviour
+process_times_of_outputlist: ON  # goes through times of output list prior to starting the simulaiton to ensure that outputs are written as close to the desired time as possible (as opposed to at next possible time if this flag is not active)
+override_peanogrid_warning: ON   # don't stop if peanogrid is not fine enough
+
+#--------------------------------------- Output/Input options
+have_hdf5: ON   # needed when HDF5 I/O support is desired (recommended)
+input_in_doubleprecision: OFF  # do not use input double precision
+generate_gas_in_ics: ON   # generate gas in the ics
+
+#------------------------------------------------ On the fly FOF groupfinder
+fof: ON                                               # enable FoF output
+fof_primary_link_types: 2                         # 2^type for the primary dark matter type
+fof_secondary_link_types: 1+16+32                 # 2^type for the types linked to nearest primaries
+
+#------------------------------------------------ Subfind
+subfind: ON                                           # enables substructure finder
+save_hsml_in_snapshot: OFF                             # stores hsml, density, and velocity dispersion values in the snapshot files
+subfind_calc_more: OFF                                 # calculates also the velocity dispersion in the local density estimate (this is automatically enabled by several other options, e.g. SAVE_HSML_IN_SNAPSHOT)
+subfind_extended_properties: OFF                       # adds calculation of further quantities related to angular momentum in different components
+
+#--------------------------------------- Testing and Debugging options
+debug: ON  # enables core-dumps
+
+#--------------------------------------- non-standard phyiscs
+enforce_jeans_stability_of_cells: OFF  # this imposes an adaptive floor for the temperature
+cooling: OFF                           # Simple primordial cooling
+use_grackle: OFF 			 # Use Grackle library for cooling
+grackle_chemistry: OFF =0
+nouvbackground: OFF 			 # Switches off UV background
+use_sfr: OFF                           # Activate star formation
+eeos_sf: OFF 			 # AGORA star formation scheme
+jeans_sf: OFF 
+jeans_mass_based: OFF 
+use_celib: OFF 
+stars: OFF 
+supernovae: OFF 
+passive_scalars: OFF =1
+metals: OFF 
+
+refinement_around_bh: OFF 
+blackholes: OFF 
+bondi_accretion: OFF 
+
+halo_seeding: ON  #
+blackhole_seeding: ON  #
+bh_seed_on_mass: ON                  # seed once halo mass exceeds MinHaloMassForFOFSeeding (param.txt); the literature-standard channel
+bh_seed_on_zero_metallicity: OFF      # seed pristine halos (max gas-cell metallicity <= ZeroMetallicityThresholdForFOFSeeding, param.txt);
+# requires METALS above to be enabled. Channels OR together if more than one is active, and a halo
+# already hosting a black hole (Type 5) is never reseeded regardless of channel.
+output_every_step: OFF 

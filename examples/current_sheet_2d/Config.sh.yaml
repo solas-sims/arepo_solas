@@ -1,0 +1,35 @@
+
+## examples/current_sheet_2d/Config.sh
+## config file for 2d current sheet probelm
+
+#--------------------------------------- Basic operation mode of code
+twodims: ON                                   # 2d simulation
+
+#--------------------------------------- Magnetohydrodynamics
+mhd: ON                                       # Master switch for magnetohydrodynamics
+mhd_powell: ON                                # Powell div(B) cleaning scheme for magnetohydrodynamics
+mhd_powell_limit_timestep: ON                 # Timestep constraint due to Powell cleaning scheme
+
+#--------------------------------------- Riemann solver
+riemann_hlld: ON                              # HLLD approximate Riemann solver (required to use for MHD)
+
+#--------------------------------------- Mesh motion and regularization
+regularize_mesh_cm_drift: ON                  # Mesh regularization; Move mesh generating point towards center of mass to make cells rounder.
+regularize_mesh_cm_drift_use_soundspeed: ON   # Limit mesh regularization speed by local sound speed
+regularize_mesh_face_angle: ON                # Use maximum face angle as roundness criterion in mesh regularization
+
+#--------------------------------------- Time integration options
+tree_based_timesteps: ON                      # non-local timestep criterion (take 'signal speed' into account)
+
+#--------------------------------------- Single/Double Precision
+doubleprecision: 1                        # mode of double precision: not defined: single; 1: full double precision 2: mixed, 3: mixed, fewer single precisions; unless short of memory, use 1.
+input_in_doubleprecision: ON                  # initial conditions are in double precision
+
+#--------------------------------------- Output/Input options
+have_hdf5: ON                                 # needed when HDF5 I/O support is desired; should this be standard?
+
+#--------------------------------------- Testing and Debugging options
+debug: ON                                     # enables core-dumps, should this be standard?
+
+#--------------------------------------- Output options
+output_bfield_gradient: ON                    # gradient estimates of B-field

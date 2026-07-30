@@ -1,0 +1,41 @@
+
+## ./examples/polytrope_1d_spherical/Config.sh
+## config file for 1d polytrope probelm in a spherically symmetric setup
+
+
+#--------------------------------------- Basic operation mode of code
+onedims: ON                                   # 1d simulation
+onedims_spherical: ON                         # 1d spherically symmetric simulation
+gamma: 2                                  # adiabatic index of gas
+
+
+#--------------------------------------- Mesh motion and regularization
+voronoi_static_mesh: ON                       # static mesh
+
+
+#--------------------------------------- Gravity treatment; default: no gravity
+selfgravity: ON                               # gravitational intraction between simulation particles/cells
+
+
+#--------------------------------------- Time integration options
+force_equal_timesteps: ON                     # variable but global timestep
+
+
+#---------------------------------------- Single/Double Precision
+doubleprecision: 1                        # mode of double precision: not defined: single; 1: full double precision 2: mixed, 3: mixed, fewer single precisions; unless short of memory, use 1.
+input_in_doubleprecision: ON                  # initial conditions are in double precision
+output_in_doubleprecision: ON                 # snapshot files will be written in double precision
+
+
+#--------------------------------------- Output/Input options
+read_mass_as_density_in_input: ON             # Reads the mass field in the IC as density
+have_hdf5: ON                                 # needed when HDF5 I/O support is desired (recommended)
+
+
+#--------------------------------------- Testing and Debugging options
+debug: ON                                     # enables core-dumps
+
+
+#--------------------------------------- output
+outputacceleration: ON                        # output gravitational acceleration
+output_pressure_gradient: ON                  # output pressure gradient

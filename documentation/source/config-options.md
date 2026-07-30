@@ -1,6 +1,40 @@
 Code Configuration
 *************************
 
+There are two methods to configure a build of arepo. One relies on the older make file and configure scripts and the other uses cmake along with configuration yaml files. The formatting has upper and lower case names respectively. 
+
+Makefile Approach
+=================
+The older method of building arepo relies on using Makfile, which needs to be edited. Key edits in the make file update the following entries 
+```makefile
+CONFIG = Config.sh
+BUILD_DIR = build
+SRC_DIR = src
+
+SYSTYPE ?= "LINUX"
+```
+
+The key build file is the `Config.sh` which lists all the build options listed below. This is in fact just a simple text file that is preprossed to set a number of build flags. This can be changed to the appropriate file to process. 
+
+The other updates relate to the `SYSTYPE` and how it sets default paths for a number of libraries. These dependencies are not auto discovered and may require defining a specific `SYSTYPE` in the make file. 
+
+The makefile framework is a bit brittle and can be challenging to alter and hence the development of a cmake approach. 
+
+CMake Approach
+==============
+
+The cmake approach will autodiscover all the dependencies depending on the build option. In this framework a similar set of build flags are used in a yaml format. There is an example in the main repo directory called `template_config.yaml`. There are a few others like `config_AGORA.yaml` and `gal_config.yaml`. Building is often as simple as
+
+```bash
+cmake -DAREPO_YAML_CONFIG=<config_file.yaml> -B build
+```
+
+If you have an older style configuration file, you can convert it to the yaml with 
+```bash
+python make_yaml_from_oldconfig -i <input_file> 
+```
+
+
 Basic operation mode
 ============================
 

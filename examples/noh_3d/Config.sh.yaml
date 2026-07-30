@@ -1,0 +1,27 @@
+
+## examples/Noh_3d/Config.sh
+## config file for 3d Noh probelm
+
+#--------------------------------------- Basic operation mode of code
+reflective_x: 2                           # in-/outflow boundary conditions in x direction
+reflective_y: 2                           # in-/outflow boundary conditions in y direction
+reflective_z: 2                           # in-/outflow boundary conditions in z direction
+
+#--------------------------------------- Mesh motion and regularization
+regularize_mesh_cm_drift: ON                  # Mesh regularization; Move mesh generating point towards center of mass to make cells rounder.
+regularize_mesh_cm_drift_use_soundspeed: ON   # Limit mesh regularization speed by local sound speed
+regularize_mesh_face_angle: ON                # Use maximum face angle as roundness criterion in mesh regularization
+
+#--------------------------------------- Time integration options
+tree_based_timesteps: ON                      # non-local timestep criterion (take 'signal speed' into account)
+
+#---------------------------------------- Single/Double Precision
+doubleprecision: 1                        # mode of double precision: not defined: single; 1: full double precision 2: mixed, 3: mixed, fewer single precisions; unless short of memory, use 1.
+input_in_doubleprecision: ON                  # initial conditions are in double precision
+output_center_of_mass: ON                     # output centers of cells
+
+#--------------------------------------- Output/Input options
+have_hdf5: ON                                 # needed when HDF5 I/O support is desired; should this be standard?
+
+#--------------------------------------- Testing and Debugging options
+debug: ON                                     # enables core-dumps, should this be standard?
