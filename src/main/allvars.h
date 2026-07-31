@@ -345,6 +345,8 @@ extern hwloc_cpuset_t cpuset_thread[NUM_THREADS];
 #define GRACKLE_SPECIES_NUMBER 0
 #define JET_INDEX 0
 #define JET_NUMBER 0
+#define DUST_INDEX 0
+#define DUST_NUMBER 0
 
 /* Metallicity */
 #ifdef METALS
@@ -378,8 +380,16 @@ extern hwloc_cpuset_t cpuset_thread[NUM_THREADS];
 #undef JET_INDEX
 #undef JET_NUMBER
 #define JET_INDEX (METALS_INDEX + METALS_NUMBER + GRACKLE_SPECIES_NUMBER)
-#define JET_NUMBER 1 
-#endif 
+#define JET_NUMBER 1
+#endif
+
+/* Dust mass (Phase 1: single species; DUST_NUMBER is the Phase 2b extension point) */
+#ifdef DUST
+#undef DUST_INDEX
+#undef DUST_NUMBER
+#define DUST_INDEX (METALS_INDEX + METALS_NUMBER + GRACKLE_SPECIES_NUMBER + JET_NUMBER)
+#define DUST_NUMBER 1
+#endif
 
 /* Potential extension */
 #ifndef PASSIVE_SCALARS_EXTRA
@@ -387,7 +397,7 @@ extern hwloc_cpuset_t cpuset_thread[NUM_THREADS];
 #endif
 
 /* Total passive scalar count */
-#define PASSIVE_SCALARS (METALS_NUMBER + GRACKLE_SPECIES_NUMBER + JET_NUMBER + PASSIVE_SCALARS_EXTRA)
+#define PASSIVE_SCALARS (METALS_NUMBER + GRACKLE_SPECIES_NUMBER + JET_NUMBER + DUST_NUMBER + PASSIVE_SCALARS_EXTRA)
 
 /* Refinement Default */
 #define SCALAR_REFINE 0
@@ -1729,7 +1739,13 @@ extern struct sph_particle_data
 /* Jet tracer */
 #ifdef JET_TRACER
 #define JetTracer PScalars[JET_INDEX]
-#define JetTracerConserved PConservedScalars[JET_INDEX]    
+#define JetTracerConserved PConservedScalars[JET_INDEX]
+#endif
+
+/* Dust mass */
+#ifdef DUST
+#define GasDustMassFraction PScalars[DUST_INDEX]
+#define GasDustMass PConservedScalars[DUST_INDEX]
 #endif
 
 /* Cooling */
@@ -1767,6 +1783,9 @@ extern struct sph_particle_data
 #endif
 #ifdef METALS
   MyDouble StarMetalsFeed;
+#endif
+#ifdef DUST
+  MyDouble StarDustFeed; /* signed: SN dust production minus SN shock destruction, staged for this cell */
 #endif
   MyDouble StarMomentumFeed[3];
   MyDouble StarEnergyFeed;
@@ -2124,6 +2143,9 @@ enum iofields
 #endif
 #ifdef OUTPUT_TIMEBIN_BH
   IO_TIMEBIN_BH,
+#endif
+#ifdef DUST
+  IO_DUST_MASS,
 #endif
   IO_LASTENTRY /* This should be kept - it signals the end of the list */
 };
