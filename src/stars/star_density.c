@@ -497,7 +497,7 @@ static int star_density_evaluate2(int target, int mode, int threadid)
   MyDouble *pos;
 
   int hosthydrobin = 0; 
-  int star_index, star_task, host_index, host_task;
+  int star_id, star_index, star_task, host_index, host_task;
 
   data_in local, *target_data;
   data_out out = {0};
