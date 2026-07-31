@@ -1431,6 +1431,7 @@ double InitMetallicityinSolar;
 
 #ifdef STAR_RADIATION_ACTIVE
   double RaySplitFactor;
+  double RayBoxPadFactor;
 #endif
 
 #ifdef RAD_OPENING_ANGLE
