@@ -896,4 +896,8 @@ void init_io_fields()
   init_units(IO_BH_DONOR_VELOCITY, 0.5, 0., 0., 0., 1., All.UnitVelocity_in_cm_per_s);
   init_snapshot_type(IO_BH_DONOR_VELOCITY, SN_MINI);
 #endif /* #if defined(HALO_SEEDING) && defined(BLACKHOLES) */
+
+#ifdef DUST
+  dust_init_io_fields();
+#endif
 }
