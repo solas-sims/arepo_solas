@@ -120,6 +120,34 @@ void domain_rearrange_particle_sequence(void)
           }
         else
           {
+            /* If the ELIMINATED particle (P[i], before being overwritten below) is itself a
+             * black hole or star, its own BhP[]/SP[] slot must be reclaimed here -- via
+             * swap-with-last on BhP[]/SP[] itself, decrementing NumBhs/NumStars -- BEFORE
+             * P[i] is overwritten, since P[i].BhID/SID is the only way to find that slot.
+             * Without this, NumBhs/NumStars never shrinks even though the particle is gone
+             * (e.g. after bh_merger() zeroes out a merged-away BH's Mass/ID expecting this
+             * function to clean it up), leaving an orphaned BhP[]/SP[] entry that's still
+             * counted -- exactly the kind of mismatch that made fill_write_buffer()'s A_BH
+             * scan walk off the end of the array in the original bug this mirrors. */
+#ifdef BLACKHOLES
+            if(P[i].Type == 5)
+              {
+                int bhid = P[i].BhID;
+                BhP[bhid] = BhP[NumBhs - 1];
+                P[BhP[bhid].PID].BhID = bhid;
+                NumBhs--;
+              }
+#endif
+#ifdef STARS
+            if(P[i].Type == 4)
+              {
+                int sid = P[i].SID;
+                SP[sid] = SP[NumStars - 1];
+                P[SP[sid].PID].SID = sid;
+                NumStars--;
+              }
+#endif
+
             /* non-gas particle being eliminated (a Type 4 star with zero mass, or any
              * non-gas type matching Mass==0 && ID==0): swap the true last particle into
              * this slot before NumPart shrinks, mirroring the gas branch above. Without
