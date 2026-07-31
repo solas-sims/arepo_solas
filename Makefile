@@ -566,7 +566,15 @@ OBJS += blackholes/bh_accretion.o \
 endif
 
 ifneq (,$(filter BH_FEEDBACK_ACTIVE,$(CONFIGVARS)))
-OBJS += blackholes/bh_feedback.o   
+OBJS += blackholes/bh_feedback.o
+endif
+
+ifneq (,$(filter BH_MERGER,$(CONFIGVARS)))
+ifeq (,$(filter BH_ACTIVE,$(CONFIGVARS)))
+$(error BH_MERGER requires BH_ACTIVE)
+endif
+OBJS += blackholes/bh_merger.o
+INCL += blackholes/bh_proto.h
 endif
 
 ifeq (FOF,$(findstring FOF,$(CONFIGVARS)))

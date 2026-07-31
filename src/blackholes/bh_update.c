@@ -111,6 +111,11 @@ void bh_reconstruct_timebins(void)
   
   for(i = 0; i < NumBhs; i++)
     {
+      /* skip BHs killed (e.g. by bh_merger()) since the last rebuild; their P[]/BhP[]
+       * slots persist until the next domain decomposition sweeps them up */
+      if(PPB(i).Mass == 0 && PPB(i).ID == 0)
+        continue;
+
       bin = BhP[i].TimeBinBh;
       if(bin >= TIMEBINS)
         continue;
@@ -178,6 +183,12 @@ void bh_perform_end_of_step_physics(void)
         continue;
 
       double original_mass = P[i].Mass;
+
+      /* each BH caps its own contribution to BhMassDrain at 0.9x the cell's mass, but
+       * multiple BHs sharing this cell as a neighbour add to the same accumulator without
+       * seeing each other's contributions, so the sum can still exceed the cell's mass */
+      if(SphP[i].BhMassDrain > 0.9 * P[i].Mass)
+        SphP[i].BhMassDrain = 0.9 * P[i].Mass;
 
       P[i].Mass -= SphP[i].BhMassDrain;
 

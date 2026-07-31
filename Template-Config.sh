@@ -66,6 +66,9 @@
 #BURST_MODE             # Only turn on for jet (not operational yet)
 #JET_TRACER             # Only turn on for jet (not operational yet)
 
+#BH_MERGER              # Requires BH_ACTIVE; merges gravitationally-bound black hole pairs closer than
+                        # BhMergerRadiusFactor (param.txt) x max(Hsml_i, Hsml_j) of each other (src/blackholes/bh_merger.c)
+
 #REFINEMENT_AROUND_BH   # BH refinement options
 #MIN_REFINEMENT_BH_MASS # Minimum BH mass above which refinement around the BH is applied (src/blackholes/bh_refinement.c)
 #REFINEMENT_AROUND_BH_FIXED   # Refine within a fixed radius around the BH

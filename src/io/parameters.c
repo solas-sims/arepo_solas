@@ -738,6 +738,12 @@ void read_parameter_file(char *fname)
 #endif
 #endif
 
+#ifdef BH_MERGER
+      strcpy(tag[nt], "BhMergerRadiusFactor");
+      addr[nt] = &All.BhMergerRadiusFactor;
+      id[nt++] = REAL;
+#endif /* #ifdef BH_MERGER */
+
 
       if((fd = fopen(fname, "r")))
         {

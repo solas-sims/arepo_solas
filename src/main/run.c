@@ -488,6 +488,10 @@ void calculate_non_standard_physics_end_of_step(void)
       bh_perform_end_of_step_physics();
 #endif
 
+#ifdef BH_MERGER
+      bh_merger();
+#endif
+
 #ifdef COOLING
 #ifdef USE_SFR
       cooling_and_starformation();

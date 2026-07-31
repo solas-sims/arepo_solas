@@ -1095,6 +1095,10 @@ extern struct global_data_all_processes
                                           of the DM gravitational softening length (a force-resolution scale,
                                           not a halo-boundary one like LinkL) */
 #endif /* #ifdef BH_SEED_ON_POTENTIAL_POSITION */
+#ifdef BH_MERGER
+  double BhMergerRadiusFactor; /*!< two black holes merge once their separation is below this factor times
+                                     max(Hsml_i, Hsml_j) and they are gravitationally bound to each other */
+#endif /* #ifdef BH_MERGER */
 #ifdef BLACKHOLE_SEEDING
   double BlackHoleSeedMass;
 #endif

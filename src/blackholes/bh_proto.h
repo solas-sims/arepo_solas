@@ -28,6 +28,11 @@ void bh_accretion(void);
 void bh_swallow(void);
 #endif
 
+#ifdef BH_MERGER
+/* BH-BH merging */
+void bh_merger(void);
+#endif
+
 /* Feedback loops */
 #ifdef BH_THERMAL_FEEDBACK
 void bh_feedback(void);

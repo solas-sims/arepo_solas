@@ -40,6 +40,10 @@ typedef struct Bh_Particle_Data
   MyDouble MassToDrain;
 #endif
 
+#ifdef BH_MERGER
+  int NumMergers; /*!< number of other black holes this one has absorbed via bh_merger() */
+#endif
+
 #ifdef BONDI_ACCRETION
   MyDouble GasVelocity[3];
   MyDouble GasCircularVelocity[3];
