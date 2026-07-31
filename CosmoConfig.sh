@@ -85,6 +85,8 @@ METALS
 #REFINEMENT_AROUND_BH
 BLACKHOLES
 BONDI_ACCRETION
+BH_MERGER                       # merges gravitationally-bound black hole pairs closer than BhMergerRadiusFactor (param.txt)
+                                 # x max(Hsml_i, Hsml_j) of each other; requires BH_ACTIVE (see src/blackholes/bh_merger.c)
 
 EVALPOTENTIAL                   # computes gravitational potential; required by BH_SEED_ON_POTENTIAL_POSITION below
 
@@ -100,4 +102,3 @@ BH_SEED_ON_POTENTIAL_POSITION    # donor cell is the densest gas cell (all parti
                                  # cell; defers seeding (rather than falling back) if no gas cell qualifies. Requires EVALPOTENTIAL.
 #OUTPUT_EVERY_STEP
 
-OVERRIDE_PEANOGRID_WARNING

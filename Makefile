@@ -65,19 +65,24 @@ HWLOC_INCL =
 HWLOC_LIB =
 endif
 
+# GRACKLE_DIR points at a Grackle install (containing include/ and lib{,64}/); override
+# per-machine by setting it in Makefile.systype (e.g. GRACKLE_DIR = $(HOME)/software/grackle_solas)
+# or on the command line (make GRACKLE_DIR=...), same convention as SYSTYPE above.
+GRACKLE_DIR ?= $(HOME)/Codes/grackle
+GRACKLE_LIBDIR := $(or $(firstword $(wildcard $(GRACKLE_DIR)/lib64 $(GRACKLE_DIR)/lib)),$(GRACKLE_DIR)/lib)
+
 ifeq (USE_GRACKLE,$(findstring USE_GRACKLE,$(CONFIGVARS)))
 OPTIONS += -DCONFIG_BFLOAT_8
-GRACKLE_INCL = -I$(HOME)/Codes/grackle/include
-GRACKLE_LIB = -L$(HOME)/Codes/grackle/lib -lgrackle -Wl,-rpath,$(HOME)/Codes/grackle/lib
+GRACKLE_INCL = -I$(GRACKLE_DIR)/include
+GRACKLE_LIB = -L$(GRACKLE_LIBDIR) -lgrackle -Wl,-rpath,$(GRACKLE_LIBDIR)
 ifeq ($(SYSTYPE),MACOSX)
-LDFLAGS += -L$(shell BREW --prefix gcc)/lib/gcc/current -lgfortran -lquadmath
+LDFLAGS += -L$(shell brew --prefix gcc)/lib/gcc/current -lgfortran -lquadmath
 else
 LDFLAGS += -lgfortran -lquadmath
 endif
 else
 GRACKLE_INCL =
 GRACKLE_LIB =
-LDFLAGS +=
 endif
 
 #Mac OS using MacPorts modules for openmpi, fftw, gsl, hdf5 and hwloc
