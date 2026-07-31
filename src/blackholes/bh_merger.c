@@ -114,10 +114,10 @@ void bh_merger(void)
   MPI_Allgatherv(local_bhs, n_local * sizeof(BhMergerCandidate), MPI_BYTE, global_bhs, bcounts, bdispls, MPI_BYTE,
                  MPI_COMM_WORLD);
 
-  myfree(bdispls);
-  myfree(bcounts);
-  myfree(counts);
-  myfree(local_bhs);
+  /* mymalloc()/myfree() is a strict LIFO stack: counts/bcounts/bdispls/local_bhs can't be
+   * freed yet even though Allgatherv is their last use, because global_bhs (allocated after
+   * them) is still on top of the stack and still needed through Step B/C below. They're
+   * freed at the very end, in exact reverse allocation order alongside everything else. */
 
   /* Step B: every task independently computes the identical accepted-pair list.
    * global_bhs[] is byte-identical on every task (same Allgatherv, same task-then-local
@@ -250,6 +250,10 @@ void bh_merger(void)
   myfree(best_r2);
   myfree(best_partner);
   myfree(global_bhs);
+  myfree(bdispls);
+  myfree(bcounts);
+  myfree(counts);
+  myfree(local_bhs);
 }
 
 #endif /* #if defined(BH_MERGER) */
