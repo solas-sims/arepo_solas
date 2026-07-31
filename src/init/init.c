@@ -534,18 +534,18 @@ int init(void)
   free_mesh();
 
 #ifdef STAR_PARTICLES
-if(ThisTask == 0)
-  {
-    build_imf_cdf();
+  if(ThisTask == 0)
+    {
+      build_imf_cdf();
 
 #if defined(STAR_PARTICLES) && STAR_PARTICLES < 2
-    setup_mass_bins();
+      setup_mass_bins();
 #endif
 
 #if STAR_PARTICLES == 0
-    setup_imf_integrals();
+      setup_imf_integrals();
 #endif
-  }
+    }
   
   MPI_Bcast(cdf_masses, N_CDF_BINS + 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
   MPI_Bcast(cdf_values, N_CDF_BINS + 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
