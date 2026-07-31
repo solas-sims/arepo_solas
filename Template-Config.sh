@@ -10,6 +10,12 @@
 #PASSIVE_SCALARS=1      # Number of passive scalar fields advected with fluid (default: 0)
 #METALS                 # Advect all metals, ie metal mass fraction, as a PASSIVE_SCALARS
 
+#---------------------------------------- Dust parameters
+#DUST                   # Single-species dust mass, advected as a PASSIVE_SCALARS (requires METALS). Phase 1: production (SN-channel only)/growth/sputtering/SN-destruction.
+#DUST_SPECIES=1         # (not yet implemented, Phase 2b) number of dust species carried per cell; Phase 1 code is written to be indexed by species so this only needs to grow later
+#DUST_SIZE_BINS         # (not yet implemented, Phase 2b) piecewise-linear grain-size bin discretization (McKinnon 2018)
+#DUST_LIVE              # (not yet implemented, Phase 4) two-fluid dynamical dust particles
+
 #---------------------------------------- Cooling parameters
 #USE_GRACKLE
 #GRACKLE_CHEMISTRY=0    # Curretly only grackle mode=0 (lookup tables) with no chemistry network is supported
