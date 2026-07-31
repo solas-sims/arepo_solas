@@ -768,7 +768,7 @@ void ngb_update_node_recursive(int no, int sib, int father, int *last, int mode)
               Nchildren++;
               
           RtNgb_Nodes[no].Nchildren = Nchildren;
-
+          
           RtNgb_Nodes[no].MaxRadius = MaxRadius;
 #endif
 
@@ -878,6 +878,7 @@ void ngb_exchange_topleafdata(void)
 #endif /* #ifdef TREE_BASED_TIMESTEPS */
 
 #ifdef STAR_RADIATION_ACTIVE
+    int Nchildren;
     MyNgbTreeFloat MaxRadius;
 #endif
 
@@ -936,6 +937,8 @@ void ngb_exchange_topleafdata(void)
 #endif /* #ifdef TREE_BASED_TIMESTEPS */
             }
 #ifdef STAR_RADIATION_ACTIVE
+          loc_DomainMoment[idx].Nchildren = RtNgb_Nodes[no].Nchildren;
+          
           loc_DomainMoment[idx].MaxRadius = RtNgb_Nodes[no].MaxRadius;
 #endif
 
@@ -983,6 +986,8 @@ void ngb_exchange_topleafdata(void)
 #endif /* #ifdef TREE_BASED_TIMESTEPS */
             }
 #ifdef STAR_RADIATION_ACTIVE
+          RtNgb_Nodes[no].Nchildren = DomainMoment[idx].Nchildren;
+          
           RtNgb_Nodes[no].MaxRadius = DomainMoment[idx].MaxRadius;
 #endif
 
