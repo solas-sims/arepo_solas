@@ -118,6 +118,28 @@ void domain_rearrange_particle_sequence(void)
             NumGas--;
             count_gaselim++;
           }
+        else
+          {
+            /* non-gas particle being eliminated (a Type 4 star with zero mass, or any
+             * non-gas type matching Mass==0 && ID==0): swap the true last particle into
+             * this slot before NumPart shrinks, mirroring the gas branch above. Without
+             * this, NumPart simply shrinks without removing this slot's stale data,
+             * silently dropping whatever particle genuinely occupied the last slot
+             * instead (and leaving the eliminated particle's own stale, still-flagged-
+             * for-elimination data sitting within the new, smaller NumPart bound) */
+            P[i]   = P[NumPart - 1];
+            Key[i] = Key[NumPart - 1];
+
+#ifdef STARS
+            if(P[i].Type == 4)
+              SPP(i).PID = i;
+#endif
+
+#ifdef BLACKHOLES
+            if(P[i].Type == 5)
+              BPP(i).PID = i;
+#endif
+          }
 
         NumPart--;
         i--;
