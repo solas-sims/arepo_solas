@@ -529,6 +529,10 @@ void calculate_non_standard_physics_end_of_step(void)
 #endif /* #ifdef USE_SFR #else */
 #endif /* #ifdef COOLING */
 
+#ifdef DUST
+      dust_processes();
+#endif
+
 #ifdef STAR_FEEDBACK_ACTIVE
       star_exit();
 #endif
