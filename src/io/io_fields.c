@@ -829,5 +829,9 @@ void init_io_fields()
   init_field(IO_TIMEBIN_BH, "TBB", "TimebinBh", MEM_INT, FILE_INT, FILE_NONE, 1, A_BH, &BhP[0].TimeBinBh, 0, BHS_ONLY);
   init_units(IO_TIMEBIN_BH, 0., 0., 0., 0., 0., 0.0);
   init_snapshot_type(IO_TIMEBIN_BH, SN_MINI);
-#endif 
+#endif
+
+#ifdef DUST
+  dust_init_io_fields();
+#endif
 }
