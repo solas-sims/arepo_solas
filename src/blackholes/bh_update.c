@@ -186,9 +186,25 @@ void bh_perform_end_of_step_physics(void)
 
       /* each BH caps its own contribution to BhMassDrain at 0.9x the cell's mass, but
        * multiple BHs sharing this cell as a neighbour add to the same accumulator without
-       * seeing each other's contributions, so the sum can still exceed the cell's mass */
-      if(SphP[i].BhMassDrain > 0.9 * P[i].Mass)
-        SphP[i].BhMassDrain = 0.9 * P[i].Mass;
+       * seeing each other's contributions, so the sum can still exceed the cell's mass.
+       * Guard against P[i].Mass itself already being non-positive (corrupted upstream, e.g.
+       * by the mesh flux update): the 0.9x-of-current-mass clamp below only makes sense for
+       * a positive mass -- applied to a negative one it flips sign and UNDER-clamps, letting
+       * the drain shrink the negative value's magnitude instead of being rejected outright. */
+      if(P[i].Mass > 0)
+        {
+          if(SphP[i].BhMassDrain > 0.9 * P[i].Mass)
+            SphP[i].BhMassDrain = 0.9 * P[i].Mass;
+        }
+      else
+        {
+          if(SphP[i].BhMassDrain != 0)
+            printf("BH_ACCRETION: WARNING Task %d: cell ID=%llu already has Mass=%g <= 0 before BhMassDrain=%g is applied "
+                   "-- corruption upstream of bh_perform_end_of_step_physics(), not from accretion draining\n",
+                   ThisTask, (unsigned long long)P[i].ID, P[i].Mass, SphP[i].BhMassDrain);
+
+          SphP[i].BhMassDrain = 0;
+        }
 
       P[i].Mass -= SphP[i].BhMassDrain;
 
