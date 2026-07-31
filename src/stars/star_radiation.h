@@ -15,6 +15,9 @@
 #define NSIDE_MIN 1
 #define NSIDE_MAX 128  
 
+/* Starting number of rays */
+#define NRays (12 * NSIDE_MIN * NSIDE_MIN)
+
 /* Dissociation of H2 */
 #define SIGMA_DISS 2.47e-18 /* cm^2, dissociation-weighted eff. cross 
                                section (DB96, Baczynski+15) */
@@ -34,9 +37,6 @@
 #define NO_IR_ACTIVE ((uint8_t)(ALL_BANDS_ACTIVE & ~(1u << INFRARED)))
 #define NO_IONIZING_ACTIVE ((uint8_t)(ALL_BANDS_ACTIVE & ~(1u << IONIZING_HI) & ~(1u << IONIZING_HeI) & ~(1u << IONIZING_HeII)))
 #define ONLY_IONIZING_ACTIVE ((uint8_t)(ALL_BANDS_ACTIVE & ((1u << IONIZING_HI) | (1u << IONIZING_HeI) | (1u << IONIZING_HeII))))
-
-extern double HealpixDirs[12 * NSIDE_MIN*NSIDE_MIN][3];
-extern int NRays;
 
 /* 
  * INFRARED: inf A - 12398.4 A (0 eV - 1 eV)
@@ -94,12 +94,13 @@ typedef struct RayPacket
   double pos[3];
   double dir[3];
 
-  int nside; /* Current HEALPix nside level */
-  int healpix_pixel; /* Pixel index in nested scheme */
-
   double t;
   double t_exit;
   double t_maximum;
+
+  int nside; /* Current HEALPix nside level */
+  int healpix_pixel; /* HEALPix basis rotation seed (per star) */
+  unsigned long long rotation_seed; /* HEALPix basis rotation seed (per star) */
 
   /* Bitmask: bit w is SET while band w is still alive */
   /* Cleared when Radiated[w] < RAD_TRUNC_FRAC * Radiated_Init[w] */

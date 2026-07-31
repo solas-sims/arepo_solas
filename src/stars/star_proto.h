@@ -78,7 +78,6 @@ double dtau_IR(int i, double length);
 void init_h2shield(void);
 double h2shield_dtau(double N_H2, double dN_H2);
 
-void start_healpix(void);
 void append_ray(RayWorkStack *w, const RayPacket *ray);
 void split_ray(const RayPacket *parent, RayPacket children[4]);
 

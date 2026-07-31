@@ -583,7 +583,6 @@ if(ThisTask == 0)
 
 #ifdef STAR_RADIATION_ACTIVE
   init_h2shield();
-  start_healpix();
 #endif
 
 #ifdef BH_ACCRETION_ACTIVE 
