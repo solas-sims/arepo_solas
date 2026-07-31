@@ -6,6 +6,9 @@
 
 #include "../main/allvars.h"
 #include "../main/proto.h"
+#ifdef DUST
+#include "../dust/dust.h"
+#endif
 
 /* SN host-injection modes, returned by SN_feedback_radius() */
 #define MESH 0 /* Couple across Voronoi faces */
@@ -39,6 +42,9 @@ struct Feedback_Kick
 #endif
 #ifdef METALS
   MyDouble SN_DeltaMetals;
+#endif
+#ifdef DUST
+  MyDouble SN_DeltaDust; /* signed: production minus shock destruction */
 #endif
   MyDouble SN_DeltaP[3];
   MyDouble SN_DeltaE;
@@ -77,6 +83,9 @@ static void apply_kick(int j, const struct Feedback_Kick *Kick)
   SphP[j].StarMetalsFeed += Kick->SN_DeltaMetals;
   All.StarFeedbackLocal[1] += Kick->SN_DeltaMetals;
 #endif
+#ifdef DUST
+  SphP[j].StarDustFeed += Kick->SN_DeltaDust;
+#endif
   for(int k = 0; k < 3; k++)
     SphP[j].StarMomentumFeed[k] += Kick->SN_DeltaP[k];
 
@@ -101,6 +110,9 @@ static void apply_kick_primexch(int particle, const struct Feedback_Kick *Kick)
   PrimExch[particle].MassFeed += Kick->SN_DeltaMass;
 #ifdef METALS
   PrimExch[particle].MetalsFeed += Kick->SN_DeltaMetals;
+#endif
+#ifdef DUST
+  PrimExch[particle].DustFeed += Kick->SN_DeltaDust;
 #endif
   for(int k = 0; k < 3; k++)
     PrimExch[particle].MomentumFeed[k] += Kick->SN_DeltaP[k];
@@ -254,6 +266,20 @@ static void SN_feedback_host(int i, int ev, int h, int mode)
 #endif
 #ifdef METALS
   Kick.SN_DeltaMetals = MechanicalFeedback->SN_MetalsLoss;
+#endif
+#ifdef DUST
+  /* HOST mode fires when the host cell is much smaller than the SN remnant
+   * (r_host < r_SN/10, see SN_feedback_radius()) -- there is no swept-mass
+   * split to compute here, so the whole cell is treated as processed by the
+   * shock: all of its pre-existing dust is destroyed, and freshly-condensed
+   * SN dust is added. */
+  {
+    double host_dust     = SphP[i].GasDustMass + SphP[i].StarDustFeed;
+    double host_gas_mass = P[i].Mass + SphP[i].StarMassFeed;
+    double dust_destroyed =
+        dust_destruction_sn(DUST_PHASE1_SPECIES, host_dust, host_gas_mass, host_gas_mass, 1.0);
+    Kick.SN_DeltaDust = dust_production_sn(DUST_PHASE1_SPECIES, MechanicalFeedback->SN_MetalsLoss) - dust_destroyed;
+  }
 #endif
   /* Advected mass only: ejecta carries the star's own velocity */
   for(k = 0; k < 3; k++)
@@ -576,6 +602,15 @@ void star_feedback(void)
           double dmZ_h = dm_h * (SphP[i].GasMetals + SphP[i].StarMetalsFeed) / m_h;
 #endif
 
+#ifdef DUST
+          /* Dust contained in the swept mass: destroyed by the shock, not
+           * redistributed intact like dmZ_h (see dust.h). Implemented via
+           * dust_destruction_sn() with dm_h itself as the McKee-style
+           * destroy-mass threshold, so it reduces exactly to the swept-mass
+           * fraction of the host's current dust. */
+          double dmD_h = dust_destruction_sn(DUST_PHASE1_SPECIES, SphP[i].GasDustMass + SphP[i].StarDustFeed, m_h, dm_h, 1.0);
+#endif
+
           double p_h[3], v_h[3];
           for(k = 0; k < 3; k++)
             {
@@ -766,6 +801,12 @@ void star_feedback(void)
 #ifdef METALS
                   Kick.SN_DeltaMetals = (MechanicalFeedback->SN_MetalsLoss + dmZ_h) * sqrtsq_wbar ;
 #endif
+#ifdef DUST
+                  /* Only freshly-condensed SN dust is redistributed here --
+                   * the swept host dust (dmD_h) was destroyed, not carried
+                   * along, unlike the metal tracer mass. */
+                  Kick.SN_DeltaDust = dust_production_sn(DUST_PHASE1_SPECIES, MechanicalFeedback->SN_MetalsLoss) * sqrtsq_wbar;
+#endif
                   /* Momentum = advected (ejecta @ v_star + host @ v_host)
                    * + directed energy-conserving kick p_SN * wbar.          */
                   for(k = 0; k < 3; k++)
@@ -826,6 +867,9 @@ void star_feedback(void)
 #endif
 #ifdef METALS
               Kick_h.SN_DeltaMetals = -dmZ_h;
+#endif
+#ifdef DUST
+              Kick_h.SN_DeltaDust = -dmD_h; /* swept dust destroyed, not returned */
 #endif
               for(k = 0; k < 3; k++)
                 Kick_h.SN_DeltaP[k] = -dm_h * v_h[k];

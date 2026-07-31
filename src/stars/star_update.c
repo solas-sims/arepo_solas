@@ -401,10 +401,26 @@ void star_perform_end_of_step_physics(void)
       /* Add metals */
       SphP[i].GasMetals += SphP[i].StarMetalsFeed;
       All.StarFeedbackLocal[4] += SphP[i].StarMetalsFeed;
-      
+
       sync_primitive_from_conserved(i, METALS_INDEX);
 
       SphP[i].StarMetalsFeed = 0;
+#endif
+#ifdef DUST
+      /* Add SN-condensed dust minus SN-shock-destroyed dust (see
+       * star_feedback.c); clamp to the physical invariant
+       * 0 <= GasDustMass <= GasMetals (dust can never exceed the metal
+       * budget it condensed from -- GasMetals was just updated above). */
+      SphP[i].GasDustMass += SphP[i].StarDustFeed;
+
+      if(SphP[i].GasDustMass < 0)
+        SphP[i].GasDustMass = 0;
+      if(SphP[i].GasDustMass > SphP[i].GasMetals)
+        SphP[i].GasDustMass = SphP[i].GasMetals;
+
+      sync_primitive_from_conserved(i, DUST_INDEX);
+
+      SphP[i].StarDustFeed = 0;
 #endif
 #endif
             
