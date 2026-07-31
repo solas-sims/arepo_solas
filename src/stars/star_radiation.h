@@ -20,7 +20,7 @@
                                section (DB96, Baczynski+15) */
 
 #define F_DISS 0.15 /* dissociation branching per absorption */
-#define SIGMA_PUMP (SIGMA_DISS / F_DISS) /* total line absorption   */
+#define SIGMA_PUMP (SIGMA_DISS / F_DISS) /* total line absorption */
  
 #define H2_SHIELD_B5 3.0 /* Doppler b / (km/s); fixed */
  
@@ -89,8 +89,14 @@ typedef struct StackEntry
 
 typedef struct RayPacket
 {
+  MyIDType star_id;
+
   double pos[3];
   double dir[3];
+
+  int nside; /* Current HEALPix nside level */
+  int healpix_pixel; /* Pixel index in nested scheme */
+
   double t;
   double t_exit;
   double t_maximum;
@@ -100,37 +106,37 @@ typedef struct RayPacket
   /* When active_bands == 0 the ray is fully absorbed - return immediately */
   uint8_t  active_bands;
 
+  /* Ray energy and photons */
   WavebandData Radiated[WAVEBANDS];
   WavebandData Radiated_Init[WAVEBANDS];
 
-  double N_H2; /* accumulated H2 column since source */
+  /* Accumulated H2 column since source */
+  double N_H2; 
 
+  /* Ray bookkeeping */
   int ray_id;
   int home_task;
   
-  /* Pending top-level nodes still to traverse after current domain */
-  StackEntry pending[RAY_PENDING_SIZE];
-  int n_pending;
   int target_node;
   int is_paused;
-  
-  int nside; /* Current HEALPix nside level */
-  int healpix_pixel; /* Pixel index in nested scheme */
+    
+  int n_pending;
+  StackEntry pending[RAY_PENDING_SIZE];
 } RayPacket;
 
 typedef struct RayWorkStack
 {
   long long n; /* Number of rays on this stack */
   long long capacity; /* Allocated capacity */
-  RayPacket *rays; /* Ray information */
+  RayPacket *rays;
 } RayWorkStack;
 
 typedef struct RayExportBuffer
 {
   long long n; /* Number of rays to export */
   long long capacity; /* Allocated capacity */
-  int *task; /* Which task to send each ray to */
-  RayPacket *rays; /* Ray information */
+  int *task; /* Where to send each ray */
+  RayPacket *rays; 
 } RayExportBuffer;
 
 extern struct rad_resultsactiveimported_data

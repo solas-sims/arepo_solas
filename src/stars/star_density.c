@@ -53,6 +53,8 @@ static MyFloat *StarHostDistance;
 
 struct Data 
 {
+  MyIDType StarID;
+
   int StarIndex; 
   int StarTask; 
   int HostIndex; 
@@ -98,6 +100,8 @@ static void particle2in(data_in *in, int i, int firstnode)
   
   if(pass == 1)
     {
+      in->Data.StarID = -1;
+
       in->Data.StarIndex = -1;
       in->Data.StarTask = -1;
       in->Data.HostIndex = -1;
@@ -105,6 +109,8 @@ static void particle2in(data_in *in, int i, int firstnode)
     }
   if(pass == 2)
     {
+      in->Data.StarID = PPS(i).ID;
+
       in->Data.StarIndex = i;
       in->Data.StarTask = ThisTask;
       in->Data.HostIndex = StarHostIndex[i];
@@ -515,6 +521,7 @@ static int star_density_evaluate2(int target, int mode, int threadid)
   h = target_data->Hsml;
   h2 = h * h;
 
+  star_id = target_data->Data.StarID;
   star_index = target_data->Data.StarIndex;
   star_task = target_data->Data.StarTask;
   host_index = target_data->Data.HostIndex;
@@ -573,6 +580,7 @@ static int star_density_evaluate2(int target, int mode, int threadid)
 
               Mechanical_Feedback_Data *data = &MechanicalFeedbackEvents.MechanicalFeedbackData[MechanicalFeedbackEvents.NumEvents++];
 
+              data->StarID = star_id;
               data->StarIndex = star_index;
               data->StarTask = star_task; 
               data->HostIndex = host_index;
