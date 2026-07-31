@@ -804,10 +804,6 @@ int fof_seeding_list(HaloSeedEvent *events, int max_events)
 
   MPI_Allgatherv(local_events, n_local * sizeof(HaloSeedEvent), MPI_BYTE, events, bcounts, bdispls, MPI_BYTE, MPI_COMM_WORLD);
 
-  /* every task records every seeded halo -> registries stay in lockstep */
-  for(i = 0; i < n_global; i++)
-    halo_mark_seeded(&HaloSeeds, events[i].HaloMinID);
-
   myfree(bdispls);
   myfree(bcounts);
   myfree(counts);
@@ -816,8 +812,22 @@ int fof_seeding_list(HaloSeedEvent *events, int max_events)
   myfree_movable(FOF_GList);
   myfree_movable(FOF_PList);
 
-  myfree_movable(Group);   
-  myfree_movable(PS);              
+  myfree_movable(Group);
+  myfree_movable(PS);
+
+  /* every task records every seeded halo -> registries stay in lockstep.
+   * Done only after every local scratch allocation above (both movable and
+   * non-movable) has been freed: HaloSeeds.ids is a long-lived movable block
+   * allocated once, far earlier, at program start/restart; growing it via
+   * myrealloc_movable() requires every block allocated *after* it in the
+   * arena to also be movable, and local_events/counts/bcounts/bdispls above
+   * are plain mymalloc() (non-movable) -- calling halo_mark_seeded() (which
+   * can trigger that growth) while they were still alive violated that
+   * invariant. events[]/n_global are populated above and don't depend on
+   * any of the freed arrays, so this reordering doesn't change what gets
+   * recorded, only when. */
+  for(i = 0; i < n_global; i++)
+    halo_mark_seeded(&HaloSeeds, events[i].HaloMinID);
 
   TIMER_STOP(CPU_FOF);
   mpi_printf("FOF_SEEDING: All FOF related work finished, %d seed events identified.\n", n_global);
