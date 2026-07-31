@@ -29,7 +29,7 @@ static inline int ray_box_intersect(const double *ray_pos, const double *ray_dir
     {
       /* Box too wide along this axis for a single minimum-image shift to be trustworthy */
       if(halfextent[i] >= halfdomain[i])
-        continue;
+        terminate("Found a very large node!");
 
       double shifted_min = ray_pos[i] + d[i] - halfextent[i];
       double shifted_max = ray_pos[i] + d[i] + halfextent[i];
