@@ -141,11 +141,17 @@ extern struct primexch
 #ifdef METALS
   MyDouble Metals;
 #endif
+#ifdef DUST
+  MyDouble Dust;
+#endif
   MyDouble Momentum[3];
 
   MyDouble MassFeed;
 #ifdef METALS
   MyDouble MetalsFeed;
+#endif
+#ifdef DUST
+  MyDouble DustFeed;
 #endif
   MyDouble MomentumFeed[3];
 #endif
