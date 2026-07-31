@@ -6,7 +6,7 @@
 
 static inline int ray_box_intersect(const double *ray_pos, const double *ray_dir,
                                     const MyNgbTreeFloat *rmin, const MyNgbTreeFloat *rmax,
-                                    double *t_enter, double *t_exit)
+                                    double pad, double *t_enter, double *t_exit)
 {
   double xtmp, ytmp, ztmp;
 
@@ -19,7 +19,8 @@ static inline int ray_box_intersect(const double *ray_pos, const double *ray_dir
   d[1] = NEAREST_Y(center[1] - ray_pos[1]);
   d[2] = NEAREST_Z(center[2] - ray_pos[2]);
 
-  double halfextent[3] = {0.5 * (rmax[0] - rmin[0]), 0.5 * (rmax[1] - rmin[1]), 0.5 * (rmax[2] - rmin[2])};
+  double halfextent[3] = {0.5 * (rmax[0] - rmin[0]) + pad, 0.5 * (rmax[1] - rmin[1]) + pad, 0.5 * (rmax[2] - rmin[2]) + pad};
+
   double halfdomain[3] = {boxHalf_X, boxHalf_Y, boxHalf_Z};
 
   double tmin = -MAX_REAL_NUMBER, tmax = MAX_REAL_NUMBER;
@@ -461,7 +462,9 @@ void raytrace_treewalk(RayPacket *ray, RayWorkStack *work, RayExportBuffer *expo
                 {   
                   struct NgbNODE *child_nop = &Ngb_Nodes[child];
 
-                  hit = ray_box_intersect(ray->pos, ray->dir, child_nop->u.d.range_min, child_nop->u.d.range_max, &t_enter, &t_exit);
+                  double MaxRadius = All.RayBoxPadFactor * RtNgb_Nodes[child].MaxRadius;
+
+                  hit = ray_box_intersect(ray->pos, ray->dir, child_nop->u.d.range_min, child_nop->u.d.range_max, MaxRadius, &t_enter, &t_exit);
                 }
               /* Pseudo-particle: remote domain */
               else 
@@ -471,7 +474,9 @@ void raytrace_treewalk(RayPacket *ray, RayWorkStack *work, RayExportBuffer *expo
 
                   struct NgbNODE *pseudo_nop = &Ngb_Nodes[top_node];
 
-                  hit = ray_box_intersect(ray->pos, ray->dir, pseudo_nop->u.d.range_min, pseudo_nop->u.d.range_max, &t_enter, &t_exit);
+                  double MaxRadius = All.RayBoxPadFactor * RtNgb_Nodes[top_node].MaxRadius;
+
+                  hit = ray_box_intersect(ray->pos, ray->dir, pseudo_nop->u.d.range_min, pseudo_nop->u.d.range_max, MaxRadius, &t_enter, &t_exit);
                 }
 
               if(hit)

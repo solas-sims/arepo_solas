@@ -60,6 +60,8 @@ extern struct RtNgbNODE
     /* number of children */
     int Nchildren;
 
+    MyNgbTreeFloat MaxRadius;
+
 #ifdef RAD_OPENING_ANGLE
     /* RT quantities - volume-weighted, accumulated during tree build */
     MyNgbTreeFloat Volume;

@@ -527,6 +527,10 @@ void ngb_update_node_recursive(int no, int sib, int father, int *last, int mode)
   MyNgbTreeFloat vmin[3], vmax[3], maxcsnd;
 #endif /* #ifdef TREE_BASED_TIMESTEPS */
 
+#ifdef STAR_RADIATION_ACTIVE
+  MyNgbTreeFloat MaxRadius = 0;
+#endif
+
 #ifdef RAD_OPENING_ANGLE
   MyNgbTreeFloat Volume, dN_H2_OverLength, DtauOverLength_E[WAVEBANDS], DtauOverLength_N[WAVEBANDS];
 
@@ -666,6 +670,11 @@ void ngb_update_node_recursive(int no, int sib, int father, int *last, int mode)
                                 vmax[k] = ExtNgb_Nodes[p].vmax[k];
 #endif /* #ifdef TREE_BASED_TIMESTEPS */
                             }
+#ifdef STAR_RADIATION_ACTIVE
+                          if(MaxRadius < RtNgb_Nodes[p].MaxRadius)
+                            MaxRadius = RtNgb_Nodes[p].MaxRadius;
+#endif
+
 #ifdef RAD_OPENING_ANGLE  
                           Volume += RtNgb_Nodes[p].Volume;
                           
@@ -711,6 +720,15 @@ void ngb_update_node_recursive(int no, int sib, int father, int *last, int mode)
 #endif /* #ifdef TREE_BASED_TIMESTEPS */
 
                         }
+#ifdef STAR_RADIATION_ACTIVE
+                          if(P[p].Type == 0)
+                            {
+                              MyNgbTreeFloat r_cell = get_cell_radius(p);
+                                if(MaxRadius < r_cell)
+                                  MaxRadius = r_cell;
+                            }
+#endif
+
 #ifdef RAD_OPENING_ANGLE  
                       Volume += SphP[p].Volume;
                       
@@ -741,6 +759,19 @@ void ngb_update_node_recursive(int no, int sib, int father, int *last, int mode)
               ExtNgb_Nodes[no].vmax[k] = vmax[k];
 #endif /* #ifdef TREE_BASED_TIMESTEPS */
             }
+#ifdef STAR_RADIATION_ACTIVE
+          /* Count direct children */
+          int Nchildren = 0;
+          
+          for(int j = 0; j < 8; j++)
+            if(suns[j] >= 0) 
+              Nchildren++;
+              
+          RtNgb_Nodes[no].Nchildren = Nchildren;
+
+          RtNgb_Nodes[no].MaxRadius = MaxRadius;
+#endif
+
 #ifdef RAD_OPENING_ANGLE  
           RtNgb_Nodes[no].Volume = Volume;
 
@@ -760,17 +791,6 @@ void ngb_update_node_recursive(int no, int sib, int father, int *last, int mode)
               RtNgb_Nodes[no].DtauOverLength_E[w] = DtauOverLength_E[w];
               RtNgb_Nodes[no].DtauOverLength_N[w] = DtauOverLength_N[w];
             }
-#endif
-
-#ifdef STAR_RADIATION_ACTIVE
-          /* Count direct children */
-          int Nchildren = 0;
-          
-          for(int j = 0; j < 8; j++)
-            if(suns[j] >= 0) 
-              Nchildren++;
-              
-          RtNgb_Nodes[no].Nchildren = Nchildren;
 #endif
 
           Ngb_Nodes[no].u.d.sibling = sib;
@@ -857,6 +877,10 @@ void ngb_exchange_topleafdata(void)
     MyNgbTreeFloat MaxCsnd, vmin[3], vmax[3];
 #endif /* #ifdef TREE_BASED_TIMESTEPS */
 
+#ifdef STAR_RADIATION_ACTIVE
+    MyNgbTreeFloat MaxRadius;
+#endif
+
 #ifdef RAD_OPENING_ANGLE
     MyNgbTreeFloat Volume, dN_H2_OverLength, DtauOverLength_E[WAVEBANDS], DtauOverLength_N[WAVEBANDS];
 #endif
@@ -911,6 +935,10 @@ void ngb_exchange_topleafdata(void)
               loc_DomainMoment[idx].vmax[k] = ExtNgb_Nodes[no].vmax[k];
 #endif /* #ifdef TREE_BASED_TIMESTEPS */
             }
+#ifdef STAR_RADIATION_ACTIVE
+          loc_DomainMoment[idx].MaxRadius = RtNgb_Nodes[no].MaxRadius;
+#endif
+
 #ifdef RAD_OPENING_ANGLE
           loc_DomainMoment[idx].Volume = RtNgb_Nodes[no].Volume;
           
@@ -954,6 +982,10 @@ void ngb_exchange_topleafdata(void)
               ExtNgb_Nodes[no].vmax[k] = DomainMoment[idx].vmax[k];
 #endif /* #ifdef TREE_BASED_TIMESTEPS */
             }
+#ifdef STAR_RADIATION_ACTIVE
+          RtNgb_Nodes[no].MaxRadius = DomainMoment[idx].MaxRadius;
+#endif
+
 #ifdef RAD_OPENING_ANGLE
           RtNgb_Nodes[no].Volume = DomainMoment[idx].Volume;
 
