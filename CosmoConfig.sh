@@ -66,8 +66,8 @@ DEBUG # enables core-dumps
 #--------------------------------------- non-standard phyiscs
 #ENFORCE_JEANS_STABILITY_OF_CELLS # this imposes an adaptive floor for the temperature
 COOLING                          # Simple primordial cooling
-#USE_GRACKLE			 # Use Grackle library for cooling
-#GRACKLE_CHEMISTRY=3
+USE_GRACKLE			 # Use Grackle library for cooling
+GRACKLE_CHEMISTRY=3
 #NOUVBACKGROUND			 # Switches off UV background
 USE_SFR                          # Activate star formation
 #EEOS_SF			 # AGORA star formation scheme
@@ -96,7 +96,7 @@ BH_SEED_ON_MASS                 # seed once halo mass exceeds MinHaloMassForFOFS
 #BH_SEED_ON_ZERO_METALLICITY     # seed pristine halos (max gas-cell metallicity <= ZeroMetallicityThresholdForFOFSeeding, param.txt);
                                  # requires METALS above to be enabled. Channels OR together if more than one is active, and a halo
                                  # already hosting a black hole (Type 5) is never reseeded regardless of channel.
-BH_SEED_ON_VELDISP               # seed once a halo's DM-only 3D velocity dispersion exceeds MinVelDispForFOFSeeding (param.txt)
+#BH_SEED_ON_VELDISP               # seed once a halo's DM-only 3D velocity dispersion exceeds MinVelDispForFOFSeeding (param.txt)
 BH_SEED_ON_POTENTIAL_POSITION    # donor cell is the densest gas cell (all particle types) within PotentialDonorSearchNSoft x the
                                  # DM softening length of the halo's potential minimum, instead of the unrestricted densest gas
                                  # cell; defers seeding (rather than falling back) if no gas cell qualifies. Requires EVALPOTENTIAL.

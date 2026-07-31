@@ -68,7 +68,7 @@ endif
 # GRACKLE_DIR points at a Grackle install (containing include/ and lib{,64}/); override
 # per-machine by setting it in Makefile.systype (e.g. GRACKLE_DIR = $(HOME)/software/grackle_solas)
 # or on the command line (make GRACKLE_DIR=...), same convention as SYSTYPE above.
-GRACKLE_DIR ?= $(HOME)/Codes/grackle
+GRACKLE_DIR ?= $(HOME)/software/grackle_solas/
 GRACKLE_LIBDIR := $(or $(firstword $(wildcard $(GRACKLE_DIR)/lib64 $(GRACKLE_DIR)/lib)),$(GRACKLE_DIR)/lib)
 
 ifeq (USE_GRACKLE,$(findstring USE_GRACKLE,$(CONFIGVARS)))
