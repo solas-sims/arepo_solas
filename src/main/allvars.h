@@ -1097,7 +1097,14 @@ extern struct global_data_all_processes
 #endif /* #ifdef BH_SEED_ON_POTENTIAL_POSITION */
 #ifdef BH_MERGER
   double BhMergerRadiusFactor; /*!< two black holes merge once their separation is below this factor times
-                                     max(Hsml_i, Hsml_j) and they are gravitationally bound to each other */
+                                     the length scale selected by BhMergerRadiusCriterion, and they are
+                                     gravitationally bound to each other */
+  char BhMergerRadiusCriterionString[MAXLEN_PARAM_VALUE]; /*!< raw value from the parameter file: "HSML" (default,
+                                     reproduces the legacy factor*max(Hsml_i,Hsml_j) behaviour), "SOFTENING",
+                                     "MAX_HSML_SOFTENING", or "MIN_HSML_SOFTENING" -- resolved into
+                                     BhMergerRadiusCriterion by check_parameters(); see enum
+                                     bh_merger_radius_criterion in src/blackholes/bh.h */
+  int BhMergerRadiusCriterion; /*!< resolved enum value; set by check_parameters(), do not set directly */
 #endif /* #ifdef BH_MERGER */
 #ifdef BLACKHOLE_SEEDING
   double BlackHoleSeedMass;

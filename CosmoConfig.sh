@@ -86,7 +86,11 @@ METALS
 BLACKHOLES
 BONDI_ACCRETION
 BH_MERGER                       # merges gravitationally-bound black hole pairs closer than BhMergerRadiusFactor (param.txt)
-                                 # x max(Hsml_i, Hsml_j) of each other; requires BH_ACTIVE (see src/blackholes/bh_merger.c)
+                                 # x <length scale> of each other; requires BH_ACTIVE (see src/blackholes/bh_merger.c).
+                                 # <length scale> is chosen by BhMergerRadiusCriterion (param.txt): HSML (default, legacy
+                                 # behaviour, max(Hsml_i,Hsml_j)), SOFTENING (max gravitational softening of the pair),
+                                 # MAX_HSML_SOFTENING, or MIN_HSML_SOFTENING. Pairs are matched greedily by ascending
+                                 # separation (not mutual-nearest-neighbour, which can deadlock 3+ body subsystems).
 
 EVALPOTENTIAL                   # computes gravitational potential; required by BH_SEED_ON_POTENTIAL_POSITION below
 

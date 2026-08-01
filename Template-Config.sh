@@ -67,7 +67,9 @@
 #JET_TRACER             # Only turn on for jet (not operational yet)
 
 #BH_MERGER              # Requires BH_ACTIVE; merges gravitationally-bound black hole pairs closer than
-                        # BhMergerRadiusFactor (param.txt) x max(Hsml_i, Hsml_j) of each other (src/blackholes/bh_merger.c)
+                        # BhMergerRadiusFactor (param.txt) x <length scale> of each other (src/blackholes/bh_merger.c).
+                        # <length scale> is chosen by BhMergerRadiusCriterion (param.txt): HSML (default, legacy
+                        # behaviour, max(Hsml_i,Hsml_j)), SOFTENING, MAX_HSML_SOFTENING, or MIN_HSML_SOFTENING.
 
 #REFINEMENT_AROUND_BH   # BH refinement options
 #MIN_REFINEMENT_BH_MASS # Minimum BH mass above which refinement around the BH is applied (src/blackholes/bh_refinement.c)

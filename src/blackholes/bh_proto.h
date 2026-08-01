@@ -31,6 +31,12 @@ void bh_swallow(void);
 #ifdef BH_MERGER
 /* BH-BH merging */
 void bh_merger(void);
+
+/* Gravitational force-softening length for the BH at local BhP[]/PPB() index idx.
+ * Mirrors how the gravity routines look up per-particle softening (All.ForceSoftening[],
+ * indexed by P[].SofteningType); exposed here (not static in bh_merger.c) so a future
+ * BH-star capture routine can reuse the same lookup for a "close enough" radius test. */
+double bh_softening_for_index(int idx);
 #endif
 
 /* Feedback loops */

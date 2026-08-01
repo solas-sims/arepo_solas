@@ -17,16 +17,34 @@
  *              Since the global black hole count is small compared to the gas particle
  *              count, this does not attempt a tree-based neighbour search: every task
  *              MPI_Allgathers a snapshot of every live black hole's position/velocity/mass/
- *              Hsml (mirroring the global event-list idiom in fof_seeding.c/bh_seed.c), and
- *              then every task independently runs an identical O(N_bh^2) scan over that
- *              snapshot to decide which pairs merge. Because the snapshot and the scan are
- *              both identical on every task, no further communication is needed to agree on
- *              the outcome -- each task only has to apply the decisions that involve one of
- *              its own local particles.
+ *              Hsml/softening (mirroring the global event-list idiom in fof_seeding.c/
+ *              bh_seed.c), and then every task independently runs an identical O(N_bh^2)
+ *              scan over that snapshot to decide which pairs merge. Because the snapshot
+ *              and the scan are both identical on every task, no further communication is
+ *              needed to agree on the outcome -- each task only has to apply the decisions
+ *              that involve one of its own local particles.
+ *
+ *              The "close enough to merge" radius is configurable (see bh_merger_radius()
+ *              and All.BhMergerRadiusCriterion / enum bh_merger_radius_criterion in bh.h):
+ *              by default it is factor*max(Hsml_i,Hsml_j), same as originally, but Hsml is
+ *              set by an unrelated criterion (target gas neighbour count) and can diverge
+ *              arbitrarily from the gravitational softening length that actually governs
+ *              the timestep criterion for a close BH pair, which can let a bound pair sit
+ *              at a separation small enough to stall the timestep indefinitely while never
+ *              satisfying an Hsml-only merger radius test.
+ *
+ *              Pair selection is a greedy global match by ascending separation (see Step B/
+ *              C below), not a mutual-nearest-neighbour rule: mutual-NN can permanently
+ *              deadlock compact 3+ body subsystems (if A's closest bound neighbour is B, but
+ *              B's closest bound neighbour is a closer C, A-B never merges even though it
+ *              independently qualifies on its own), which is a real, observed failure mode,
+ *              not a hypothetical one.
  */
 
 #include <math.h>
 #include <mpi.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "../main/allvars.h"
 #include "../main/proto.h"
@@ -43,10 +61,100 @@ typedef struct
   MyDouble Pos[3];
   MyDouble Vel[3];
   MyDouble Hsml;
+  MyDouble Softening;
 } BhMergerCandidate;
 
-/*! \brief Merges gravitationally-bound black hole pairs closer than
- *         All.BhMergerRadiusFactor x max(Hsml_i, Hsml_j).
+/*! \brief One qualifying (bound, within-radius) candidate pair, indices into global_bhs[]. */
+typedef struct
+{
+  int i, j;
+  double r2;
+} BhMergerPair;
+
+/*! \brief Gravitational force-softening length for the BH at local BhP[]/PPB() index idx.
+ *  See declaration in bh_proto.h for why this isn't static.
+ */
+double bh_softening_for_index(int idx)
+{
+  return All.ForceSoftening[PPB(idx).SofteningType];
+}
+
+/*! \brief Computes the "close enough to merge" radius for a candidate pair, per
+ *         All.BhMergerRadiusCriterion (enum bh_merger_radius_criterion in bh.h).
+ *
+ *  BH_MERGER_RADIUS_HSML (the default) reproduces the original factor*max(Hsml_i,Hsml_j)
+ *  behaviour exactly, so a parameter file that sets BhMergerRadiusCriterion=HSML gets
+ *  identical merger behaviour to before this option existed.
+ *
+ *  \param[in] a First candidate.
+ *  \param[in] b Second candidate.
+ *
+ *  \return The merger radius for this pair (All.BhMergerRadiusFactor already applied).
+ */
+static double bh_merger_radius(const BhMergerCandidate *a, const BhMergerCandidate *b)
+{
+  double h_hsml = fmax(a->Hsml, b->Hsml);
+  double h_soft = fmax(a->Softening, b->Softening);
+
+  double h;
+  switch(All.BhMergerRadiusCriterion)
+    {
+      case BH_MERGER_RADIUS_HSML:
+        h = h_hsml;
+        break;
+      case BH_MERGER_RADIUS_SOFTENING:
+        h = h_soft;
+        break;
+      case BH_MERGER_RADIUS_MAX_HSML_SOFTENING:
+        h = fmax(h_hsml, h_soft);
+        break;
+      case BH_MERGER_RADIUS_MIN_HSML_SOFTENING:
+        h = fmin(h_hsml, h_soft);
+        break;
+      case BH_MERGER_RADIUS_OTHER_PHYSICAL:
+      default:
+        /* stub for a future physically-motivated criterion (e.g. mutual Bondi radius);
+         * check_parameters() already rejects unrecognised strings, so reaching this means
+         * BH_MERGER_RADIUS_OTHER_PHYSICAL was explicitly selected -- not implemented yet. */
+        terminate(
+            "BH_MERGER: BhMergerRadiusCriterion selects an unimplemented criterion "
+            "(BH_MERGER_RADIUS_OTHER_PHYSICAL). Use HSML, SOFTENING, MAX_HSML_SOFTENING, or "
+            "MIN_HSML_SOFTENING.\n");
+        h = 0; /* unreachable; terminate() aborts */
+    }
+
+  return All.BhMergerRadiusFactor * h;
+}
+
+/*! \brief qsort() comparator for BhMergerPair, sorting by ascending r2.
+ *
+ *  global_bhs[] is byte-identical and identically ordered on every task, so every task's
+ *  candidate list is identical too -- but qsort() is not guaranteed stable, and different
+ *  qsort implementations (or even the same implementation on different inputs) can order
+ *  exact ties differently. Break ties deterministically by (i,j) index so every task's
+ *  sorted list is byte-identical regardless of qsort implementation details.
+ */
+static int bh_merger_pair_compare(const void *va, const void *vb)
+{
+  const BhMergerPair *a = (const BhMergerPair *)va;
+  const BhMergerPair *b = (const BhMergerPair *)vb;
+
+  if(a->r2 < b->r2)
+    return -1;
+  if(a->r2 > b->r2)
+    return +1;
+
+  if(a->i != b->i)
+    return (a->i < b->i) ? -1 : +1;
+
+  if(a->j != b->j)
+    return (a->j < b->j) ? -1 : +1;
+
+  return 0;
+}
+
+/*! \brief Merges gravitationally-bound black hole pairs closer than the radius
+ *         returned by bh_merger_radius() for that pair (see All.BhMergerRadiusCriterion).
  *
  *  Collective call: every task must enter this function together (it does two
  *  collective MPI calls). Should be called once per BH-active step, after
@@ -71,11 +179,12 @@ void bh_merger(void)
       if(PPB(i).Mass == 0 && PPB(i).ID == 0) /* already killed (e.g. by an earlier merge this run) */
         continue;
 
-      local_bhs[n_local].ID    = PPB(i).ID;
-      local_bhs[n_local].Task  = ThisTask;
-      local_bhs[n_local].Index = i;
-      local_bhs[n_local].Mass  = PPB(i).Mass;
-      local_bhs[n_local].Hsml  = BhP[i].Hsml;
+      local_bhs[n_local].ID        = PPB(i).ID;
+      local_bhs[n_local].Task      = ThisTask;
+      local_bhs[n_local].Index     = i;
+      local_bhs[n_local].Mass      = PPB(i).Mass;
+      local_bhs[n_local].Hsml      = BhP[i].Hsml;
+      local_bhs[n_local].Softening = bh_softening_for_index(i);
       for(k = 0; k < 3; k++)
         {
           local_bhs[n_local].Pos[k] = PPB(i).Pos[k];
@@ -119,18 +228,13 @@ void bh_merger(void)
    * them) is still on top of the stack and still needed through Step B/C below. They're
    * freed at the very end, in exact reverse allocation order alongside everything else. */
 
-  /* Step B: every task independently computes the identical accepted-pair list.
+  /* Step B: every task independently computes the identical qualifying-pair list.
    * global_bhs[] is byte-identical on every task (same Allgatherv, same task-then-local
    * ordering), so this scan produces the same result everywhere without further MPI. */
 
-  int *best_partner = (int *)mymalloc("bh_merger_best_partner", n_global * sizeof(int));
-  double *best_r2    = (double *)mymalloc("bh_merger_best_r2", n_global * sizeof(double));
-
-  for(i = 0; i < n_global; i++)
-    {
-      best_partner[i] = -1;
-      best_r2[i]      = 0;
-    }
+  int max_pairs = n_global * (n_global - 1) / 2;
+  BhMergerPair *pairs = (BhMergerPair *)mymalloc("bh_merger_pairs", (max_pairs > 0 ? max_pairs : 1) * sizeof(BhMergerPair));
+  int n_pairs = 0;
 
   MyDouble xtmp, ytmp, ztmp;
 
@@ -146,7 +250,7 @@ void bh_merger(void)
           if(r2 <= 0) /* degenerate/identical positions: nothing sane to compute */
             continue;
 
-          double hmax = All.BhMergerRadiusFactor * fmax(global_bhs[i].Hsml, global_bhs[j].Hsml);
+          double hmax = bh_merger_radius(&global_bhs[i], &global_bhs[j]);
 
           if(r2 >= hmax * hmax)
             continue;
@@ -164,31 +268,43 @@ void bh_merger(void)
           if(v2 >= vesc2)
             continue;
 
-          if(best_partner[i] < 0 || r2 < best_r2[i])
-            {
-              best_partner[i] = j;
-              best_r2[i]      = r2;
-            }
-          if(best_partner[j] < 0 || r2 < best_r2[j])
-            {
-              best_partner[j] = i;
-              best_r2[j]      = r2;
-            }
+          pairs[n_pairs].i  = i;
+          pairs[n_pairs].j  = j;
+          pairs[n_pairs].r2 = r2;
+          n_pairs++;
         }
     }
 
-  /* Step C: deterministic apply. Accept a pair only where both sides picked each other
-   * (mutual nearest neighbour), and process each accepted pair exactly once. */
+  qsort(pairs, n_pairs, sizeof(BhMergerPair), bh_merger_pair_compare);
 
-  for(i = 0; i < n_global; i++)
+  /* Step C: greedy global match by ascending separation, then deterministic apply.
+   *
+   * A mutual-nearest-neighbour rule (only merge a pair if each side's single closest bound
+   * candidate is the other) can permanently deadlock compact 3+ body subsystems: e.g. if A's
+   * closest bound neighbour is B, but B's closest bound neighbour is a closer C, A-B never
+   * merges even though the A-B pair independently satisfies the bound + within-radius test
+   * on its own. This is a real, observed failure mode (runs stalling indefinitely at the
+   * minimum timebin with exactly 3-4 active BH particles), not a hypothetical one.
+   *
+   * Greedy-by-separation instead walks the sorted qualifying-pair list once, accepting the
+   * globally closest pair first, then the next-closest pair whose both members are still
+   * unconsumed, and so on. Every accepted pair still independently satisfies the bound +
+   * within-radius test, and no BH merges more than once per call, but a BH is no longer
+   * required to be any particular *other* BH's single closest neighbour to merge. Do not
+   * "simplify" this back to mutual-NN bookkeeping -- that's the deadlock this replaced. */
+
+  char *consumed = (char *)mymalloc("bh_merger_consumed", (n_global > 0 ? n_global : 1) * sizeof(char));
+  memset(consumed, 0, n_global * sizeof(char));
+
+  for(int p = 0; p < n_pairs; p++)
     {
-      int j = best_partner[i];
+      i = pairs[p].i;
+      int j = pairs[p].j;
 
-      if(j < 0 || j < i) /* no candidate, or this pair already handled from j's side */
+      if(consumed[i] || consumed[j]) /* one or both already merged this call */
         continue;
 
-      if(best_partner[j] != i) /* not mutual */
-        continue;
+      consumed[i] = consumed[j] = 1;
 
       int survivor, loser;
       if(global_bhs[i].Mass > global_bhs[j].Mass || (global_bhs[i].Mass == global_bhs[j].Mass && global_bhs[i].ID < global_bhs[j].ID))
@@ -247,8 +363,8 @@ void bh_merger(void)
         }
     }
 
-  myfree(best_r2);
-  myfree(best_partner);
+  myfree(consumed);
+  myfree(pairs);
   myfree(global_bhs);
   myfree(bdispls);
   myfree(bcounts);
