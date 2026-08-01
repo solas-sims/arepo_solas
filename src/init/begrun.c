@@ -185,9 +185,16 @@ void begrun1(void)
   timebins_init(&TimeBinsHydro, "Hydro", &All.MaxPartSph);
   timebins_init(&TimeBinsGravity, "Gravity", &All.MaxPart);
 
-#ifdef STAR_FEEDBACK_ACTIVE 
+#ifdef STAR_FEEDBACK_ACTIVE
   timebins_init(&TimeBinsStar, "Star", &All.MaxPartStars);
-#endif 
+
+  /* Loaded from a static input file, independent of restart state, so (like
+   * the IMF tables above) this must happen here rather than in init(), which
+   * is skipped on restart -- otherwise Z_VALUES/M_VALUES/N/Age stay NULL for
+   * the life of a restarted run. */
+  mpi_printf("BEGRUN: Loading star evolution tables\n");
+  load_star_tables(All.StarTablesFile);
+#endif
 
 #ifdef BH_ACTIVE
   timebins_init(&TimeBinsBh, "Bh", &All.MaxPartBhs);

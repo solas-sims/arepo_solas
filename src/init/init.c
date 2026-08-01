@@ -559,9 +559,8 @@ int init(void)
    * begrun1(), since it (unlike this function) also runs on restart. */
 
 #ifdef STAR_FEEDBACK_ACTIVE
-  mpi_printf("Loading star evolution tables\n");
-  load_star_tables(All.StarTablesFile);
-
+  /* load_star_tables() is now called unconditionally in begrun1(), since it
+   * (unlike this function) also runs on restart. */
   feedback_init(&MechanicalFeedbackEvents);
 
   for(i = 0; i < NumStars; i++)
