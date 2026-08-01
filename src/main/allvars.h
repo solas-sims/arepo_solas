@@ -1095,7 +1095,14 @@ extern struct global_data_all_processes
                                           of the DM gravitational softening length (a force-resolution scale,
                                           not a halo-boundary one like LinkL) */
 #endif /* #ifdef BH_SEED_ON_POTENTIAL_POSITION */
+#ifdef BLACKHOLE_SEEDING
+  double BlackHoleSeedMass;
+#endif
+#endif /* #ifdef HALO_SEEDING */
+
 #ifdef BH_MERGER
+  /* Independent of HALO_SEEDING: BH_MERGER is also used for non-cosmological runs with
+   * black holes already present in the IC (no on-the-fly FOF seeding involved). */
   double BhMergerRadiusFactor; /*!< two black holes merge once their separation is below this factor times
                                      the length scale selected by BhMergerRadiusCriterion, and they are
                                      gravitationally bound to each other */
@@ -1106,10 +1113,6 @@ extern struct global_data_all_processes
                                      bh_merger_radius_criterion in src/blackholes/bh.h */
   int BhMergerRadiusCriterion; /*!< resolved enum value; set by check_parameters(), do not set directly */
 #endif /* #ifdef BH_MERGER */
-#ifdef BLACKHOLE_SEEDING
-  double BlackHoleSeedMass;
-#endif
-#endif /* #ifdef HALO_SEEDING */
     
   double TotCountReducedFluxes;
   double TotCountFluxes;
