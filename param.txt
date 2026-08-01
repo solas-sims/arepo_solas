@@ -22,7 +22,6 @@ SN_HostShellSweepFrac    0.1
 SN_LeadTime              40
 
 %RaySplitFactor          4
-%RayBoxPadFactor         1
 %RTIonizationTimestepFraction  1
 
 %RefStarsPerCell         4 %Refine cells hosting more than this number of stars

@@ -621,10 +621,6 @@ void read_parameter_file(char *fname)
       strcpy(tag[nt], "RaySplitFactor");
       addr[nt] = &All.RaySplitFactor;
       id[nt++] = REAL;
-
-      strcpy(tag[nt], "RayBoxPadFactor");
-      addr[nt] = &All.RayBoxPadFactor;
-      id[nt++] = REAL;
 #endif  
 
 #ifdef RAD_OPENING_ANGLE

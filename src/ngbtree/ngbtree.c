@@ -519,16 +519,42 @@ int ngb_create_empty_nodes(int no, int topnode, int bits, int x, int y, int z)
 void ngb_update_node_recursive(int no, int sib, int father, int *last, int mode)
 {
   int j, jj, k, p, pp, nextsib, suns[8];
+
   MyNgbTreeFloat range_min[3];
   MyNgbTreeFloat range_max[3];
   MyNgbTreeFloat vertex_vmin[3];
   MyNgbTreeFloat vertex_vmax[3];
+
+  for(k = 0; k < 3; k++)
+    {
+      range_min[k] = MAX_NGBRANGE_NUMBER;
+      range_max[k] = -MAX_NGBRANGE_NUMBER;
+
+      vertex_vmin[k] = MAX_NGBRANGE_NUMBER;
+      vertex_vmax[k] = -MAX_NGBRANGE_NUMBER;
+    }
+
 #ifdef TREE_BASED_TIMESTEPS
-  MyNgbTreeFloat vmin[3], vmax[3], maxcsnd;
+  MyNgbTreeFloat maxcsnd, vmin[3], vmax[3];
+  
+  maxcsnd = 0;
+
+  for(k = 0; k < 3; k++)
+    {
+      vmin[k] = MAX_NGBRANGE_NUMBER;
+      vmax[k] = -MAX_NGBRANGE_NUMBER;
+    }
 #endif /* #ifdef TREE_BASED_TIMESTEPS */
 
 #ifdef STAR_RADIATION_ACTIVE
-  MyNgbTreeFloat MaxRadius = 0;
+  int Nchildren = 0;
+  MyNgbTreeFloat rt_range_min[3], rt_range_max[3];
+
+  for(k = 0; k < 3; k++)
+    {
+      rt_range_min[k] = MAX_NGBRANGE_NUMBER;
+      rt_range_max[k] = -MAX_NGBRANGE_NUMBER;
+    }
 #endif
 
 #ifdef RAD_OPENING_ANGLE
@@ -600,23 +626,6 @@ void ngb_update_node_recursive(int no, int sib, int father, int *last, int mode)
             suns[j] = Ngb_Nodes[no].u.suns[j]; /* this "backup" is necessary because the nextnode entry will
                                                   overwrite one element (union!) */
 
-#ifdef TREE_BASED_TIMESTEPS
-          maxcsnd = 0;
-#endif /* #ifdef TREE_BASED_TIMESTEPS */
-          for(k = 0; k < 3; k++)
-            {
-              range_min[k] = MAX_NGBRANGE_NUMBER;
-              range_max[k] = -MAX_NGBRANGE_NUMBER;
-
-              vertex_vmin[k] = MAX_NGBRANGE_NUMBER;
-              vertex_vmax[k] = -MAX_NGBRANGE_NUMBER;
-
-#ifdef TREE_BASED_TIMESTEPS
-              vmin[k] = MAX_NGBRANGE_NUMBER;
-              vmax[k] = -MAX_NGBRANGE_NUMBER;
-#endif /* #ifdef TREE_BASED_TIMESTEPS */
-            }
-
           for(j = 0; j < 8; j++)
             {
               if((p = suns[j]) >= 0)
@@ -671,8 +680,14 @@ void ngb_update_node_recursive(int no, int sib, int father, int *last, int mode)
 #endif /* #ifdef TREE_BASED_TIMESTEPS */
                             }
 #ifdef STAR_RADIATION_ACTIVE
-                          if(MaxRadius < RtNgb_Nodes[p].MaxRadius)
-                            MaxRadius = RtNgb_Nodes[p].MaxRadius;
+                          for(k = 0; k < 3; k++)
+                            {
+                              if(rt_range_min[k] > RtNgb_Nodes[p].rt_range_min[k])
+                                rt_range_min[k] = RtNgb_Nodes[p].rt_range_min[k];
+
+                              if(rt_range_max[k] < RtNgb_Nodes[p].rt_range_max[k])
+                                rt_range_max[k] = RtNgb_Nodes[p].rt_range_max[k];
+                            }
 #endif
 
 #ifdef RAD_OPENING_ANGLE  
@@ -721,12 +736,19 @@ void ngb_update_node_recursive(int no, int sib, int father, int *last, int mode)
 
                         }
 #ifdef STAR_RADIATION_ACTIVE
-                          if(P[p].Type == 0)
+                      if(P[p].Type == 0)
+                        {
+                          double r_cell = get_cell_radius(p);
+
+                          for(k = 0; k < 3; k++)
                             {
-                              MyNgbTreeFloat r_cell = get_cell_radius(p);
-                                if(MaxRadius < r_cell)
-                                  MaxRadius = r_cell;
+                              if(rt_range_min[k] > P[p].Pos[k] - r_cell)
+                                rt_range_min[k] = P[p].Pos[k] - r_cell;
+
+                              if(rt_range_max[k] < P[p].Pos[k] + r_cell)
+                                rt_range_max[k] = P[p].Pos[k] + r_cell;
                             }
+                        }
 #endif
 
 #ifdef RAD_OPENING_ANGLE  
@@ -761,15 +783,17 @@ void ngb_update_node_recursive(int no, int sib, int father, int *last, int mode)
             }
 #ifdef STAR_RADIATION_ACTIVE
           /* Count direct children */
-          int Nchildren = 0;
-          
           for(int j = 0; j < 8; j++)
             if(suns[j] >= 0) 
               Nchildren++;
               
           RtNgb_Nodes[no].Nchildren = Nchildren;
           
-          RtNgb_Nodes[no].MaxRadius = MaxRadius;
+          for(k = 0; k < 3; k++)
+            {
+              RtNgb_Nodes[no].rt_range_min[k] = rt_range_min[k];
+              RtNgb_Nodes[no].rt_range_max[k] = rt_range_max[k];
+            }
 #endif
 
 #ifdef RAD_OPENING_ANGLE  
@@ -879,7 +903,7 @@ void ngb_exchange_topleafdata(void)
 
 #ifdef STAR_RADIATION_ACTIVE
     int Nchildren;
-    MyNgbTreeFloat MaxRadius;
+    MyNgbTreeFloat rt_range_min[3], rt_range_max[3];
 #endif
 
 #ifdef RAD_OPENING_ANGLE
@@ -939,7 +963,11 @@ void ngb_exchange_topleafdata(void)
 #ifdef STAR_RADIATION_ACTIVE
           loc_DomainMoment[idx].Nchildren = RtNgb_Nodes[no].Nchildren;
           
-          loc_DomainMoment[idx].MaxRadius = RtNgb_Nodes[no].MaxRadius;
+          for(int k = 0; k < 3; k++)
+            {
+              loc_DomainMoment[idx].rt_range_min[k] = RtNgb_Nodes[no].rt_range_min[k];
+              loc_DomainMoment[idx].rt_range_max[k] = RtNgb_Nodes[no].rt_range_max[k];
+            }
 #endif
 
 #ifdef RAD_OPENING_ANGLE
@@ -988,7 +1016,11 @@ void ngb_exchange_topleafdata(void)
 #ifdef STAR_RADIATION_ACTIVE
           RtNgb_Nodes[no].Nchildren = DomainMoment[idx].Nchildren;
           
-          RtNgb_Nodes[no].MaxRadius = DomainMoment[idx].MaxRadius;
+          for(int k = 0; k < 3; k++)
+            {
+              RtNgb_Nodes[no].rt_range_min[k] = DomainMoment[idx].rt_range_min[k];
+              RtNgb_Nodes[no].rt_range_max[k] = DomainMoment[idx].rt_range_max[k];
+            }
 #endif
 
 #ifdef RAD_OPENING_ANGLE

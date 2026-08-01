@@ -4,9 +4,14 @@
 #include "../main/proto.h"
 
 
+static inline int rt_node_inverted(int no)
+{
+  return RtNgb_Nodes[no].rt_range_min[0] >= RtNgb_Nodes[no].rt_range_max[0];
+}
+
 static inline int ray_box_intersect(const double *ray_pos, const double *ray_dir,
                                     const MyNgbTreeFloat *rmin, const MyNgbTreeFloat *rmax,
-                                    double pad, double *t_enter, double *t_exit)
+                                    double *t_enter, double *t_exit)
 {
   double xtmp, ytmp, ztmp;
 
@@ -19,7 +24,7 @@ static inline int ray_box_intersect(const double *ray_pos, const double *ray_dir
   d[1] = NEAREST_Y(center[1] - ray_pos[1]);
   d[2] = NEAREST_Z(center[2] - ray_pos[2]);
 
-  double halfextent[3] = {0.5 * (rmax[0] - rmin[0]) + pad, 0.5 * (rmax[1] - rmin[1]) + pad, 0.5 * (rmax[2] - rmin[2]) + pad};
+  double halfextent[3] = {0.5 * (rmax[0] - rmin[0]), 0.5 * (rmax[1] - rmin[1]), 0.5 * (rmax[2] - rmin[2])};
 
   double halfdomain[3] = {boxHalf_X, boxHalf_Y, boxHalf_Z};
 
@@ -29,7 +34,12 @@ static inline int ray_box_intersect(const double *ray_pos, const double *ray_dir
     {
       /* Box too wide along this axis for a single minimum-image shift to be trustworthy */
       if(halfextent[i] >= halfdomain[i])
-        terminate("Found a very large node!");
+        { 
+          /* Conservative hit */ 
+          *t_enter = 0.0;
+          *t_exit = MAX_REAL_NUMBER;
+          return 1;
+        }
 
       double shifted_min = ray_pos[i] + d[i] - halfextent[i];
       double shifted_max = ray_pos[i] + d[i] + halfextent[i];
@@ -305,17 +315,18 @@ void raytrace_treewalk(RayPacket *ray, RayWorkStack *work, RayExportBuffer *expo
       else if(no < Ngb_MaxPart + Ngb_MaxNodes)
         {
           struct NgbNODE *nop = &Ngb_Nodes[no];
+          struct RtNgbNODE *rt_nop = &RtNgb_Nodes[no];
 
           /* Node geometry */
           /* Node center */
-          double cx = 0.5 * (nop->u.d.range_max[0] + nop->u.d.range_min[0]);
-          double cy = 0.5 * (nop->u.d.range_max[1] + nop->u.d.range_min[1]);
-          double cz = 0.5 * (nop->u.d.range_max[2] + nop->u.d.range_min[2]);
+          double cx = 0.5 * (rt_nop->rt_range_max[0] + rt_nop->rt_range_min[0]);
+          double cy = 0.5 * (rt_nop->rt_range_max[1] + rt_nop->rt_range_min[1]);
+          double cz = 0.5 * (rt_nop->rt_range_max[2] + rt_nop->rt_range_min[2]);
                             
           /* Node extent */ 
-          double dx = nop->u.d.range_max[0] - nop->u.d.range_min[0];
-          double dy = nop->u.d.range_max[1] - nop->u.d.range_min[1];
-          double dz = nop->u.d.range_max[2] - nop->u.d.range_min[2];
+          double dx = rt_nop->rt_range_max[0] - rt_nop->rt_range_min[0];
+          double dy = rt_nop->rt_range_max[1] - rt_nop->rt_range_min[1];
+          double dz = rt_nop->rt_range_max[2] - rt_nop->rt_range_min[2];
 
           /* Node silhouette */
           double ax = fabs(ray->dir[0]), ay = fabs(ray->dir[1]), az = fabs(ray->dir[2]);
@@ -460,11 +471,8 @@ void raytrace_treewalk(RayPacket *ray, RayWorkStack *work, RayExportBuffer *expo
               /* Internal node */  
               else if(child < Ngb_MaxPart + Ngb_MaxNodes) 
                 {   
-                  struct NgbNODE *child_nop = &Ngb_Nodes[child];
-
-                  double MaxRadius = All.RayBoxPadFactor * RtNgb_Nodes[child].MaxRadius;
-
-                  hit = ray_box_intersect(ray->pos, ray->dir, child_nop->u.d.range_min, child_nop->u.d.range_max, MaxRadius, &t_enter, &t_exit);
+                  if(!rt_node_inverted(child))
+                    hit = ray_box_intersect(ray->pos, ray->dir, RtNgb_Nodes[child].rt_range_min, RtNgb_Nodes[child].rt_range_max, &t_enter, &t_exit);
                 }
               /* Pseudo-particle: remote domain */
               else 
@@ -472,11 +480,8 @@ void raytrace_treewalk(RayPacket *ray, RayWorkStack *work, RayExportBuffer *expo
                   int pseudo_idx = child - (Ngb_MaxPart + Ngb_MaxNodes);
                   int top_node = Ngb_DomainNodeIndex[pseudo_idx];
 
-                  struct NgbNODE *pseudo_nop = &Ngb_Nodes[top_node];
-
-                  double MaxRadius = All.RayBoxPadFactor * RtNgb_Nodes[top_node].MaxRadius;
-
-                  hit = ray_box_intersect(ray->pos, ray->dir, pseudo_nop->u.d.range_min, pseudo_nop->u.d.range_max, MaxRadius, &t_enter, &t_exit);
+                  if(!rt_node_inverted(top_node))
+                    hit = ray_box_intersect(ray->pos, ray->dir, RtNgb_Nodes[top_node].rt_range_min, RtNgb_Nodes[top_node].rt_range_max, &t_enter, &t_exit);
                 }
 
               if(hit)
