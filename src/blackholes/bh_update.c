@@ -123,13 +123,21 @@ void bh_reconstruct_timebins(void)
            * codebase (see star_reconstruct_timebins()/deactivate_star()); a negative bin
            * has no such meaning and indicates genuinely unexpected state (ASan caught this
            * as a global-buffer-overflow read into TimeBinsBh.TimeBinCount[] via a stale
-           * BhP[i].TimeBinBh). Skip rather than index out of bounds, but flag it loudly --
-           * this BH's physics silently doesn't run this step, which is a soft failure that
-           * still needs tracking down, not a fix in itself. */
-          printf("WARNING: BH_UPDATE: BhP[%d] (ID=%llu) has invalid TimeBinBh=%d (valid range [0,%d)) -- skipping\n", i,
+           * BhP[i].TimeBinBh). Confirmed via production runs to be state baked into the
+           * restart checkpoint itself (predates any swap this run performs), not something
+           * introduced live -- so *skipping* this BH here would orphan it from the timebin
+           * linked list permanently: it would never again be picked up by
+           * bh_update_list_of_active_particles(), silently freezing its gravity/accretion
+           * out for the rest of the run. Reset to bin 0 (the same default a freshly seeded
+           * BH gets, see spawn_black_hole_from_cell()) and fall through to the normal
+           * insertion below instead, so it resumes being tracked -- self-healing rather than
+           * permanently dropping the particle. Flagged loudly since the underlying cause
+           * (how TimeBinBh went negative in the first place) is still unexplained. */
+          printf("WARNING: BH_UPDATE: BhP[%d] (ID=%llu) has invalid TimeBinBh=%d (valid range [0,%d)) -- resetting to bin 0\n", i,
                  (unsigned long long)PPB(i).ID, bin, TIMEBINS);
           myflush(stdout);
-          continue;
+          bin             = 0;
+          BhP[i].TimeBinBh = 0;
         }
 
       if(TimeBinsBh.TimeBinCount[bin] > 0)
