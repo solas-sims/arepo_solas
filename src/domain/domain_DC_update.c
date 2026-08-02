@@ -514,10 +514,24 @@ void domain_exchange_and_update_DC(void)
           if(task >= 0)
             {
               if(task >= NTask)
-                terminate("Thistask=%d  i=%d Nvc=%d MaxNvc=%d DC[i].task=%d DC[i].next=%d\n", ThisTask, i, Nvc, MaxNvc, DC[i].task,
-                          DC[i].next);
-
-              if(DC[i].index >= 0)
+                {
+                  /* .next was never assigned a valid destination task this round -- this is a
+                   * slot past the point where domain_mark_in_trans_table() stopped walking a
+                   * corrupted connection chain (see the "corrupted connection chain" WARNING
+                   * there), so .next still holds a stale leftover value (e.g. an old
+                   * free-list/connection index) instead of a task. Treat it the same as an
+                   * already-removed connection (DC[i].index < 0): drop it from the rebuilt
+                   * DC[] below instead of sending it to a bogus task. The later loop that
+                   * actually populates the send buffer also reads DC[i].next as a task without
+                   * re-validating it, so this guard must run before that loop, not just here. */
+                  printf(
+                      "WARNING: DOMAIN_DC: Task=%d DC[%d] has out-of-range .next=%d (not a valid task in [0,%d)) -- "
+                      "dropping this stale connection instead of sending it\n",
+                      ThisTask, i, task, NTask);
+                  myflush(stdout);
+                  DC[i].index = -1;
+                }
+              else if(DC[i].index >= 0)
                 Send_count[task]++;
             }
         }
