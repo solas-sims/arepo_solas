@@ -128,6 +128,43 @@ and a new particle can only be safely injected there — before the next domain 
   implemented ones — mass and zero-metallicity seeding have some run history, but
   velocity-dispersion and potential-anchored donor selection do not yet.
 
+## Post-merge robustness fixes (production crash investigation, August 2026)
+
+Two crashes surfaced in real Setonix production runs after the merge, both in the registry
+growth path (`fof_seeding_registry.c`/`fof_seeding.c`) rather than in feature logic. Neither
+was reachable in normal short test runs — both needed a restart with zero pre-existing
+allocation headroom (see below) to trigger.
+
+- **`halo_seed_registry_grow()` reallocated the wrong pointer.** It called
+  `myrealloc_movable(&r->ids, ...)` — passing the *address of the struct field* — instead of
+  `myrealloc_movable(r->ids, ...)`, which takes the current pointer *value*.
+  `myrealloc_movable()`/`myfree_movable()` look up a block by the pointer value tracked
+  internally, so passing the wrong thing corrupted the memory-arena bookkeeping the next time
+  anything tried to free or resize that block. Fixed by passing `r->ids` and reassigning the
+  result, matching every other `myrealloc_movable()` call site in the codebase.
+- **Non-movable scratch alive behind `HaloSeeds.ids` during registry growth.** `mymalloc`/
+  `myfree` is a strict LIFO stack: a `movable` block (like `HaloSeeds.ids`) can only grow via
+  `myrealloc_movable()` if every block allocated *after* it on the arena is also movable — any
+  `mymalloc()` (non-movable) block still alive above it blocks the resize. `fof_seeding_list()`
+  was calling `halo_mark_seeded()` (which can trigger registry growth) *before* freeing its own
+  non-movable scratch buffers (`bdispls`/`bcounts`/`counts`/`local_events`) and non-movable-ish
+  `FOF_GList`/`FOF_PList`/`Group`/`PS`. Fixed by reordering so all of that cleanup happens
+  before `halo_mark_seeded()` runs. This only manifested once enough halos had been seeded
+  across a run's history to exhaust the registry's initial headroom and force a real growth —
+  hence only appearing well into long production runs, never in short test runs.
+
+Both fixes are on `merge-fof-into-star-feedback` only for now (commits `43ed2f5`, `d1677cb`) --
+`fof_seeding_registry.c` doesn't exist on `Star_feedback_radiation` yet, so there was nothing to
+cherry-pick there; port these alongside the wider `HALO_SEEDING` feature merge, not before.
+
+A separate, related fix landed in `domain_rearrange_particle_sequence()`
+(`src/domain/domain_rearrange.c`, commit `80fe435`): when a particle is eliminated under
+`REFINEMENT_MERGE_CELLS` and it is itself a black hole (e.g. a BH merged away by `bh_merger()`),
+its own `BhP[]` slot was never reclaimed, leaving `NumBhs` permanently out of sync with the
+true live-BH count. This affects any black hole regardless of how it was created, seeded ones
+included. This fix *is* portable and has its own PR against `Star_feedback_radiation`
+(see the general fix-porting workflow — not seeding-specific, so not detailed further here).
+
 ## Development history (chronological, oldest first)
 
 The feature evolved through several rounds of bug-fixing before settling into its current form:
