@@ -133,9 +133,18 @@ void domain_rearrange_particle_sequence(void)
             if(P[i].Type == 5)
               {
                 int bhid = P[i].BhID;
+                printf(
+                    "DEBUG_BHSWAP: Task=%d eliminating P[%d] ID=%llu bhid=%d NumBhs=%d -- source BhP[NumBhs-1=%d]: "
+                    "PID=%d TimeBinBh=%d ID-of-owner=%llu\n",
+                    ThisTask, i, (unsigned long long)P[i].ID, bhid, NumBhs, NumBhs - 1, BhP[NumBhs - 1].PID,
+                    BhP[NumBhs - 1].TimeBinBh, (unsigned long long)P[BhP[NumBhs - 1].PID].ID);
+                myflush(stdout);
                 BhP[bhid] = BhP[NumBhs - 1];
                 P[BhP[bhid].PID].BhID = bhid;
                 NumBhs--;
+                printf("DEBUG_BHSWAP: Task=%d -> BhP[%d] now TimeBinBh=%d PID=%d ID-of-owner=%llu, new NumBhs=%d\n", ThisTask,
+                       bhid, BhP[bhid].TimeBinBh, BhP[bhid].PID, (unsigned long long)P[BhP[bhid].PID].ID, NumBhs);
+                myflush(stdout);
               }
 #endif
 #ifdef STARS
