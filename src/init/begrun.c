@@ -194,21 +194,6 @@ void begrun1(void)
    * the life of a restarted run. */
   mpi_printf("BEGRUN: Loading star evolution tables\n");
   load_star_tables(All.StarTablesFile);
-
-#ifdef SUPERNOVAE
-  printf("BEGRUN_DEBUG: Task=%d StarTablesFile='%s' Z_COUNT=%d M_COUNT=%d SN_MassLoss=%p", ThisTask, All.StarTablesFile, Z_COUNT,
-         M_COUNT, (void *)SN_MassLoss);
-#if GRACKLE_CHEMISTRY >= 1
-  printf(" SN_HLoss=%p SN_HeLoss=%p", (void *)SN_HLoss, (void *)SN_HeLoss);
-  if(Z_COUNT > 0 && SN_HeLoss != NULL)
-    printf(" SN_HeLoss[0]=%p SN_HeLoss[Z_COUNT-1]=%p", (void *)SN_HeLoss[0], (void *)SN_HeLoss[Z_COUNT - 1]);
-#endif
-#ifdef METALS
-  printf(" SN_MetalsLoss=%p", (void *)SN_MetalsLoss);
-#endif
-  printf("\n");
-  myflush(stdout);
-#endif /* #ifdef SUPERNOVAE */
 #endif
 
 #ifdef BH_ACTIVE
