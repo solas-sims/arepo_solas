@@ -261,14 +261,26 @@ void domain_exchange_and_update_DC(void)
   myfree(recv_trans_data);
   myfree(send_trans_data);
 
-  /* it's now time to transcribe the task and index fields in the DC list */
+  /* it's now time to transcribe the task and index fields in the DC list.
+   *
+   * DC[i].index < 0 marks a connection whose target cell has already been removed (see
+   * the "cell has been removed" convention in voronoi_get_connected_particles()) -- its
+   * slot can still be marked live (task >= 0) even though there's no real particle left
+   * to look up in trans_table[] on the owning task. The second exchange round below
+   * (search "count where they should go") already excludes these via `DC[i].index >= 0`
+   * and lets them simply vanish from the rebuilt DC[] after the exchange; this first
+   * round must exclude them the same way, and consistently across all three loops that
+   * touch it (count / populate / copy-back), since they all rely on matching iteration
+   * order over MaxNvc to stay in sync with send_transscribe_data[]/recv_transscribe_data[].
+   * Skipping this guard here sends a removed cell's connection to its owning task, whose
+   * trans_table[] lookup receives an out-of-range index and terminates. */
   for(int j = 0; j < NTask; j++)
     Send_count[j] = 0;
 
   for(int i = 0; i < MaxNvc; i++)
     {
       int task = DC[i].task;
-      if(task >= 0)
+      if(task >= 0 && DC[i].index >= 0)
         {
           if(task >= NTask)
             terminate("i=%d Nvc=%d MaxNvc=%d task=%d\n", i, Nvc, MaxNvc, task);
@@ -303,7 +315,7 @@ void domain_exchange_and_update_DC(void)
   for(int i = 0; i < MaxNvc; i++)
     {
       int task = DC[i].task;
-      if(task >= 0)
+      if(task >= 0 && DC[i].index >= 0)
         {
           send_transscribe_data[Send_offset[task] + Send_count[task]].old_index   = DC[i].index;
           send_transscribe_data[Send_offset[task] + Send_count[task]].image_flags = DC[i].image_flags;
@@ -438,11 +450,16 @@ void domain_exchange_and_update_DC(void)
   for(int j = 0; j < NTask; j++)
     Send_count[j] = 0;
 
-  /* copy the results over to the DC structure */
+  /* copy the results over to the DC structure. Must use the exact same condition as the
+   * count/populate loops above (task >= 0 && index >= 0) -- this consumes
+   * send_transscribe_data[] in the same per-task order it was produced in, so skipping a
+   * different set of entries here would desync the two and misattribute results to the
+   * wrong connections. DC[i].index itself hasn't been overwritten yet at this point, so
+   * it's still safe to test here for the same "cell already removed" condition. */
   for(int i = 0; i < MaxNvc; i++)
     {
       int task = DC[i].task;
-      if(task >= 0)
+      if(task >= 0 && DC[i].index >= 0)
         {
           DC[i].task        = send_transscribe_data[Send_offset[task] + Send_count[task]].new_task;
           DC[i].index       = send_transscribe_data[Send_offset[task] + Send_count[task]].new_index;
