@@ -117,8 +117,20 @@ void bh_reconstruct_timebins(void)
         continue;
 
       bin = BhP[i].TimeBinBh;
-      if(bin >= TIMEBINS)
-        continue;
+      if(bin < 0 || bin >= TIMEBINS)
+        {
+          /* TIMEBINS is the established "inactive/parked" sentinel elsewhere in this
+           * codebase (see star_reconstruct_timebins()/deactivate_star()); a negative bin
+           * has no such meaning and indicates genuinely unexpected state (ASan caught this
+           * as a global-buffer-overflow read into TimeBinsBh.TimeBinCount[] via a stale
+           * BhP[i].TimeBinBh). Skip rather than index out of bounds, but flag it loudly --
+           * this BH's physics silently doesn't run this step, which is a soft failure that
+           * still needs tracking down, not a fix in itself. */
+          printf("WARNING: BH_UPDATE: BhP[%d] (ID=%llu) has invalid TimeBinBh=%d (valid range [0,%d)) -- skipping\n", i,
+                 (unsigned long long)PPB(i).ID, bin, TIMEBINS);
+          myflush(stdout);
+          continue;
+        }
 
       if(TimeBinsBh.TimeBinCount[bin] > 0)
         {
