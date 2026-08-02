@@ -109,19 +109,36 @@ void domain_mark_in_trans_table(int i, int task)
               int qq = DC[q].next;
               if(q == qq)
                 {
+                  /* Confirmed via production diagnostics: this is a genuinely inactive cell
+                   * (TimeBinSynchronized[P[i].TimeBinHydro] == 0) whose claimed connection
+                   * range [first_connection, last_connection] should be stable and untouched
+                   * -- AREPO's incremental connectivity scheme (voronoi_update_connectivity())
+                   * only rebuilds/frees connections for cells in TimeBinsHydro.ActiveParticleList
+                   * each step. Despite that, one of this cell's own connection slots partway
+                   * through its range has been silently reallocated to a completely different
+                   * particle's connection list (confirmed: DC[q].ID belongs to a different
+                   * particle than P[i].ID) -- a real gap in that stability guarantee, not yet
+                   * root-caused. Walking the (now foreign) slot's .next field routes into
+                   * unrelated territory and can loop back on itself here.
+                   *
+                   * Stop walking this cell's chain at the point of corruption rather than
+                   * crashing the whole run. Connections already walked before this point keep
+                   * whatever .next/task assignment was already written to them above; slots
+                   * from here to the recorded last_connection are left untouched, since they
+                   * likely belong to a different particle now and overwriting them would
+                   * corrupt that particle's own connection instead. This cell's connections
+                   * will be correctly rebuilt from scratch the next time it becomes active
+                   * (voronoi_update_connectivity() only rebuilds active cells' connections, so
+                   * this defers the fix rather than resolving it -- if this fires often, the
+                   * underlying slot-reclaim gap still needs a proper fix). */
                   printf(
-                      "DEBUG_SELFLOOP: Task=%d i=%d P[i].ID=%llu P[i].Type=%d P[i].Mass=%g P[i].TimeBinHydro=%d "
-                      "TimeBinSynchronized=%d SphP[i].first_connection=%d SphP[i].last_connection=%d\n",
-                      ThisTask, i, (unsigned long long)P[i].ID, P[i].Type, P[i].Mass, P[i].TimeBinHydro,
-                      TimeBinSynchronized[P[i].TimeBinHydro], SphP[i].first_connection, SphP[i].last_connection);
-                  printf(
-                      "DEBUG_SELFLOOP: q=%d DC[q].task=%d DC[q].index=%d DC[q].dp_index=%d DC[q].vf_index=%d DC[q].next=%d "
-                      "DC[q].ID=%llu DC[q].image_flags=%d Nvc=%d MaxNvc=%d FirstUnusedConnection=%d\n",
-                      q, DC[q].task, DC[q].index, DC[q].dp_index, DC[q].vf_index, DC[q].next, (unsigned long long)DC[q].ID,
-                      DC[q].image_flags, Nvc, MaxNvc, FirstUnusedConnection);
+                      "WARNING: DOMAIN_DC: Task=%d cell i=%d (ID=%llu, inactive, TimeBinHydro=%d) has a corrupted connection "
+                      "chain -- slot q=%d (claimed range [%d,%d]) unexpectedly self-loops and now belongs to a different "
+                      "particle (DC[q].ID=%llu) -- stopping this cell's chain walk early rather than crashing\n",
+                      ThisTask, i, (unsigned long long)P[i].ID, P[i].TimeBinHydro, q, SphP[i].first_connection,
+                      SphP[i].last_connection, (unsigned long long)DC[q].ID);
                   myflush(stdout);
-                  terminate("preventing getting stuck in a loop due to q == DC[q].next : i=%d q=%d last_connection=%d", i, q,
-                            SphP[i].last_connection);
+                  break;
                 }
 
               if((P[i].Mass == 0 && P[i].ID == 0) || P[i].Type != 0) /* this cell has been deleted or turned into a star */
