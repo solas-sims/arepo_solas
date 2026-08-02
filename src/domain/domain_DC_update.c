@@ -659,7 +659,23 @@ void domain_exchange_and_update_DC(void)
         }
       else
         {
-          terminate("strange");
+          /* DC[j] claims an ID that doesn't match any local particle -- a merge-join desync
+           * between the sorted local-particle list and the sorted, rebuilt DC[] connections.
+           * This can be downstream fallout from the corrupted-chain skip in
+           * domain_mark_in_trans_table(): when that walk breaks out early, the unvisited
+           * remainder of a cell's chain keeps whatever stale linkage it had, which can
+           * eventually surface here as a connection claiming an ID nothing local matches.
+           * Drop it (advance j only, retry the same local particle against the next j)
+           * instead of crashing the whole run -- an orphaned slot simply isn't attached to
+           * any SphP[].first/last_connection, so skipping it here is enough to drop it from
+           * the rebuilt connectivity. */
+          printf(
+              "WARNING: DOMAIN_DC: Task=%d orphaned connection DC[%d] (ID=%llu) does not match any local particle -- "
+              "dropping it\n",
+              ThisTask, j, (unsigned long long)DC[j].ID);
+          myflush(stdout);
+          j++;
+          i--; /* compensate for the for-loop's i++ so this local particle is retried */
         }
     }
 
