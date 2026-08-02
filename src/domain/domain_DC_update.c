@@ -108,8 +108,21 @@ void domain_mark_in_trans_table(int i, int task)
             {
               int qq = DC[q].next;
               if(q == qq)
-                terminate("preventing getting stuck in a loop due to q == DC[q].next : i=%d q=%d last_connection=%d", i, q,
-                          SphP[i].last_connection);
+                {
+                  printf(
+                      "DEBUG_SELFLOOP: Task=%d i=%d P[i].ID=%llu P[i].Type=%d P[i].Mass=%g P[i].TimeBinHydro=%d "
+                      "TimeBinSynchronized=%d SphP[i].first_connection=%d SphP[i].last_connection=%d\n",
+                      ThisTask, i, (unsigned long long)P[i].ID, P[i].Type, P[i].Mass, P[i].TimeBinHydro,
+                      TimeBinSynchronized[P[i].TimeBinHydro], SphP[i].first_connection, SphP[i].last_connection);
+                  printf(
+                      "DEBUG_SELFLOOP: q=%d DC[q].task=%d DC[q].index=%d DC[q].dp_index=%d DC[q].vf_index=%d DC[q].next=%d "
+                      "DC[q].ID=%llu DC[q].image_flags=%d Nvc=%d MaxNvc=%d FirstUnusedConnection=%d\n",
+                      q, DC[q].task, DC[q].index, DC[q].dp_index, DC[q].vf_index, DC[q].next, (unsigned long long)DC[q].ID,
+                      DC[q].image_flags, Nvc, MaxNvc, FirstUnusedConnection);
+                  myflush(stdout);
+                  terminate("preventing getting stuck in a loop due to q == DC[q].next : i=%d q=%d last_connection=%d", i, q,
+                            SphP[i].last_connection);
+                }
 
               if((P[i].Mass == 0 && P[i].ID == 0) || P[i].Type != 0) /* this cell has been deleted or turned into a star */
                 DC[q].next = -1;
