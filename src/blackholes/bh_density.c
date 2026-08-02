@@ -210,14 +210,24 @@ void bh_density(void)
        * and guarantees the "zero neighbours at maximum Hsml=0" terminate() a few dozen lines
        * down, regardless of what this Hsml self-heal does, since it reads the same value.
        * Repair SofteningType itself back to this particle's normal type-based default (the
-       * same value spawn_black_hole_from_cell() assigns a fresh BH) before using it. */
+       * same value spawn_black_hole_from_cell() assigns a fresh BH) before using it.
+       *
+       * Do NOT read that default via All.SofteningTypeOfPartType[PPB(i).Type]: production
+       * logs showed the "repaired" value itself coming out as nonsense (e.g. 1063818100),
+       * which means PPB(i).Type -- unsigned char, so up to 255 -- was *also* out of range
+       * for these same corrupted zombie BH entries. SofteningTypeOfPartType[] only has
+       * NTYPES (6) elements; indexing it with a bad Type reads far past the array into
+       * unrelated fields of the All struct. We already know this is a BH (we're inside
+       * bh_density()), so use the literal BH type (5, matching P[ibh].Type = 5 in
+       * spawn_black_hole_from_cell()) directly instead of trusting PPB(i).Type at all. */
       if(PPB(i).SofteningType < 0 || PPB(i).SofteningType >= NSOFTTYPES + NSOFTTYPES_HYDRO ||
          All.SofteningTable[PPB(i).SofteningType] <= 0)
         {
-          printf("WARNING: BH_DENSITY: BhP[%d] (ID=%llu) has invalid/degenerate SofteningType=%d -- resetting to type default %d\n",
-                 i, (unsigned long long)PPB(i).ID, PPB(i).SofteningType, All.SofteningTypeOfPartType[PPB(i).Type]);
+          printf("WARNING: BH_DENSITY: BhP[%d] (ID=%llu) has invalid/degenerate SofteningType=%d (particle Type=%d) -- resetting to "
+                 "BH type default %d\n",
+                 i, (unsigned long long)PPB(i).ID, PPB(i).SofteningType, PPB(i).Type, All.SofteningTypeOfPartType[5]);
           myflush(stdout);
-          PPB(i).SofteningType = All.SofteningTypeOfPartType[PPB(i).Type];
+          PPB(i).SofteningType = All.SofteningTypeOfPartType[5];
         }
 
       if(BhP[i].Hsml <= 0)
