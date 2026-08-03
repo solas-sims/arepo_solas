@@ -25,6 +25,7 @@ typedef struct halo_seed_event
   MyIDType HaloMinID;              /*!< MinID identifying the FOF group */
   MyIDType DonorID;                /*!< particle ID of the donor gas cell */
   double HaloMass;                 /*!< total FOF mass of the group (code units) */
+  MyFloat HaloVel[3];               /*!< mass-weighted bulk velocity of the group (all particle types) */
   int DonorTask;                   /*!< MPI task owning the donor cell */
   int DonorIndex;                  /*!< local index of the donor cell on DonorTask */
   int FormationChannel;            /*!< bitmask of BH_SEED_CHANNEL_* values that triggered this event */

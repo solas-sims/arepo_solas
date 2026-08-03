@@ -778,6 +778,8 @@ int fof_seeding_list(HaloSeedEvent *events, int max_events)
 
       local_events[n_local].HaloMinID        = Group[n].MinID;
       local_events[n_local].HaloMass         = Group[n].Mass;
+      for(int k = 0; k < 3; k++)
+        local_events[n_local].HaloVel[k] = Group[n].Vel[k];
       local_events[n_local].FormationChannel = formation_channel;
       n_local++;
     }

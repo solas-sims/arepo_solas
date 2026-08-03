@@ -34,7 +34,7 @@ static int bhs_spawned;            /*!< local number of black holes spawned at t
 static int tot_bhs_spawned;        /*!< global number of black holes spawned at this seeding event */
 static double cum_mass_bhs = 0.0;  /*!< cumulative seeded black hole mass (global, task 0 log only) */
 
-static void spawn_black_hole_from_cell(int igas, int ibh, double seed_mass, int formation_channel);
+static void spawn_black_hole_from_cell(int igas, int ibh, double seed_mass, int formation_channel, MyFloat halo_vel[3]);
 
 /*! \brief Spawn black holes for the seed events of this FOF pass.
  *
@@ -92,7 +92,7 @@ void seed_black_holes_from_events(HaloSeedEvent *events, int n_events)
 
       int ibh = NumPart + bhs_spawned; /* index of the new black hole */
 
-      spawn_black_hole_from_cell(igas, ibh, seed_mass, events[i].FormationChannel);
+      spawn_black_hole_from_cell(igas, ibh, seed_mass, events[i].FormationChannel, events[i].HaloVel);
 
       printf("FOF_SEEDING: Task %d: seeded BH (mass=%g) from cell ID=%llu in halo MinID=%llu (M=%g)\n", ThisTask, seed_mass,
              (unsigned long long)events[i].DonorID, (unsigned long long)events[i].HaloMinID, events[i].HaloMass);
@@ -157,7 +157,7 @@ void seed_black_holes_from_events(HaloSeedEvent *events, int n_events)
  *
  *  \return void
  */
-static void spawn_black_hole_from_cell(int igas, int ibh, double seed_mass, int formation_channel)
+static void spawn_black_hole_from_cell(int igas, int ibh, double seed_mass, int formation_channel, MyFloat halo_vel[3])
 {
   /* captured before anything below mutates the donor cell, for formation-history bookkeeping */
   MyFloat donor_vel[3];
@@ -174,6 +174,15 @@ static void spawn_black_hole_from_cell(int igas, int ibh, double seed_mass, int 
   P[ibh].Type          = 5;
   P[ibh].SofteningType = All.SofteningTypeOfPartType[P[ibh].Type];
   P[ibh].Mass          = seed_mass;
+
+  /* seed with the halo's own mass-weighted bulk velocity (all particle types), not the donor
+   * cell's instantaneous velocity -- accretion physics (e.g. Bondi's steep dependence on
+   * relative velocity) is most sensitive to this exactly when seed mass is smallest, and the
+   * donor cell's own velocity is not a reliable proxy for where the BH should sit dynamically.
+   * DonorVelocity below still preserves the donor's own velocity, so this choice can be
+   * checked against the alternative after the fact. */
+  for(int k = 0; k < 3; k++)
+    P[ibh].Vel[k] = halo_vel[k];
 
 #ifdef INDIVIDUAL_GRAVITY_SOFTENING
   if(((1 << P[ibh].Type) & (INDIVIDUAL_GRAVITY_SOFTENING)))

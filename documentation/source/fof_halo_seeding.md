@@ -165,6 +165,101 @@ true live-BH count. This affects any black hole regardless of how it was created
 included. This fix *is* portable and has its own PR against `Star_feedback_radiation`
 (see the general fix-porting workflow — not seeding-specific, so not detailed further here).
 
+## Further robustness fixes (mesh-connectivity + fossilized BhP[] crashes, August 2026)
+
+A second wave of production crashes surfaced after the fixes above, none of them specific to
+this feature's own logic — they trace to two separate, unrelated root causes that this feature
+happens to expose more often than most (frequent on-the-fly FOF passes each force their own
+`domain_Decomposition()`, and BH-driven derefinement of donor cells adds extra mesh churn).
+
+**Root cause 1: fossilized zombie `BhP[]` entries from pre-event-based seeding.** Git archaeology
+(`git log --follow -- src/blackholes/bh_seed.c`) found that before commit `7d15250` ("Event-based
+BH seeding"), an earlier "basic form" of seeding (commit `4347420`) had its BH-structure
+initialisation block entirely commented out — a gas cell was flipped to `Type=5` but `NumBhs` was
+never incremented and `P[].BhID` was never assigned, defaulting to `0`. Every BH seeded under that
+old code collided on `BhID=0`/`BhP[0]`, leaving old restart checkpoints with a permanently
+under-initialised slot (`TimeBinBh`, `SofteningType`, `Hsml` all garbage) that later code paths
+assumed was always valid. This is fossilized checkpoint history, not a live bug — a dedicated
+BH-seeding stress test against current `bh_seed.c` (many seed/regrow events, 1- and 2-task runs)
+found nothing wrong with the seeding code itself. Fixed by self-healing wherever this garbage
+surfaces, loudly, instead of crashing:
+
+- `src/blackholes/bh_update.c` (`bh_reconstruct_timebins()`, commit `c135099`): `TimeBinBh` outside
+  `[0, TIMEBINS)` is reset to bin `0` (not skipped — an earlier skip-based attempt permanently
+  orphaned the BH from timebin scheduling forever).
+- `src/blackholes/bh_density.c` (commit `7908521`, hardened `98a36d8`): degenerate
+  `SofteningType` is reset to the BH type default. The first version trusted `PPB(i).Type` for the
+  fallback lookup, which is itself garbage for these entries (`Type` is `unsigned char`, so values
+  up to 255 are possible and index far past `SofteningTypeOfPartType[NTYPES]`); hardened to use a
+  hardcoded BH-type literal (`5`, matching `bh_seed.c`'s convention) instead.
+- `src/blackholes/bh_accretion.c` (`bh_accretion_rate()`, commit `fc29fef`): a Bondi-rate
+  denominator that's `<=0` (or NaN) only happens when the local gas has zero sound speed and zero
+  velocity, or `GasInternalEnergy` is corrupted negative — the same zombie-entry signature. Treated
+  as "no accretion" (matching the existing `GasDensity<=0` branch immediately above) instead of
+  terminating.
+
+**Root cause 2: a rare, latent bug in AREPO's own mesh-connectivity exchange.** Confirmed via
+`git log --follow` that `src/domain/domain_DC_update.c` and
+`src/mesh/voronoi/voronoi_dynamic_update.c` have never been modified since the original public
+AREPO import — this is genuine upstream behaviour, not a Solas regression. `domain_exchange_and_update_DC()`
+rebuilds the entire `DC[]` connection array on every domain decomposition; under certain edge
+cases a connection can fail to cleanly reattach to any cell's chain during that rebuild, without
+being returned to the free list either (the free list is rebuilt from the *tail* of the array
+before the per-particle reattachment loop runs) — it becomes an inert "dead zone" slot that no
+cell references, and can sit dormant for tens of thousands of sync-points before some unrelated
+cell's connection-chain walk coincidentally routes through that same index, at which point it
+looks like a self-loop or a foreign-particle collision. Three concrete edge cases were found and
+fixed, all in `src/domain/domain_DC_update.c`:
+
+- `domain_exchange_and_update_DC()`'s first exchange round (transcribing task/index) was missing
+  the `DC[i].index >= 0` guard the second round already had, so an already-removed connection
+  could be re-sent and crash the receiver's `trans_table[]` lookup (commit `481f3d6`).
+- `domain_mark_in_trans_table()`'s per-cell chain walk can hit a slot whose `.next` points back to
+  itself (`q == DC[q].next`) — confirmed via a targeted diagnostic to be a genuinely inactive,
+  otherwise-normal cell whose claimed connection range has been silently reallocated to an
+  unrelated particle partway through. Root mechanism not fully pinned down; mitigated by breaking
+  out of the chain walk at that point with a loud warning instead of terminating (commit `9b6fa3f`).
+- That break leaves `DC[q].next` unset for the rest of the chain, which two downstream loops read
+  as a destination-task scratch value without validating it — first
+  `domain_exchange_and_update_DC()`'s second exchange round (a stale value `>= NTask` crashed
+  `terminate()`, commit `4c5fe31`), then its final ID-based merge-join reattaching connections to
+  local particles (a stale/orphaned entry with no matching local ID hit `terminate("strange")`,
+  commit `186deaa`). Both now drop the offending connection with a warning instead of crashing.
+
+**Investigated and ruled out** as the missing-cleanup culprit: `spawn_black_hole_from_cell()`
+(`bh_seed.c`) never removes a gas cell — the donor persists with reduced mass — so it was never a
+candidate for a missing `voronoi_remove_connection()` call. Both of the two paths that *do* fully
+remove a gas cell already call it correctly: `voronoi_derefinement.c:711` and
+`starformation.c`'s `convert_cell_into_star()` (line ~346). A BH-free, pure-hydro synthetic
+reproduction (no gravity, no `HALO_SEEDING`/`BLACKHOLES`/`FOF`, just `REFINEMENT_SPLIT_CELLS`/
+`MERGE_CELLS` driven by a standing compression wave, genuine sustained refine/derefine churn over
+a full run) came through clean, suggesting the trigger needs either self-gravity's cross-task
+particle migration pattern or far more exposure than that test achieved — not yet confirmed either
+way.
+
+**What increases exposure, and what doesn't fix it:** the bug's frequency scales with how often
+`domain_Decomposition()` runs — `ActivePartFracForNewDomainDecomp` (currently `0.01` in
+`param.txt`, an aggressive/frequent setting) and, independently, every on-the-fly FOF/seeding pass
+(`src/fof/fof.c` calls `domain_Decomposition()` unconditionally, outside that threshold). Relaxing
+`ActivePartFracForNewDomainDecomp` to something like `0.1` would reduce exposure at no physics
+cost; reducing `TimeBetweenHaloFinding`'s frequency would also reduce exposure but has a real
+physics cost (delayed BH seeding) and shouldn't be tuned purely to dodge this. Two production runs
+with identical IC/`param.txt`/compiler flags and even matched task count (Setonix, 8 tasks, crashed
+repeatedly vs. OzSTAR, 8 and 16 tasks, both clean) show the trigger is sensitive to something below
+that level of reproducibility — most plausibly floating-point non-associativity across different
+machines/compilers/task counts compounding, via this being a chaotically-sensitive self-gravitating
+system, into different halo-assembly timing and therefore different exposure. Not confirmed by a
+direct bit-level comparison.
+
+**Status as of August 2026**: all of the above fixes are on `merge-fof-into-star-feedback`. Two are
+also on branches with **open, unmerged** PRs against `Star_feedback_radiation` — PR #34
+(`d8b2742`/superseded-by-`c135099`, `7908521` — **not yet updated with the `98a36d8` hardening**)
+and PR #35 (`481f3d6` only). The three later `domain_DC_update.c` self-heals (`9b6fa3f`,
+`4c5fe31`, `186deaa`) and `bh_accretion.c`'s fix (`fc29fef`) have not been ported to
+`Star_feedback_radiation` at all yet — production runs on that branch would still hit the original
+crashes. The `ActivePartFracForNewDomainDecomp` relaxation has not been committed to the tracked
+`param.txt` either.
+
 ## Development history (chronological, oldest first)
 
 The feature evolved through several rounds of bug-fixing before settling into its current form:
