@@ -12,6 +12,7 @@ GrackleDataFile				./CloudyData_UVB=FG2011_shielded.h5
 StarFormationEfficiency	    0.01
 NumberDensThreshold	        10
 TemperatureThreshold        1e6
+CritOverDensity             57.7    % overdensity threshold value (now also required for AGORA_SF/JEANS_SF, not just EEOS_SF)
 
 
 %---- Star options

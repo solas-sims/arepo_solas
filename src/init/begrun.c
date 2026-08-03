@@ -360,6 +360,10 @@ void set_units(void)
       mpi_printf("BEGRUN: MinEgySpec set to %g based on MinGasTemp=%g\n", All.MinEgySpec, All.MinGasTemp);
     }
 
+#if defined(EEOS_SF) || defined(AGORA_SF) || defined(JEANS_SF)
+  set_overdens_thresh();
+#endif /* #if defined(EEOS_SF) || defined(AGORA_SF) || defined(JEANS_SF) */
+
 #if defined EEOS_SF
   set_units_sfr();
 #endif /* #ifdef EEOS_SF */

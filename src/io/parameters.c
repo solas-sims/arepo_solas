@@ -520,11 +520,13 @@ void read_parameter_file(char *fname)
 #endif 
         
 /* Star Formation */
-#ifdef EEOS_SF
+#if defined(EEOS_SF) || defined(AGORA_SF) || defined(JEANS_SF)
         strcpy(tag[nt], "CritOverDensity");
         addr[nt] = &All.CritOverDensity;
         id[nt++] = REAL;
-        
+#endif /* #if defined(EEOS_SF) || defined(AGORA_SF) || defined(JEANS_SF) */
+
+#ifdef EEOS_SF
         strcpy(tag[nt], "CritPhysDensity");
         addr[nt] = &All.CritPhysDensity;
         id[nt++] = REAL;

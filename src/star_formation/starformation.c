@@ -31,6 +31,7 @@
  *                void make_star(int idx, int i, double prob, MyDouble
  *                  mass_of_star, double *sum_mass_stars)
  *                double sf_threshold_halo_mass_factor(int i)
+ *                void set_overdens_thresh(void)
  *
  * \par Major modifications and contributions:
  *
@@ -58,6 +59,32 @@ static int tot_stars_converted;     /*!< global number of gas cells converted in
 static int altogether_spawned;      /*!< local number of particles spawned in the time step */
 static int tot_altogether_spawned;  /*!< global number of particles spawned in the time step */
 static double cum_mass_stars = 0.0; /*!< cumulative mass of stars created in the time step (global value) */
+
+#if defined(EEOS_SF) || defined(AGORA_SF) || defined(JEANS_SF)
+/*! \brief Set All.OverDensThresh from All.CritOverDensity.
+ *
+ *  Shared by all three SF schemes: a comoving-overdensity floor (relative to the mean
+ *  baryon density) below which star formation is never allowed, regardless of whether the
+ *  scheme's own local density/temperature (or Jeans) gate is otherwise satisfied. Without
+ *  this, a scheme using comparatively permissive local thresholds (as AGORA_SF/JEANS_SF
+ *  typically do relative to EEOS_SF) can let diffuse, cosmologically-unvirialized gas
+ *  transiently satisfy its local criterion early in a run, forming stars well before any
+ *  real structure has collapsed. EEOS_SF has always guarded against this
+ *  (All.ComovingIntegrationOn && dens < All.OverDensThresh); AGORA_SF and JEANS_SF did not
+ *  until this was added, and needed it in practice once run with less conservative
+ *  parameters for a cosmological box.
+ *
+ *  Only meaningful together with All.ComovingIntegrationOn -- callers should still check
+ *  that themselves alongside the resulting All.OverDensThresh, since this function only
+ *  sets the value and does not know whether the run is comoving.
+ *
+ *  \return void
+ */
+void set_overdens_thresh(void)
+{
+  All.OverDensThresh = All.CritOverDensity * All.OmegaBaryon * 3 * All.Hubble * All.Hubble / (8 * M_PI * All.G);
+}
+#endif /* #if defined(EEOS_SF) || defined(AGORA_SF) || defined(JEANS_SF) */
 
 #ifdef SF_THRESHOLD_HALO_MASS_DEPENDENT
 #ifndef HALO_SEEDING

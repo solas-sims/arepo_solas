@@ -64,6 +64,25 @@ criterion calls this and folds it into its own threshold at the point of compari
 halo-mass dependence lives in exactly one place, and adding a fourth SF scheme in the
 future only requires that scheme to call the same helper, not reimplement the logic.
 
+## Related, independent gate: the comoving overdensity floor
+
+`EEOS_SF` has always additionally required `All.ComovingIntegrationOn && dens >=
+All.OverDensThresh` before treating a cell as star-forming, regardless of its own local
+density/temperature gate — `AGORA_SF` and `JEANS_SF` did not, until this was added
+alongside the halo-mass work above (same development pass, different motivation): with
+less conservative local thresholds, both schemes could let diffuse,
+cosmologically-unvirialized gas transiently satisfy their own criterion early in a run,
+forming stars well before real structure had collapsed.
+
+`All.OverDensThresh` is now set for all three schemes by one shared function,
+`set_overdens_thresh()` in `starformation.c` (`All.OverDensThresh = All.CritOverDensity *
+All.OmegaBaryon * 3 * All.Hubble^2 / (8*pi*G)`), called from `begrun.c` for
+`EEOS_SF`/`AGORA_SF`/`JEANS_SF` alike. `CritOverDensity` (`param.txt`) is consequently now
+required for all three schemes, not just `EEOS_SF` — the standard AREPO example value is
+`57.7`. This is independent of, and unaffected by, `SF_THRESHOLD_HALO_MASS_DEPENDENT`
+above — the two gates compose (both must pass), neither depends on the other being
+enabled.
+
 ## Per-scheme application
 
 - **`AGORA_SF`** (`sf_criteria()` in `sfr_AGORA.c`): `NumberDensThreshold` is multiplied by

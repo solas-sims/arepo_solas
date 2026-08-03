@@ -1415,10 +1415,16 @@ double InitMetallicityinSolar;
   char GrackleDataFile[100];
 #endif
 
-/* enable Springel & Hernquist model */
-#ifdef EEOS_SF
+#if defined(EEOS_SF) || defined(AGORA_SF) || defined(JEANS_SF)
+  /* shared by all three SF schemes: a comoving-overdensity floor below which star formation
+   * is never allowed, regardless of whether the local density/temperature (or Jeans) gate is
+   * otherwise satisfied -- see set_overdens_thresh() in starformation.c */
   double OverDensThresh;
   double CritOverDensity;
+#endif /* #if defined(EEOS_SF) || defined(AGORA_SF) || defined(JEANS_SF) */
+
+/* enable Springel & Hernquist model */
+#ifdef EEOS_SF
   double TemperatureThresh;
   double CritPhysDensity;
   double PhysDensThresh;
@@ -1429,7 +1435,7 @@ double InitMetallicityinSolar;
   double TempClouds;
   double MaxSfrTimescale;
   double FactorSN;
-#endif 
+#endif
 
 #ifdef AGORA_SF
   double NumberDensThreshold;

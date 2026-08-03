@@ -496,7 +496,9 @@ void set_units_sfr(void)
 {
   double meanweight;
 
-  All.OverDensThresh = All.CritOverDensity * All.OmegaBaryon * 3 * All.Hubble * All.Hubble / (8 * M_PI * All.G);
+  /* All.OverDensThresh is already set by set_overdens_thresh(), called from begrun.c
+   * alongside this function for EEOS_SF -- not recomputed here to keep one source of truth
+   * shared with AGORA_SF/JEANS_SF (see starformation.c). */
 
   All.PhysDensThresh = All.CritPhysDensity * PROTONMASS / HYDROGEN_MASSFRAC / All.UnitDensity_in_cgs;
 

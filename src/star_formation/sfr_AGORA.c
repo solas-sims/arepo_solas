@@ -45,6 +45,14 @@
 /* Function that checks whether a cell i satisfies star formation criteria*/
 static int sf_criteria(int i)
 {
+  /* comoving-overdensity floor, shared with EEOS_SF/JEANS_SF (see set_overdens_thresh() in
+   * starformation.c) -- without this, diffuse, cosmologically-unvirialized gas can
+   * transiently satisfy the local density/temperature gate below well before any real
+   * structure has collapsed, especially with less conservative threshold parameters */
+  if(All.ComovingIntegrationOn)
+    if(SphP[i].Density < All.OverDensThresh)
+      return 0;
+
 #ifdef USE_GRACKLE
   double mu = compute_mu(i);
 #else

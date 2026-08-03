@@ -84,6 +84,14 @@ double get_jeans_mass(int i)
 /* Function that checks whether a cell i satisfies star formation criteria*/
 static int sf_criteria(int i)
 {
+  /* comoving-overdensity floor, shared with EEOS_SF/AGORA_SF (see set_overdens_thresh() in
+   * starformation.c) -- applies to both JEANS_MASS_BASED and the plain Jeans-length variant
+   * below, since it's an independent gate rather than a modulation of either criterion's own
+   * threshold quantity */
+  if(All.ComovingIntegrationOn)
+    if(SphP[i].Density < All.OverDensThresh)
+      return 0;
+
 #ifdef JEANS_MASS_BASED
   double jeans_mass_threshold = All.JeansMassThreshold;
 #ifdef SF_THRESHOLD_HALO_MASS_DEPENDENT
