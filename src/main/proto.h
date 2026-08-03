@@ -689,6 +689,9 @@ void subfind_add_grp_props_calc_fof_angular_momentum(int num, int ngroups_cat);
 void convert_cell_into_star(int i, double birthtime);
 void spawn_star_from_cell(int igas, double birthtime, int istar, MyDouble mass_of_star);
 void make_star(int idx, int i, double prob, MyDouble mass_of_star, double *sum_mass_stars);
+#ifdef SF_THRESHOLD_HALO_MASS_DEPENDENT
+double sf_threshold_halo_mass_factor(int i);
+#endif /* #ifdef SF_THRESHOLD_HALO_MASS_DEPENDENT */
 #endif /* #ifdef USE_SFR */
 
 #ifdef USE_GRACKLE

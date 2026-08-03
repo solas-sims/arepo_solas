@@ -85,14 +85,29 @@ double get_jeans_mass(int i)
 static int sf_criteria(int i)
 {
 #ifdef JEANS_MASS_BASED
+  double jeans_mass_threshold = All.JeansMassThreshold;
+#ifdef SF_THRESHOLD_HALO_MASS_DEPENDENT
+  /* raising the *effective* SF threshold here means requiring a smaller Jeans mass (relative
+   * to cell mass) before a cell qualifies -- the inequality below is oriented the opposite way
+   * from AGORA_SF/EEOS_SF's density gates, so achieving the same "factor > 1 means harder to
+   * form stars" semantics means dividing the threshold constant here, not multiplying it. See
+   * documentation/source/sf_threshold_halo_mass.md. */
+  jeans_mass_threshold /= sf_threshold_halo_mass_factor(i);
+#endif /* #ifdef SF_THRESHOLD_HALO_MASS_DEPENDENT */
+
   /* SF if Jeans mass is smaller than threshold x cell mass */
-  if(get_jeans_mass(i) < All.JeansMassThreshold * P[i].Mass)
+  if(get_jeans_mass(i) < jeans_mass_threshold * P[i].Mass)
     return 1;
-#else
+#else /* #ifdef JEANS_MASS_BASED */
+#ifdef SF_THRESHOLD_HALO_MASS_DEPENDENT
+#error \
+    "SF_THRESHOLD_HALO_MASS_DEPENDENT with JEANS_SF requires JEANS_MASS_BASED -- the plain Jeans-length criterion has no threshold quantity to modulate"
+#endif /* #ifdef SF_THRESHOLD_HALO_MASS_DEPENDENT */
+
   /* SF if Jeans length is smaller than cell size (unresolved) */
   if(get_jeans_length(i) < 2.0 * get_cell_radius(i))
     return 1;
-#endif
+#endif /* #ifdef JEANS_MASS_BASED #else */
 
   return 0;
 }

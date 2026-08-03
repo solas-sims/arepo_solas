@@ -1432,10 +1432,20 @@ double InitMetallicityinSolar;
 #endif 
 
 #ifdef AGORA_SF
-  double NumberDensThreshold;  
+  double NumberDensThreshold;
   double TemperatureThreshold;
   double StarFormationEfficiency;
 #endif
+
+#ifdef SF_THRESHOLD_HALO_MASS_DEPENDENT
+  /* scheme-agnostic: applies as a multiplicative factor on whichever SF scheme's own
+   * threshold quantity is active (EEOS_SF's PhysDensThresh, AGORA_SF's NumberDensThreshold,
+   * JEANS_SF's criterion) -- see sf_threshold_halo_mass_factor() in starformation.c */
+  double MinHaloMassForNormalSF;              /*!< halo mass above which the ordinary threshold applies; below it
+                                                    (and above 0), the raised threshold below is used instead */
+  double LowMassHaloThresholdFactor;          /*!< multiplier applied to the active scheme's own SF threshold for gas
+                                                    cells whose host halo mass is below MinHaloMassForNormalSF */
+#endif /* #ifdef SF_THRESHOLD_HALO_MASS_DEPENDENT */
 
 #ifdef JEANS_SF
 #ifdef JEANS_MASS_BASED

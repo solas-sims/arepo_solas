@@ -563,10 +563,20 @@ void read_parameter_file(char *fname)
         addr[nt] = &All.TemperatureThreshold;
         id[nt++] = REAL;
 
-        strcpy(tag[nt], "StarFormationEfficiency");  
+        strcpy(tag[nt], "StarFormationEfficiency");
         addr[nt] = &All.StarFormationEfficiency;
         id[nt++] = REAL;
 #endif
+
+#ifdef SF_THRESHOLD_HALO_MASS_DEPENDENT
+        strcpy(tag[nt], "MinHaloMassForNormalSF");
+        addr[nt] = &All.MinHaloMassForNormalSF;
+        id[nt++] = REAL;
+
+        strcpy(tag[nt], "LowMassHaloThresholdFactor");
+        addr[nt] = &All.LowMassHaloThresholdFactor;
+        id[nt++] = REAL;
+#endif /* #ifdef SF_THRESHOLD_HALO_MASS_DEPENDENT */
 
 #ifdef JEANS_SF
 #ifdef JEANS_MASS_BASED

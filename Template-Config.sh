@@ -21,6 +21,16 @@
 #JEANS_SF               # Jeans length based SF
 #JEANS_MASS_BASED       # Jeans mass based SF
 
+#SF_THRESHOLD_HALO_MASS_DEPENDENT # Requires USE_SFR, AGORA_SF, and HALO_SEEDING; raises the density threshold for star
+                                   # formation (All.NumberDensThreshold) for gas cells whose on-the-fly-FOF host halo mass
+                                   # is below MinHaloMassForNormalSF (param.txt), by a factor of LowMassHaloNumberDensThresholdFactor
+                                   # (param.txt). A crude, single-knob stand-in for physics not otherwise modelled here --
+                                   # e.g. a background UV/Lyman-Werner radiation field suppressing cooling/self-shielding in
+                                   # small halos, or a Pop III -> Pop II transition in effective collapse threshold. See
+                                   # documentation/source/sf_threshold_halo_mass.md for the full design rationale, including
+                                   # why this is a hard step rather than a smooth transition, and what a collaborator would
+                                   # need to change to improve on it.
+
 #INDIVIDUAL_STAR_BY_STAR_FORMATION # Form individual resolved stars (need STAR_PARTICLES=2 AND USE_SFR)
 #DIVVEL                 # Enables an alternate one-dimensional velocity-divergence gradient calculation (src/mesh/voronoi/voronoi_gradients_onedims.c)
 

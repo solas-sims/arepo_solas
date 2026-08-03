@@ -52,10 +52,15 @@ static int sf_criteria(int i)
 #endif
 
   double number_dens = (SphP[i].Density * All.cf_UnitDensity_in_cgs) / mu / PROTONMASS;
-  double temp = (SphP[i].Utherm * All.cf_UnitVelocity_in_cm_per_s * All.cf_UnitVelocity_in_cm_per_s) 
+  double temp = (SphP[i].Utherm * All.cf_UnitVelocity_in_cm_per_s * All.cf_UnitVelocity_in_cm_per_s)
   * mu * PROTONMASS * GAMMA_MINUS1 / BOLTZMANN;
 
-  if(number_dens < All.NumberDensThreshold)
+  double number_dens_threshold = All.NumberDensThreshold;
+#ifdef SF_THRESHOLD_HALO_MASS_DEPENDENT
+  number_dens_threshold *= sf_threshold_halo_mass_factor(i);
+#endif /* #ifdef SF_THRESHOLD_HALO_MASS_DEPENDENT */
+
+  if(number_dens < number_dens_threshold)
     return 0;
   
   if(temp > All.TemperatureThreshold)

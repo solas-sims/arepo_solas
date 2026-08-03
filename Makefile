@@ -379,6 +379,12 @@ ifneq ($(word 2,$(SF_MODELS)),)
 $(error Only one SF model may be active at a time. Currently enabled: $(SF_MODELS))
 endif
 
+ifneq (,$(filter SF_THRESHOLD_HALO_MASS_DEPENDENT,$(CONFIGVARS)))
+ifeq (,$(filter USE_SFR,$(CONFIGVARS)))
+$(error SF_THRESHOLD_HALO_MASS_DEPENDENT requires USE_SFR (and one of EEOS_SF/AGORA_SF/JEANS_SF))
+endif
+endif
+
 ifneq (,$(filter EEOS_SF,$(CONFIGVARS)))
 OBJS  += star_formation/sfr_eEOS.o
 endif

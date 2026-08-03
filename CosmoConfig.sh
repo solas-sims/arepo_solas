@@ -74,6 +74,8 @@ USE_SFR                          # Activate star formation
 #JEANS_SF
 #JEANS_MASS_BASED
 AGORA_SF
+#SF_THRESHOLD_HALO_MASS_DEPENDENT # raises the SF density threshold in low-mass halos; see Template-Config.sh and
+                                   # documentation/source/sf_threshold_halo_mass.md -- new/untested, off by default
 #USE_CELIB
 STARS
 STAR_PARTICLES=0
