@@ -240,6 +240,9 @@ void star_prep(void)
           SP[i].Age = 0.0;
           SP[i].Birthtime = All.Time;
         }
+
+      /* Clean up */
+      memset(&SP[i].MechanicalFeedback, 0, sizeof(Mechanical_Feedback));
       
       /* Advance timestep and age */
       MyDouble star_timestep = (SP[i].TimeBinStar ? (((integertime)1) << SP[i].TimeBinStar) : 0) * All.Timebase_interval;

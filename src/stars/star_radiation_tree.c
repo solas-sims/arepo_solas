@@ -439,8 +439,7 @@ void raytrace_treewalk(RayPacket *ray, RayWorkStack *work, RayExportBuffer *expo
                     
                       for(int k = 0; k < 4; k++)                      
                         append_ray(work, &children[k]);
-                
-                      
+                   
                       /* Parent ray is consumed */
                       return;   
                                   
