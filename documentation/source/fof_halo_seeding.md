@@ -82,7 +82,7 @@ and a new particle can only be safely injected there — before the next domain 
 
   Donor selection then reads `Group[].MaxGasDensNearPotential*` instead of `Group[].MaxGasDens*`, deferring (not falling back) if no candidate was found.
 
-- **`src/fof/fof_seeding.h`** (new) — declares `fof_seeding_list()`, `HaloSeedEvent` (including the `FormationChannel` bitmask and the `BH_SEED_CHANNEL_*` constants), `MAX_HALO_SEED`, and the `HaloSeedRegistry` type used for restart persistence.
+- **`src/fof/fof_seeding.h`** (new) — declares `fof_seeding_list()`, `HaloSeedEvent` (including the `FormationChannel` bitmask and the `BH_SEED_CHANNEL_*` constants: `_MASS`, `_ZERO_METALLICITY`, `_VELDISP` — there is no `_POTENTIAL_POSITION` constant, consistent with that flag changing donor *selection* rather than being its own channel), `seed_black_holes_from_events()`, and the `HaloSeedRegistry` type used for restart persistence. `MAX_HALO_SEED` itself is `#define`d in `src/main/run.c`, not here.
 
 - **`src/fof/fof_seeding_registry.c`** (new) — maintains `HaloSeeds`, a registry of already-seeded halos (so they aren't reseeded), and provides `fof_seeding_registry_io()` for restart read/write.
 
@@ -98,6 +98,32 @@ and a new particle can only be safely injected there — before the next domain 
 
 - **`src/init/init.c`** — `fof_seeding_init(RestartFlag)` is now guarded with `if(RestartFlag != 1)`, mirroring the `All.NextTimeOfHaloFinding` guard in `begrun.c`. Previously this call ran unconditionally and wiped the halo-seed registry that `loadrestart()` had just restored from the restart file, on every `RestartFlag == 1` restart. `RestartFlag == 2` (snapshot continuation) still reseeds the registry from scratch, deliberately — `Group[n].LenType[5] > 0` independently catches any halo whose black hole is currently FoF-linked into it, which any snapshot-restored particle set will show correctly on the next FoF pass.
 
+## Data-integrity fix: BhP[]/SP[] not following P[] during FoF/SubFind output reordering
+
+Every time a snapshot is written with FOF enabled, `fof_subfind_exchange()` in
+`src/fof/fof_distribute.c` redistributes `P[]`/`PS[]`/`SphP[]` across MPI tasks to put particles
+into group order for output, then reverts the exchange afterward. Until commits `9afdd67` +
+`13ae729`, this routine never moved the auxiliary `BhP[]`/`SP[]` arrays (black hole and star
+particle data, respectively) alongside a relocated Type-5/Type-4 particle. A relocated BH or
+star's `P[].BhID`/`SID` then pointed at the sending task's own local array index — meaningless
+on the receiving task — which surfaced as a segfault in `fill_write_buffer()`'s `A_BH` branch
+(`src/io/io.c`), since it scans `BhP[]` with no bounds check against `NumBhs`.
+
+This directly affects the trustworthiness of any BH/star snapshot output whenever FOF/SubFind
+reordering is active — i.e. essentially always when `HALO_SEEDING`/`BLACKHOLE_SEEDING` are on.
+The fix mirrors `domain_exchange()`'s already-working `BhP[]`/`SP[]` handling
+(`src/domain/domain_exchange.c`), adapted to `fof_subfind_exchange()`'s per-type do-while
+structure: `P[].BhID`/`SID` are resynced at the top of each type's cycle (since earlier types'
+bulk `memmove()`s in the same function can silently relocate a BH/star locally without anything
+else knowing), the export/import paths copy the auxiliary entries alongside the main particle
+buffer with swap-with-last reclamation of vacated slots, `BhP[]`/`SP[]` are grown via
+`reallocate_memory_maxpartbhs()`/`reallocate_memory_maxpartstars()` as needed, and a final
+comprehensive `PID` resync pass runs at the end of the function. A companion fix in
+`src/utils/allocate.c` makes those two reallocation routines `memset()` newly-grown memory,
+matching `allocate_memory()`'s existing behaviour on initial allocation. Verified against a
+synthetic reproduction (segfault reproduced 3/3 trials pre-fix; fix confirmed across 2/3/4 MPI
+ranks and multiple snapshots with all seeded BH IDs intact).
+
 ## Known limitations / not yet validated
 
 - **`fof_seeding_find_potential_donor()`'s gather-back step** (phase 3 above) is the one piece
@@ -107,6 +133,16 @@ and a new particle can only be safely injected there — before the next domain 
   `EVALPOTENTIAL` `#error` guard fires when it's missing) — not run against a real halo
   catalogue. Recommend testing it in isolation (e.g. a small box with a known,
   hand-checkable gas configuration near a potential minimum) before trusting it in a full run.
+  This function was also the site of a LIFO-allocator-ordering crash (`0491776`): `myfree(query)`
+  was originally called before the loop consuming `candidates` had finished, but `query` was
+  allocated *after* `candidates` on Arepo's strict LIFO `mymalloc`/`myfree` stack, so it had to be
+  freed first — fixed by reordering the two calls.
+- **`BH_SEED_ON_ZERO_METALLICITY` was silently broken until `c0f1919`**: `bh_seed.c` and `fof.c`'s
+  zero-metallicity block referenced a non-existent `SphP[].Metals` field instead of the
+  `GasMetals` macro (`PConservedScalars[METALS_INDEX]`). This went uncaught because the channel
+  is off in `CosmoConfig.sh`; it has since been fixed and build-verified with the channel enabled,
+  but has no run history yet — treat it the same as the velocity-dispersion/potential-position
+  channels for validation purposes.
 - **`PotentialDonorSearchNSoft` default (5.0)** is an untuned starting point from the design
   discussion's suggested 3-5 range, not derived from testing against real halos.
 - **Registry/`LenType[5]` joint failure**: a black hole that both (a) has drifted to a
