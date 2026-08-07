@@ -1073,6 +1073,24 @@ extern struct global_data_all_processes
   /* some SPH parameters */
 
   int DesNumNgb; /*!< Desired number of SPH neighbours */
+#ifdef HALO_SEEDING
+#ifndef FOF
+#error "HALO_SEEDING requires FOF to be defined"
+#endif /* #ifndef FOF */
+  double TimeOfFirstHaloFinding;
+  double NextTimeOfHaloFinding;
+  double TimeBetweenHaloFinding;
+#ifdef BH_SEED_ON_MASS
+  double MinHaloMassForFOFSeeding;
+#endif /* #ifdef BH_SEED_ON_MASS */
+#ifdef BH_SEED_ON_ZERO_METALLICITY
+  double ZeroMetallicityThresholdForFOFSeeding; /*!< metal mass fraction below which a halo's most
+                                                      enriched gas cell still counts as "pristine" */
+#endif /* #ifdef BH_SEED_ON_ZERO_METALLICITY */
+#ifdef BLACKHOLE_SEEDING
+  double BlackHoleSeedMass;
+#endif
+#endif /* #ifdef HALO_SEEDING */
     
   double TotCountReducedFluxes;
   double TotCountFluxes;
@@ -1646,6 +1664,12 @@ extern struct sph_particle_data
   
   MySingle ActiveArea;
 
+#ifdef HALO_SEEDING
+  MyFloat HostHaloMass; /*!< FOF mass of the host halo, refreshed at each on-the-fly FOF pass (0 if not in a halo);
+                             can be used e.g. to select the mode of star formation by halo mass */
+#endif /* #ifdef HALO_SEEDING */
+
+
 #ifdef OUTPUT_SURFACE_AREA
   int CountFaces;
 #endif 
@@ -2063,6 +2087,7 @@ enum iofields
   IO_NE,
   IO_NH,
   IO_SFR,
+  IO_HOSTHALOMASS,
 
   IO_POT,
   IO_ACCEL,

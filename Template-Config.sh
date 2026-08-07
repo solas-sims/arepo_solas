@@ -14,6 +14,10 @@
 #USE_GRACKLE
 #GRACKLE_CHEMISTRY=0    # Curretly only grackle mode=0 (lookup tables) with no chemistry network is supported
 
+#ENABLE_PROFILE_UTIL
+#_MPI
+#IGNORE_CODE
+
 #---------------------------------------- Star Formation options
 #EEOS_SF                # Default SF scheme in Arepo
 #AGORA_SF               # Agora based SF
@@ -65,10 +69,16 @@
 #OUTPUT_REFBHCOUNTER
 
 #---------------------------------------- Special behaviour
-#FEEDBACK_TESTING_RESTRICT_SNAPSHOTS     # Only dump snapshots after a feedback event
+#BLACKHOLE_SEEDING # Requires HALOS_SEEDING; seeds black holes in halos. Requires at least one of BH_SEED_ON_MASS /
+                   # BH_SEED_ON_ZERO_METALLICITY below (channels OR together if more than one is enabled); a halo already
+                   # hosting a black hole is never reseeded regardless of channel.
+#BH_SEED_ON_MASS # Requires BLACKHOLE_SEEDING; seed once halo mass exceeds MinHaloMassForFOFSeeding (param.txt)
+#BH_SEED_ON_ZERO_METALLICITY # Requires BLACKHOLE_SEEDING and METALS; seed pristine halos, i.e. every gas cell's metal mass
+                             # fraction <= ZeroMetallicityThresholdForFOFSeeding (param.txt)
 
-#---------------------------------------- Inline halo finding
-#FIND_HALOS
+
+#--------------------------------------- Inline halo finding
+#HALO_SEEDING # Requires FOF; seeds halos above a certain mass threshold with collisionless particles; this can be used for example to seed black holes in halos (with BLACKHOLE_SEEDING)
 
 
 #---------------------------------------- Arepo public

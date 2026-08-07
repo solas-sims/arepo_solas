@@ -49,6 +49,8 @@
 #include "../domain/domain.h"
 #include "../mesh/voronoi/voronoi.h"
 
+#include "../fof/fof_seeding.h"
+
 /*! \brief Prepares the loaded initial conditions for the run.
  *
  *  It is only called if RestartFlag !=1. Various counters and variables are
@@ -58,7 +60,7 @@
  *  are determined.
  *
  *  \return status code: <0 if finished without errors and run can start,
- *          0 code ends after calling init()  > 0 an error occurred, terminate.
+ *          0 code ends after calling init()   0 an error occurred, terminate.
  */
 int init(void)
 {
@@ -308,6 +310,12 @@ int init(void)
 
   for(i = 0; i < NumGas; i++) /* initialize sph_properties */
     {
+#ifdef HALO_SEEDING
+      /* always reset: refreshed at the first on-the-fly FOF pass, and older
+         snapshots may not contain the HostHaloMass block */
+      SphP[i].HostHaloMass = 0;
+#endif /* #ifdef HALO_SEEDING */
+
       if(RestartFlag == 2 || RestartFlag == 3)
         for(j = 0; j < 3; j++)
           SphP[i].Center[j] = P[i].Pos[j];
@@ -399,6 +407,13 @@ int init(void)
   /* will build tree */
   ngb_treeallocate();
   ngb_treebuild(NumGas);
+
+#ifdef HALO_SEEDING
+#ifndef FOF
+#error "HALO_SEEDING is only implemented for FOF."
+#endif /* #ifndef FOF */
+  fof_seeding_init(RestartFlag);
+#endif
  
   if(RestartFlag == 3)
     {

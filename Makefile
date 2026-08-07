@@ -75,7 +75,7 @@ LDFLAGS +=
 endif
 
 #Mac OS using MacPorts modules for openmpi, fftw, gsl, hdf5 and hwloc
-ifeq ($(SYSTYPE),"Darwin")
+ifeq ($(filter Darwin,$(SYSTYPE)),Darwin)
 # compiler and its optimization options
 CC        = mpicc   # sets the C-compiler
 OPTIMIZE  = -std=c11 -ggdb -g -O0 -fno-omit-frame-pointer -Wall -Wno-format-security -Wno-unknown-pragmas -Wno-unused-function
@@ -95,7 +95,7 @@ endif
 # end of Darwin
 
 #Mac OS using MacPorts modules for openmpi, fftw, gsl, hdf5 and hwloc
-ifeq ($(SYSTYPE),"MACOSX")
+ifeq ($(filter MACOSX,$(SYSTYPE)),MACOSX)
 BREW := /opt/homebrew/bin/brew
 $(info BREW: $(BREW))
 
@@ -120,7 +120,7 @@ endif
 # end of Darwin
 
 #Linux
-ifeq ($(SYSTYPE),"LINUX")
+ifeq ($(filter LINUX,$(SYSTYPE)),"LINUX")
 # compiler and its optimization options
 CC        = mpicc
 OPTIMIZE  = -std=c11 -ggdb -g -O0 -fno-omit-frame-pointer -Wall -Wno-format-security -Wno-unknown-pragmas -Wno-unused-function
@@ -139,6 +139,56 @@ HDF5_LIB  = -L/usr/lib/x86_64-linux-gnu/hdf5/serial/
 HWLOC_INCL=
 endif
 # end of Linux
+
+#Ngarrgu Tindebeek
+ifeq ($(filter NT,$(SYSTYPE)),"NT")
+# compiler and its optimization options
+CC        =  mpicc
+OPTIMIZE  =  -std=c11 -ggdb -O3 -Wall -Wno-format-security -Wno-unknown-pragmas -Wno-unused-function
+
+MPICH_INCL=
+MPICH_LIB = -lmpi
+GSL_INCL  = -I$(EBROOTGSL)/include
+GSL_LIB   = -L$(EBROOTGSL)/lib -lgsl -lgslcblas
+HWLOC_LIB =
+
+# libraries that are included on demand, depending on Config.sh options
+FFTW_INCL = -I$(EBROOTFFTW)/include
+FFTW_LIBS = -L$(EBROOTFFTW)/lib
+HDF5_INCL = -I$(EBROOTHDF5)/include -DH5_USE_16_API
+HDF5_LIB  = -L$(EBROOTHDF5)/lib -lhdf5 -lz
+HWLOC_INCL=
+endif
+# end of NT
+
+# Pawsey Setonix (Cray: PrgEnv-cray + cray-mpich; load gsl, fftw, hdf5 modules)
+ifneq ($(filter Setonix "Setonix",$(SYSTYPE)),)
+# the Cray compiler wrapper 'cc' provides MPI includes and libraries itself
+CC        = cc
+OPTIMIZE  = -std=c11 -ggdb -g -O0 -fno-omit-frame-pointer -Wall -Wno-format-security -Wno-unknown-pragmas -Wno-unused-function
+#OPTIMIZE = -std=c11 -g -O2 -Wall -Wno-format-security -Wno-unknown-pragmas -Wno-unused-function  # production
+
+MPICH_INCL=
+MPICH_LIB = #-lmpi provided by the cc wrapper
+
+GSL_INCL  = -I$(PAWSEY_GSL_HOME)/include
+GSL_LIB   = -L$(PAWSEY_GSL_HOME)/lib -lgsl -lgslcblas
+
+# NOTE: keep gmp in its own prefix. A shared prefix (e.g. ~/software) whose
+# include/ also contains another MPI's mpi.h will shadow cray-mpich's mpi.h
+# and break the link with undefined ompi_* symbols.
+GMP_INCL  = -I$(HOME)/software/gmp-6.3.0/include
+GMP_LIB   = -L$(HOME)/software/gmp-6.3.0/lib64 -lgmp
+
+# libraries that are included on demand, depending on Config.sh options
+FFTW_INCL = -I$(PAWSEY_FFTW_HOME)/include
+FFTW_LIBS = -L$(PAWSEY_FFTW_HOME)/lib
+HDF5_INCL = -I$(PAWSEY_HDF5_HOME)/include -DH5_USE_16_API
+HDF5_LIB  = -L$(PAWSEY_HDF5_HOME)/lib -lhdf5 -lz
+HWLOC_INCL=
+HWLOC_LIB =
+endif
+# end of Setonix
 
 ifndef LINKER
 LINKER = $(CC)
@@ -529,6 +579,15 @@ OBJS += fof/fof_seeding.o
 endif
 endif
 
+endif
+
+ifeq (HALO_SEEDING,$(findstring HALO_SEEDING,$(CONFIGVARS)))
+OBJS    += fof/fof_seeding.o \
+		   fof/fof_seeding_registry.o
+INCL    += fof/fof_seeding.h
+endif
+endif
+
 ifeq (SUBFIND,$(findstring SUBFIND,$(CONFIGVARS)))
 OBJS += subfind/subfind.o \
         subfind/subfind_vars.o \
@@ -552,6 +611,11 @@ INCL += subfind/subfind.h
 SUBDIRS += subfind
 endif
 
+ifeq (BLACKHOLE_SEEDING,$(findstring BLACKHOLE_SEEDING,$(CONFIGVARS)))
+OBJS    += blackholes/bh_seed.o
+INCL    += blackholes/bh_proto.h
+SUBDIRS += blackholes
+endif
 
 ##########################
 #combine compiler options#
