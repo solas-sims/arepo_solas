@@ -558,6 +558,15 @@ int init(void)
   /* IMF tables and the star-particle RNG are now set up unconditionally in
    * begrun1(), since it (unlike this function) also runs on restart. */
 
+#if defined(STAR_PARTICLES) && STAR_PARTICLES < 2
+  /* initial IMF-bin sampling for star particles already present in the ICs (newly formed
+   * stars get this from sample_star_particle() in starformation.c instead); needs
+   * NumStars/SP[] to be populated, so unlike the setup above this must stay here rather
+   * than move to begrun1() */
+  for(i = 0; i < NumStars; i++)
+    sample_star_particle(PPS(i).Mass * All.cf_UnitMass_in_Msun, SP[i].NumOfStarsInBins);
+#endif
+
 #ifdef STAR_FEEDBACK_ACTIVE
   /* load_star_tables() is now called unconditionally in begrun1(), since it
    * (unlike this function) also runs on restart. */

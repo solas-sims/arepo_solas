@@ -1113,7 +1113,7 @@ extern struct global_data_all_processes
                                      bh_merger_radius_criterion in src/blackholes/bh.h */
   int BhMergerRadiusCriterion; /*!< resolved enum value; set by check_parameters(), do not set directly */
 #endif /* #ifdef BH_MERGER */
-    
+
   double TotCountReducedFluxes;
   double TotCountFluxes;
 
@@ -1496,6 +1496,10 @@ double InitMetallicityinSolar;
 
 #ifdef PHOTOIONIZATION
   double RTIonizationTimestepFraction;
+#endif
+
+#ifdef RADIATION_PRESSURE
+  double IRDtauMomentumBoostCoeff;
 #endif
 
 #if defined (BH_ACCRETION_ACTIVE) || defined(BH_FEEDBACK_ACTIVE)

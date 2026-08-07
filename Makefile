@@ -628,7 +628,6 @@ INCL += subfind/subfind.h
 SUBDIRS += subfind
 endif
 
-
 ifeq (BLACKHOLE_SEEDING,$(findstring BLACKHOLE_SEEDING,$(CONFIGVARS)))
 OBJS    += blackholes/bh_seed.o
 INCL    += blackholes/bh_proto.h

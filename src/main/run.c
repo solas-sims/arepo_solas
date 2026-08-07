@@ -261,7 +261,11 @@ void run(void)
                                                                                            */
 #else /* #if defined(VORONOI_STATIC_MESH) && !defined(VORONOI_STATIC_MESH_DO_DOMAIN_DECOMPOSITION) */
 
+#ifdef STAR_RADIATION_ACTIVE
+      if(1)
+#else
       if(All.HighestActiveTimeBin >= All.SmallestTimeBinWithDomainDecomposition) /* only do this for sufficiently large steps */
+#endif
         {
 #ifdef VORONOI_STATIC_MESH
           free_mesh();
@@ -428,7 +432,7 @@ void calculate_non_standard_physics_prior_mesh_construction(void)
 
 #if defined(COOLING) && defined(USE_SFR) && !defined(INDIVIDUAL_STAR_BY_STAR_FORMATION)
       sfr_create_star_particles();
-#endif 
+#endif
 
 #ifdef INDIVIDUAL_STAR_BY_STAR_FORMATION
       individual_starbystar_formation();

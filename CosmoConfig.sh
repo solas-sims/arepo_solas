@@ -107,4 +107,3 @@ BH_SEED_ON_POTENTIAL_POSITION    # donor cell is the densest gas cell (all parti
                                  # DM softening length of the halo's potential minimum, instead of the unrestricted densest gas
                                  # cell; defers seeding (rather than falling back) if no gas cell qualifies. Requires EVALPOTENTIAL.
 #OUTPUT_EVERY_STEP
-
