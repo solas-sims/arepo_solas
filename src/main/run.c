@@ -261,11 +261,7 @@ void run(void)
                                                                                            */
 #else /* #if defined(VORONOI_STATIC_MESH) && !defined(VORONOI_STATIC_MESH_DO_DOMAIN_DECOMPOSITION) */
 
-#ifdef STAR_RADIATION_ACTIVE
-      if(1)
-#else
       if(All.HighestActiveTimeBin >= All.SmallestTimeBinWithDomainDecomposition) /* only do this for sufficiently large steps */
-#endif
         {
 #ifdef VORONOI_STATIC_MESH
           free_mesh();

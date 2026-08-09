@@ -85,7 +85,7 @@ int *Ngb_Nextnode;
 struct NgbNODE *Ngb_Nodes;
 struct ExtNgbNODE *ExtNgb_Nodes;
 
-#ifdef STAR_RADIATION_ACTIVE
+#ifdef RAD_OPENING_ANGLE
 struct RtNgbNODE *RtNgb_Nodes;
 #endif
 
@@ -546,7 +546,7 @@ void ngb_update_node_recursive(int no, int sib, int father, int *last, int mode)
     }
 #endif /* #ifdef TREE_BASED_TIMESTEPS */
 
-#ifdef STAR_RADIATION_ACTIVE
+#ifdef RAD_OPENING_ANGLE_ACTIVE
   int Nchildren = 0;
   MyNgbTreeFloat rt_range_min[3], rt_range_max[3];
 
@@ -679,7 +679,7 @@ void ngb_update_node_recursive(int no, int sib, int father, int *last, int mode)
                                 vmax[k] = ExtNgb_Nodes[p].vmax[k];
 #endif /* #ifdef TREE_BASED_TIMESTEPS */
                             }
-#ifdef STAR_RADIATION_ACTIVE
+#ifdef RAD_OPENING_ANGLE_ACTIVE
                           for(k = 0; k < 3; k++)
                             {
                               if(rt_range_min[k] > RtNgb_Nodes[p].rt_range_min[k])
@@ -735,7 +735,7 @@ void ngb_update_node_recursive(int no, int sib, int father, int *last, int mode)
 #endif /* #ifdef TREE_BASED_TIMESTEPS */
 
                         }
-#ifdef STAR_RADIATION_ACTIVE
+#ifdef RAD_OPENING_ANGLE_ACTIVE
                       if(P[p].Type == 0)
                         {
                           double r_cell = get_cell_radius(p);
@@ -781,7 +781,7 @@ void ngb_update_node_recursive(int no, int sib, int father, int *last, int mode)
               ExtNgb_Nodes[no].vmax[k] = vmax[k];
 #endif /* #ifdef TREE_BASED_TIMESTEPS */
             }
-#ifdef STAR_RADIATION_ACTIVE
+#ifdef RAD_OPENING_ANGLE_ACTIVE
           /* Count direct children */
           for(int j = 0; j < 8; j++)
             if(suns[j] >= 0) 
@@ -901,7 +901,7 @@ void ngb_exchange_topleafdata(void)
     MyNgbTreeFloat MaxCsnd, vmin[3], vmax[3];
 #endif /* #ifdef TREE_BASED_TIMESTEPS */
 
-#ifdef STAR_RADIATION_ACTIVE
+#ifdef RAD_OPENING_ANGLE_ACTIVE
     int Nchildren;
     MyNgbTreeFloat rt_range_min[3], rt_range_max[3];
 #endif
@@ -960,7 +960,7 @@ void ngb_exchange_topleafdata(void)
               loc_DomainMoment[idx].vmax[k] = ExtNgb_Nodes[no].vmax[k];
 #endif /* #ifdef TREE_BASED_TIMESTEPS */
             }
-#ifdef STAR_RADIATION_ACTIVE
+#ifdef RAD_OPENING_ANGLE_ACTIVE
           loc_DomainMoment[idx].Nchildren = RtNgb_Nodes[no].Nchildren;
           
           for(int k = 0; k < 3; k++)
@@ -1013,7 +1013,7 @@ void ngb_exchange_topleafdata(void)
               ExtNgb_Nodes[no].vmax[k] = DomainMoment[idx].vmax[k];
 #endif /* #ifdef TREE_BASED_TIMESTEPS */
             }
-#ifdef STAR_RADIATION_ACTIVE
+#ifdef RAD_OPENING_ANGLE_ACTIVE
           RtNgb_Nodes[no].Nchildren = DomainMoment[idx].Nchildren;
           
           for(int k = 0; k < 3; k++)
@@ -1514,7 +1514,7 @@ void ngb_treemodifylength(int delta_NgbMaxPart)
   ExtNgb_Nodes -= delta_NgbMaxPart;
 #endif /* #ifdef TREE_BASED_TIMESTEPS */
 
-#ifdef STAR_RADIATION_ACTIVE
+#ifdef RAD_OPENING_ANGLE_ACTIVE
   RtNgb_Nodes -= delta_NgbMaxPart;
 #endif
 
@@ -1553,7 +1553,7 @@ void ngb_treeallocate(void)
   ExtNgb_Nodes -= Ngb_MaxPart;
 #endif /* #ifdef TREE_BASED_TIMESTEPS */
 
-#ifdef STAR_RADIATION_ACTIVE
+#ifdef RAD_OPENING_ANGLE_ACTIVE
   RtNgb_Nodes = (struct RtNgbNODE *)mymalloc_movable(&RtNgb_Nodes, "RtNgb_Nodes", (Ngb_MaxNodes + 1) * sizeof(struct RtNgbNODE));
   RtNgb_Nodes -= Ngb_MaxPart;
 #endif
@@ -1579,7 +1579,7 @@ void ngb_treefree(void)
       myfree_movable(Ngb_Father);
       myfree_movable(Ngb_Nextnode);
 
-#ifdef STAR_RADIATION_ACTIVE
+#ifdef RAD_OPENING_ANGLE_ACTIVE
       myfree_movable(RtNgb_Nodes + Ngb_MaxPart);
       RtNgb_Nodes = NULL;
 #endif

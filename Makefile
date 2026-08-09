@@ -466,6 +466,12 @@ $(error STAR_RADIATION_ACTIVE requires GRACKLE_CHEMISTRY >= 2)
 endif
 endif
 
+ifneq (,$(filter STAR_RADIATION_ACTIVE,$(CONFIGVARS)))
+ifeq (,$(filter CREATE_FULL_MESH,$(CONFIGVARS)))
+$(error STAR_RADIATION_ACTIVE requires CREATE_FULL_MESH)
+endif
+endif
+
 ifneq (,$(filter STAR_PARTICLES,$(CONFIGVARS)))
 OBJS += stars/star_particle.o
 INCL += stars/star_particle.h  
@@ -487,7 +493,7 @@ endif
 ifneq (,$(filter STAR_RADIATION_ACTIVE,$(CONFIGVARS)))
 OBJS += extern/chealpix.o \
         stars/star_radiation.o \
-        stars/star_radiation_tree.o
+        stars/star_radiation_voronoi.o
 INCL += extern/chealpix.h \
         stars/star_radiation.h
 SUBDIRS += extern
