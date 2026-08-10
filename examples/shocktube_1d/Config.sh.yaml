@@ -1,0 +1,29 @@
+
+## examples/shocktube_1d/Config.sh
+## config file for 1d shocktube probelm
+
+
+#--------------------------------------- Basic operation mode of code
+onedims: ON                                   # 1d simulation
+reflective_x: 2                           # x boundary; 1: reflective, 2: inflow/outflow; not active: periodic
+gamma: 1.4                                # adiabatic index of gas; 5/3 if not set
+
+#--------------------------------------- Mesh motion and regularization
+regularize_mesh_cm_drift: ON                  # Mesh regularization; Move mesh generating point towards center of mass to make cells rounder.
+regularize_mesh_cm_drift_use_soundspeed: ON   # Limit mesh regularization speed by local sound speed
+regularize_mesh_face_angle: ON                # Use maximum face angle as roundness criterion in mesh regularization
+
+#--------------------------------------- Time integration options
+force_equal_timesteps: ON                     # variable but global timestep
+
+#---------------------------------------- Single/Double Precision
+doubleprecision: 1                        # mode of double precision: not defined: single; 1: full double precision 2: mixed, 3: mixed, fewer single precisions; unless short of memory, use 1.
+input_in_doubleprecision: ON                  # initial conditions are in double precision
+output_in_doubleprecision: ON                 # snapshot files will be written in double precision
+
+#--------------------------------------- Output/Input options
+have_hdf5: ON                                 # needed when HDF5 I/O support is desired (recommended)
+
+#--------------------------------------- Testing and Debugging options
+debug: ON                                     # enables core-dumps
+

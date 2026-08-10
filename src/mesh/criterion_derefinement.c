@@ -177,14 +177,16 @@ static int jeans_derefinement_criteria(int i)
     return 1;
 
 #ifdef JEANS_REFINEMENT
-  double jeans_number, jeans_length, sound_speed, dx;
+  double jeans_number, jeans_length, sound_speed, dx, jeans_ref;
+  jeans_ref = JEANS_REFINEMENT;
   sound_speed  = sqrt(GAMMA * SphP[i].Pressure / SphP[i].Density);
   jeans_length = sqrt(M_PI / All.G / SphP[i].Density) * sound_speed;
   dx           = 2.0 * get_cell_radius(i);
   jeans_number = jeans_length / dx;
 
-  if(jeans_number > 1.5 * JEANS_REFINEMENT && P[i].Mass < 0.5 * All.TargetGasMass)
-    return 1;
+  return ((jeans_number > 1.5 * jeans_ref) && (P[i].Mass < 0.5 * All.TargetGasMass));
+  // if((jeans_number > 1.5 * JEANS_REFINEMENT) && (P[i].Mass < 0.5 * All.TargetGasMass))
+  //   return 1;
 #endif /* #ifdef JEANS_REFINEMENT */
   return 0;
 }

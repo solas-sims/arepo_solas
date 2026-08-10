@@ -36,6 +36,8 @@
  * - DD.MM.YYYY Description
  */
 
+#ifdef EEOS_SF
+
 #include <math.h>
 #include <mpi.h>
 #include <stdio.h>
@@ -533,3 +535,5 @@ double calc_egyeff(int i, double gasdens, double *ne, double *x, double *tsfr, d
 
   return egyeff;
 }
+
+#endif

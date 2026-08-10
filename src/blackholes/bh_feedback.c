@@ -134,6 +134,7 @@ static void kernel_imported(void)
 
 void bh_feedback(void)
 {
+#ifdef BH_ACTIVE
   TIMER_START(CPU_BLACKHOLES_FEEDBACK);
 
   generic_set_MaxNexport();
@@ -141,6 +142,7 @@ void bh_feedback(void)
   generic_comm_pattern(TimeBinsBh.NActiveParticles, kernel_local, kernel_imported);
 
   TIMER_STOP(CPU_BLACKHOLES_FEEDBACK);
+#endif
 }
 
 static int bh_feedback_evaluate(int target, int mode, int threadid)
@@ -176,7 +178,8 @@ static int bh_feedback_evaluate(int target, int mode, int threadid)
   mass_feed = All.Mload * All.Epsilon_r * accretion; 
   energy_feed = All.Epsilon_f * (1.0 - All.Mload) * All.Epsilon_r  * accretion * (CLIGHT*CLIGHT / (All.cf_UnitVelocity_in_cm_per_s*All.cf_UnitVelocity_in_cm_per_s));
 
-  //MyDouble hinv, hinv3, hinv4, u, dwk;
+  // why was this commented out!?
+  MyDouble hinv, hinv3, hinv4, u, dwk;
 
   //h2   = h * h;
   //hinv = 1.0 / h;

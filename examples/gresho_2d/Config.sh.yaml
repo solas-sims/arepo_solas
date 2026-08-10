@@ -1,0 +1,28 @@
+
+## examples/Gresho_2d/Config.sh
+## config file for 2d Gresho vortex probelm
+
+
+#--------------------------------------- Basic operation mode of code
+twodims: ON                                   # 2d simulation
+read_mass_as_density_in_input: ON             # Reads the mass field in the IC as density
+
+#--------------------------------------- Mesh motion and regularization
+regularize_mesh_cm_drift: ON                  # Mesh regularization; Move mesh generating point towards center of mass to make cells rounder.
+regularize_mesh_cm_drift_use_soundspeed: ON   # Limit mesh regularization speed by local sound speed
+regularize_mesh_face_angle: ON                # Use maximum face angle as roundness criterion in mesh regularization
+
+#--------------------------------------- Time integration options
+tree_based_timesteps: ON                      # non-local timestep criterion (take 'signal speed' into account)
+
+#---------------------------------------- Single/Double Precision
+doubleprecision: 1                        # mode of double precision: not defined: single; 1: full double precision 2: mixed, 3: mixed, fewer single precisions; unless short of memory, use 1.
+input_in_doubleprecision: ON                  # initial conditions are in double precision
+output_in_doubleprecision: ON                 # snapshot files will be written in double precision
+output_center_of_mass: ON                     # output centers of cells
+
+#--------------------------------------- Output/Input options
+have_hdf5: ON                                 # needed when HDF5 I/O support is desired (recommended)
+
+#--------------------------------------- Testing and Debugging options
+debug: ON                                     # enables core-dumps

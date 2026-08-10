@@ -50,16 +50,16 @@ DEBUG # enables core-dumps
 #--------------------------------------- non-standard phyiscs
 #ENFORCE_JEANS_STABILITY_OF_CELLS # this imposes an adaptive floor for the temperature
 COOLING                          # Simple primordial cooling
-USE_GRACKLE			 # Use Grackle library for cooling
+USE_GRACKLE # Use Grackle library for cooling
 GRACKLE_CHEMISTRY=0
-NOUVBACKGROUND			 # Switches off UV background
-USE_SFR                          # Activate star formation
-AGORA_SF			 # AGORA star formation scheme
-USE_CELIB
-STARS
-PASSIVE_SCALARS=1
-METALS
+NOUVBACKGROUND # Switches off UV background
+USE_SFR  # Activate star formation
+AGORA_SF # AGORA star formation scheme
+USE_CELIB #
+STARS #
+PASSIVE_SCALARS=1 #
+METALS #
 
 #REFINEMENT_AROUND_BH
-BLACKHOLES
-BONDI_ACCRETION
+BLACKHOLES #
+BONDI_ACCRETION #

@@ -43,9 +43,9 @@ PROCESS_TIMES_OF_OUTPUTLIST # goes through times of output list prior to startin
 OVERRIDE_PEANOGRID_WARNING  # don't stop if peanogrid is not fine enough
 
 #--------------------------------------- Output/Input options
-HAVE_HDF5 # needed when HDF5 I/O support is desired (recommended)
-#INPUT_IN_DOUBLEPRECISION
-GENERATE_GAS_IN_ICS
+HAVE_HDF5  # needed when HDF5 I/O support is desired (recommended)
+#INPUT_IN_DOUBLEPRECISION # do not use input double precision
+GENERATE_GAS_IN_ICS  # generate gas in the ics
 
 #------------------------------------------------ On the fly FOF groupfinder
 FOF                                              # enable FoF output
@@ -81,8 +81,8 @@ DEBUG # enables core-dumps
 #BLACKHOLES
 #BONDI_ACCRETION
 
-HALO_SEEDING
-BLACKHOLE_SEEDING
+HALO_SEEDING # 
+BLACKHOLE_SEEDING #
 BH_SEED_ON_MASS                 # seed once halo mass exceeds MinHaloMassForFOFSeeding (param.txt); the literature-standard channel
 #BH_SEED_ON_ZERO_METALLICITY     # seed pristine halos (max gas-cell metallicity <= ZeroMetallicityThresholdForFOFSeeding, param.txt);
                                  # requires METALS above to be enabled. Channels OR together if more than one is active, and a halo

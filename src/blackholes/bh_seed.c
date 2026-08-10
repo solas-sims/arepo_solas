@@ -13,6 +13,7 @@
  *              is destroyed.
  */
 
+
 #include <gsl/gsl_math.h>
 #include <math.h>
 #include <mpi.h>
@@ -200,6 +201,7 @@ static void spawn_black_hole_from_cell(int igas, int ibh, double seed_mass)
   BhP[NumBhs].PID = ibh;
 
   /* initial guess for the smoothing length: radius of the donor cell */
+#ifdef BH_ACTIVE
   BhP[NumBhs].Hsml        = cbrt((3.0 * SphP[igas].Volume) / (4.0 * M_PI));
   BhP[NumBhs].Density     = 0;
   BhP[NumBhs].NgbMass     = 0;
@@ -207,6 +209,7 @@ static void spawn_black_hole_from_cell(int igas, int ibh, double seed_mass)
   BhP[NumBhs].NgbMinStep  = 0;
   BhP[NumBhs].DensityFlag = 0;
   BhP[NumBhs].TimeBinBh   = 0;
+#endif
 
   /* timebin_add_particle(&TimeBinsBh, NumBhs, -1, 0, 1); */
 

@@ -1,0 +1,42 @@
+
+#########################################################
+#  Enable/Disable compile-time options as needed        #
+#  examples/isolated_galaxy_collisionless_3d/Config.sh  #
+#########################################################
+
+
+#--------------------------------------- Gravity treatment
+selfgravity: ON                               # gravitational intraction between simulation particles/cells
+hierarchical_gravity: ON                      # use hierarchical splitting of the time integration of the gravity
+cell_center_gravity: ON                       # uses geometric centers to calculate gravity of cells, only possible with HIERARCHICAL_GRAVITY
+allow_direct_summation: ON                    # Performed direct summation instead of tree-based gravity if number of active particles < DIRECT_SUMMATION_THRESHOLD (= 3000 unless specified differently here)
+direct_summation_threshold: 500           # overrides maximum number of active particles for which direct summation is performed instead of tree based calculation
+gravity_not_periodic: ON                      # gravity is not treated periodically
+
+
+#--------------------------------------- Gravity softening
+nsofttypes: 2                             # number of different softening values to which particle types can be mapped.
+multiple_node_softening: ON                   # If a tree node is to be used which is softened, this is done with the softenings of its different mass components
+individual_gravity_softening: 32          # bitmask with particle types where the softenig type should be chosen with that of parttype 1 as a reference type
+adaptive_hydro_softening: ON                  # Adaptive softening of gas cells depending on their size
+
+
+#--------------------------------------- Time integration options
+tree_based_timesteps: ON                      # non-local timestep criterion (take 'signal speed' into account)
+
+
+#--------------------------------------- Single/Double Precision
+doubleprecision: 1                        # mode of double precision: not defined: single; 1: full double precision 2: mixed, 3: mixed, fewer single precisions; unless short of memory, use 1.
+ngb_tree_doubleprecision: ON                  # if this is enabled, double precision is used for the neighbor node extension
+
+
+#--------------------------------------- Things for special behaviour
+process_times_of_outputlist: ON               # goes through times of output list prior to starting the simulaiton to ensure that outputs are written as close to the desired time as possible (as opposed to at next possible time if this flag is not active)
+
+
+#--------------------------------------- Output/Input options
+have_hdf5: ON                                 # needed when HDF5 I/O support is desired (recommended)
+
+
+#--------------------------------------- Testing and Debugging options
+debug: ON                                     # enables core-dumps

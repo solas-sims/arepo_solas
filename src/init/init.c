@@ -49,7 +49,14 @@
 #include "../domain/domain.h"
 #include "../mesh/voronoi/voronoi.h"
 
+#ifdef FOF
 #include "../fof/fof_seeding.h"
+#endif
+
+/* CELIB is deprecated */
+#ifdef USE_CELIB
+#include "../../celib/src/config.h"
+#endif
 
 /*! \brief Prepares the loaded initial conditions for the run.
  *
