@@ -31,6 +31,7 @@
  * - DD.MM.YYYY Description
  */
 
+#ifdef AGORA_SF
 #include <math.h>
 #include <mpi.h>
 #include <stdio.h>
@@ -41,6 +42,10 @@
 #include "../main/proto.h"
 
 #include "../gravity/forcetree.h"
+
+#ifdef COOLING
+#include "../cooling/cooling_proto.h"
+#endif
 
 /* Function that checks whether a cell i satisfies star formation criteria*/
 static int sf_criteria(int i)
@@ -87,10 +92,12 @@ void cooling_and_starformation(void)
   int idx, i, bin;
   double unew, du;
     
+#ifdef USE_SFR
   /* clear the SFR stored in the active timebins */
   for(bin = 0; bin < TIMEBINS; bin++)
     if(TimeBinSynchronized[bin])
       TimeBinSfr[bin] = 0;
+#endif
 
   for(idx = 0; idx < TimeBinsHydro.NActiveParticles; idx++)
     {
@@ -112,8 +119,11 @@ void cooling_and_starformation(void)
       SphP[i].Utherm += du;
       SphP[i].Energy += All.cf_atime * All.cf_atime * du * P[i].Mass;
 
+#ifdef COOLING
       cool_cell(i);
+#endif
 
+#ifdef USE_SFR
       if(sf_criteria(i))
         {
           SphP[i].Sfr = get_starformation_rate(i);
@@ -121,6 +131,7 @@ void cooling_and_starformation(void)
         }
       else
         SphP[i].Sfr = 0;
+#endif
 
     } /* end of main loop over active particles */
 
@@ -135,8 +146,14 @@ void cooling_and_starformation(void)
  */
 double get_starformation_rate(int i)
 {
+  // the Sfr is note necessarily defined if AGORA_SF is defined
+  // thuse either return 0 if no SFR or return the value 
   if(RestartFlag == 3)
+  #ifdef USE_SFR
     return SphP[i].Sfr;
+  #else
+    return 0;
+  #endif
 
   double rateOfSF, t_freefall;
 
@@ -153,3 +170,5 @@ double get_starformation_rate(int i)
 
   return rateOfSF;
 }
+
+#endif 

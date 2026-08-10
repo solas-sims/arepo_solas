@@ -35,6 +35,8 @@
  * - DD.MM.YYYY Description
  */
 
+#ifdef JEANS_SF
+
 #include <math.h>
 #include <mpi.h>
 #include <stdio.h>
@@ -181,3 +183,5 @@ double get_starformation_rate(int i)
 
   return rateOfSF;
 }
+
+#endif

@@ -467,7 +467,7 @@ void read_parameter_file(char *fname)
       strcpy(tag[nt], "RefBHMaxCellRadiusHSML");
       addr[nt] = &All.RefBHMaxCellRadiusHSML;
       id[nt++] = REAL;
-#endif
+#endif  /* #if defined(REFINEMENT_AROUND_BH_FIXED or REFINEMENT_AROUND_BH_HYBRID) */
       strcpy(tag[nt], "RefBHMinCellMass");
       addr[nt] = &All.RefBHMinCellMass;
       id[nt++] = REAL;
@@ -475,7 +475,7 @@ void read_parameter_file(char *fname)
       strcpy(tag[nt], "RefBHLowerFactorC");
       addr[nt] = &All.RefBHLowerFactorC;
       id[nt++] = REAL;
-#endif
+#endif /* #if defined(REFINEMENT_AROUND_BH) */
 
 #ifdef TILE_ICS
       strcpy(tag[nt], "TileICsFactor");
@@ -504,20 +504,20 @@ void read_parameter_file(char *fname)
         strcpy(tag[nt], "InitMetallicityinSolar");
         addr[nt] = &All.InitMetallicityinSolar;
         id[nt++] = REAL;
-#endif
+#endif /* ifdef METALS */
 
 /* Cooling */
 #ifdef COOLING
       strcpy(tag[nt], "TreecoolFile");
       addr[nt] = &All.TreecoolFile;
       id[nt++] = STRING;
-#endif
+#endif /* ifdef COOLING */
 
 #ifdef USE_GRACKLE
         strcpy(tag[nt], "GrackleDataFile");
         addr[nt] = &All.GrackleDataFile;
         id[nt++] = STRING;
-#endif 
+#endif /* ifdef USE_GRACKLE */
         
 /* Star Formation */
 #ifdef EEOS_SF
@@ -566,18 +566,18 @@ void read_parameter_file(char *fname)
         strcpy(tag[nt], "StarFormationEfficiency");  
         addr[nt] = &All.StarFormationEfficiency;
         id[nt++] = REAL;
-#endif
+#endif /* #ifdef EEOS_SF */
 
 #ifdef JEANS_SF
 #ifdef JEANS_MASS_BASED
         strcpy(tag[nt], "JeansMassThreshold");
         addr[nt] = &All.JeansMassThreshold;
         id[nt++] = REAL;
-#endif 
+#endif /* #ifdef JEANS_MASS_BASED */
         strcpy(tag[nt], "StarFormationEfficiency"); 
         addr[nt] = &All.StarFormationEfficiency;
         id[nt++] = REAL;
-#endif
+#endif /* #ifdef JEANS_SF */
         
 #ifdef INDIVIDUAL_STAR_BY_STAR_FORMATION
         strcpy(tag[nt], "NumberDensThreshold"); 
@@ -591,60 +591,58 @@ void read_parameter_file(char *fname)
         strcpy(tag[nt], "StarFormationEfficiency");  
         addr[nt] = &All.StarFormationEfficiency;
         id[nt++] = REAL;
-#endif
+#endif /* #ifdef INDIVIDUAL_STAR_BY_STAR_FORMATION */
 
 #ifdef STAR_PARTICLES
       strcpy(tag[nt], "IMF");
       addr[nt] = &All.IMF;
       id[nt++] = INT;
-#endif
+#endif /* #ifdef STAR_PARTICLES */
 
 #if defined(TREE_BASED_TIMESTEPS) && defined(SUPERNOVAE)
       strcpy(tag[nt], "SN_LeadTime");
       addr[nt] = &All.SN_LeadTime;
       id[nt++] = REAL;
-#endif
+#endif /* #if defined(TREE_BASED_TIMESTEPS) && defined(SUPERNOVAE) */
 
 #ifdef STAR_FEEDBACK_ACTIVE
       strcpy(tag[nt], "StarTablesFile");
       addr[nt] = &All.StarTablesFile;
       id[nt++] = STRING;
-#endif
+#endif /* #ifdef STAR_FEEDBACK_ACTIVE */
 
 #ifdef SUPERNOVAE
       strcpy(tag[nt], "SN_HostShellSweepFrac");
       addr[nt] = &All.SN_HostShellSweepFrac;
       id[nt++] = REAL;
-#endif
+#endif /* #ifdef SUPERNOVAE */
 
 #ifdef STAR_RADIATION_ACTIVE
       strcpy(tag[nt], "RaySplitFactor");
       addr[nt] = &All.RaySplitFactor;
       id[nt++] = REAL;
-#endif  
+#endif /* #ifdef STAR_RADIATION_ACTIVE */
 
 #ifdef RAD_OPENING_ANGLE
       strcpy(tag[nt], "RadOpeningAngle");
       addr[nt] = &All.RadOpeningAngle;
       id[nt++] = REAL;
-#endif  
-
       strcpy(tag[nt], "NodeAspectRatio");
       addr[nt] = &All.NodeAspectRatio;
       id[nt++] = REAL;
-#endif  
+#endif  /* #ifdef RAD_OPENING_ANGLE */
 
 #ifdef PHOTOIONIZATION
       strcpy(tag[nt], "RTIonizationTimestepFraction");
       addr[nt] = &All.RTIonizationTimestepFraction;
       id[nt++] = REAL;
-#endif  
+#endif /* #ifdef PHOTOIONIZATION */
 
 #ifdef RADIATION_PRESSURE
       strcpy(tag[nt], "IRDtauMomentumBoostCoeff");
       addr[nt] = &All.IRDtauMomentumBoostCoeff;
       id[nt++] = REAL;
-#endif  
+#endif  /* #ifdef RADIATION_PRESSURE */
 
 #ifdef BH_ACTIVE
 #ifdef BH_CONSTANT_RADIUS
@@ -663,20 +661,21 @@ void read_parameter_file(char *fname)
       strcpy(tag[nt], "HMaxFactor");
       addr[nt] = &All.HMaxFactor;
       id[nt++] = REAL;
-#endif
-#endif
+#endif /* #ifdef BH_CONSTANT_RADIUS */
+#endif /* #ifdef BH_ACTIVE */
 
 #ifdef BH_ACCRETION_ACTIVE
       strcpy(tag[nt], "Epsilon_r");
       addr[nt] = &All.Epsilon_r;
       id[nt++] = REAL;
-#endif            
+#endif /* #ifdef BH_ACCRETION_ACTIVE */
 
 #ifdef TORQUE_ACCRETION
       strcpy(tag[nt], "Epsilon_T"); /* Normalization for Torque Accretion */
       addr[nt] = &All.Epsilon_T;
       id[nt++] = REAL;
-#endif
+#endif /* #ifdef TORQUE_ACCRETION */
+
 
 #ifdef ADP_ACCRETION
       strcpy(tag[nt], "ADP_tvisc"); /* Viscous timescale */
@@ -690,7 +689,8 @@ void read_parameter_file(char *fname)
       strcpy(tag[nt], "ADP_EddFactor");
       addr[nt] = &All.ADP_EddFactor;
       id[nt++] = REAL;
-#endif
+#endif /* #ifdef ADP_ACCRETION */
+
 
 #ifdef BH_FEEDBACK_ACTIVE
       strcpy(tag[nt], "Epsilon_f");
@@ -700,7 +700,7 @@ void read_parameter_file(char *fname)
       strcpy(tag[nt], "Mload");
       addr[nt] = &All.Mload;
       id[nt++] = REAL;
-#endif
+#endif /* #ifdef BH_FEEDBACK_ACTIVE */
         
 #ifdef HALO_SEEDING 
 #ifndef FOF

@@ -46,6 +46,12 @@ void bh_kernel(double u, double hinv3, double hinv4, double *wk, double *dwk)
 
 integertime bh_timestep(int i)
 { 
+  // this is very confusing!!! 
+  // NgbsMinBin is only present in the BH structure if BH_ACTIVE is defined
+  // but it looks like BH_ACTIVE should always be defined if BH are present 
+  // given the bh_timesteps ... 
+  // yet there is an ifdef in bh.h 
+  // I am deeply confused!
   /* Neighbours minimum bin */
   double dt_ngbmin = (BhP[i].NgbsMinBin ? (((integertime)1) << BhP[i].NgbsMinBin) : 0) * All.Timebase_interval;
   

@@ -36,22 +36,25 @@ def make_yaml(
                 continue 
             if regex2.search(stripped_line):
                 newline = stripped_line.lower().replace("=", ": " , 1)
+                newline = newline.replace("\t", " ")
                 ofile.write(newline+'\n')
             elif regex1.search(stripped_line):
                 size = len(regex1.search(stripped_line).group())
                 newline = stripped_line[:size].lower()
                 newline += ": ON " + stripped_line[size:]
+                newline = newline.replace("\t", " ")
                 ofile.write(newline+'\n')
             elif regex3.search(stripped_line):
                 size = len(regex3.search(stripped_line).group())
                 newline = stripped_line[1:size].lower()
                 if len(stripped_line) > size:
-                    if stripped_line[size] == "=":
+                    if "=" in stripped_line[size]:
                         newline = "#" + newline + stripped_line[size:]
                     else:
                         newline += ": OFF " + stripped_line[size:]
                 else:
                     newline += ": OFF "
+                newline = newline.replace("\t", " ")
                 ofile.write(newline+'\n')
             else:
                 ofile.write(stripped_line+'\n')

@@ -8,6 +8,9 @@
 #include "../main/allvars.h"
 #include "../main/proto.h"
 
+// why is there no bh_proto!!!
+#include "bh_proto.h"
+
 #include "../domain/domain.h"
 
 #define DEG_TO_RAD(deg) ((deg) * M_PI / 180.0)

@@ -30,6 +30,7 @@ arepo_option(ENABLE_SHARED_LIB "Enable shared library" ON)
 arepo_option(ENABLE_TESTS "Enable testing" ON)
 arepo_option(ENABLE_CMAKE_PTHREADS_FIX "Enable CMake pthreads fix for ARM" OFF)
 arepo_option(ENABLE_PROFILE_UTIL "Enable profiling utility" OFF)
+arepo_option(ENABLE_FFTW "Enable FFTW" OFF)
 
 set(AREPO_YAML_CONFIG "${CMAKE_CURRENT_SOURCE_DIR}/template_config.yaml" CACHE FILEPATH "YAML config file for AREPO")
 
@@ -81,6 +82,7 @@ arepo_configure_from_yaml()
 include(${CMAKE_CURRENT_BINARY_DIR}/generated_options.cmake)
 
 if (AREPO_ENABLE_USE_CELIB)
+   add_definitions("-DUSE_CELIB")
    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/celib/src)
    include_directories(${CMAKE_CURRENT_SOURCE_DIR}/celib/src ${CMAKE_CURRENT_SOURCE_DIR}/celib/data)
 endif()

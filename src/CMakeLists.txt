@@ -69,7 +69,7 @@ set(AREPO_SOURCES
     main/allvars.c
     main/main.c
     main/run.c
-    main/update.c
+#    main/update.c
     mesh/criterion_derefinement.c
     mesh/criterion_refinement.c
     mesh/refinement.c
@@ -193,6 +193,12 @@ if (AREPO_ENABLE_FOF)
         fof/fof_sort_kernels.c
         fof/fof_vars.c
     )
+    if (AREPO_ENABLE_HALO_SEEDING)
+    list(APPEND AREPO_SOURCES
+        fof/fof_seeding.c
+        fof/fof_seeding_registry.c
+    )
+    endif()
     list(APPEND AREPO_INCLUDES_DIRS
         fof
     )
@@ -230,7 +236,13 @@ if (AREPO_ENABLE_BLACKHOLES)
         blackholes/bh_jet_density.c
         blackholes/bh_feedback.c
         blackholes/bh_refinement.c
+        blackholes/bh_update.c
     )
+    if ((AREPO_ENABLE_HALO_SEEDING) AND (AREPO_ENABLE_BLACKHOLE_SEEDING))
+    list(APPEND AREPO_SOURCES
+        blackholes/bh_seed.c
+    )
+    endif()
     list(APPEND AREPO_INCLUDES_DIRS
         blackholes
     )
@@ -246,9 +258,10 @@ if (AREPO_ENABLE_STARS)
     )
 endif()
 
-if (AREPO_ENABLE_USE_CELIB)
-    include_directories(${CMAKE_CURRENT_SOURCE_DIR}/celib/src ${CMAKE_CURRENT_SOURCE_DIR}/celib/data)
-endif()
+# CELIB is deprecated.
+# if (AREPO_ENABLE_USE_CELIB)
+#     include_directories(${CMAKE_CURRENT_SOURCE_DIR}/celib/src ${CMAKE_CURRENT_SOURCE_DIR}/celib/data)
+# endif()
 
 if (AREPO_ENABLE_PROFILE_UTIL)
     include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../profile_util/include)
@@ -388,7 +401,9 @@ sanitizer_options(arepolib)
 add_executable(arepo main/main.c)
 target_link_libraries(arepo arepolib ${AREPO_LIBS})
 if (AREPO_ENABLE_USE_CELIB)
-    target_link_libraries(arepo celib)
+    message(WARNING "CELIB is marked for deprecation")
+    #error("CELIB is deprecated")
+    #target_link_libraries(arepo celib)
 endif()
 if (AREPO_ENABLE_PROFILE_UTIL)
     target_link_libraries(arepo profile_util)
@@ -399,7 +414,7 @@ if (AREPO_LINK_FLAGS)
 endif()
 if (AREPO_ENABLE_FFTW)
     if (AREPO_DOUBLEPRECISION_FFTW)
-       target_link_libraries(arepo fftw3 fftw3_mpi)
+        target_link_libraries(arepo fftw3 fftw3_mpi)
     else()
         target_link_libraries(arepo fftw3f fftw3f_mpi)
     endif()

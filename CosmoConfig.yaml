@@ -10,11 +10,11 @@ regularize_mesh_cm_drift_use_soundspeed: ON  # Limit mesh regularization speed b
 regularize_mesh_face_angle: ON               # Use maximum face angle as roundness criterion in mesh regularization
 
 #--------------------------------------- Refinement and derefinement
-refinement_split_cells: ON  			 # Refinement
+refinement_split_cells: ON      # Refinement
 refinement_merge_cells: ON                    # Derefinement
 
 #--------------------------------------- Time integration options
-tree_based_timesteps: ON  			 # non-local timestep criterion (take 'signal speed' into account)
+tree_based_timesteps: ON      # non-local timestep criterion (take 'signal speed' into account)
 
 #------------------------------------------------ TreePM Options
 pmgrid: 64                                       # enables particle mesh; numberof cells used for grid in each dimension
@@ -30,7 +30,7 @@ direct_summation_threshold: 500 # overrides maximum number of active particles f
 #--------------------------------------- Gravity softening
 nsofttypes: 6                    # number of different softening values to which particle types can be mapped.
 multiple_node_softening: ON          # If a tree node is to be used which is softened, this is done with the softenings of its different mass components
-individual_gravity_softening: OFF =32 # bitmask with particle types where the softenig type should be chosen with that of parttype 1 as a reference type
+#individual_gravity_softening=32 # bitmask with particle types where the softenig type should be chosen with that of parttype 1 as a reference type
 adaptive_hydro_softening: ON         # Adaptive softening of gas cells depending on their size
 
 #--------------------------------------- Single/Double Precision
@@ -63,24 +63,27 @@ debug: ON  # enables core-dumps
 #--------------------------------------- non-standard phyiscs
 enforce_jeans_stability_of_cells: OFF  # this imposes an adaptive floor for the temperature
 cooling: OFF                           # Simple primordial cooling
-use_grackle: OFF 			 # Use Grackle library for cooling
-grackle_chemistry: OFF =0
-nouvbackground: OFF 			 # Switches off UV background
+use_grackle: OFF     # Use Grackle library for cooling
+#grackle_chemistry=0
+nouvbackground: OFF     # Switches off UV background
 use_sfr: OFF                           # Activate star formation
-eeos_sf: OFF 			 # AGORA star formation scheme
+eeos_sf: OFF     # AGORA star formation scheme
+agora_sf: ON #
 jeans_sf: OFF 
 jeans_mass_based: OFF 
 use_celib: OFF 
 stars: OFF 
 supernovae: OFF 
-passive_scalars: OFF =1
+#passive_scalars=1
 metals: OFF 
 
 refinement_around_bh: OFF 
-blackholes: OFF 
+blackholes: ON 
 bondi_accretion: OFF 
 
 halo_seeding: ON  #
+fof: ON                            # enable FoF output
+
 blackhole_seeding: ON  #
 bh_seed_on_mass: ON                  # seed once halo mass exceeds MinHaloMassForFOFSeeding (param.txt); the literature-standard channel
 bh_seed_on_zero_metallicity: OFF      # seed pristine halos (max gas-cell metallicity <= ZeroMetallicityThresholdForFOFSeeding, param.txt);

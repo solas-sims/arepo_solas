@@ -4,7 +4,7 @@
 METALS                 # Advect all metals, ie metal mass fraction, as a PASSIVE_SCALARS
 
 #--------------------------------------- Cooling parameters
-USE_GRACKLE
+USE_GRACKLE # use grackle
 GRACKLE_CHEMISTRY=3    
 
 #--------------------------------------- Star Formation options
@@ -20,7 +20,7 @@ WINDS                  # Only winds
 #RADIATION              # Full radiation
 SUPERNOVAE             # Only supernovae
 
-#STAR_HOST_REFINEMENT
+#STAR_HOST_REFINEMENT  # no gas containing star refinement
 
 
 #--------------------------------------- Arepo public
