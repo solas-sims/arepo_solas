@@ -60,10 +60,15 @@ extern struct RtNgbNODE
     /* number of children */
     int Nchildren;
 
+    /* AABB of cell *spheres*, not points */
+    MyNgbTreeFloat rt_range_min[3];   
+    MyNgbTreeFloat rt_range_max[3];
+
 #ifdef RAD_OPENING_ANGLE
     /* RT quantities - volume-weighted, accumulated during tree build */
     MyNgbTreeFloat Volume;
-    MyNgbTreeFloat dN_H2_OverLength;  
+    MyNgbTreeFloat dN_H2_OverLength;
+      
     MyNgbTreeFloat DtauOverLength_E[WAVEBANDS];
     MyNgbTreeFloat DtauOverLength_N[WAVEBANDS];
 

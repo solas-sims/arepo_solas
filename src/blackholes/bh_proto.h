@@ -40,11 +40,4 @@ void bh_jet_feedback(void);
 
 void blackhole_mark_cells_for_refinement(void);
 
-#ifdef BLACKHOLES_FEEDBACK
-void bh_jet_density(void);
-void bh_ngb_feedback(void);
-#endif
-
-#endif /* #ifdef BLACKHOLES */
-
-/* black hole seeding from on-the-fly FOF: see src/fof/fof_seeding.h */
+#endif 

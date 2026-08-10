@@ -78,7 +78,6 @@ double dtau_IR(int i, double length);
 void init_h2shield(void);
 double h2shield_dtau(double N_H2, double dN_H2);
 
-void start_healpix(void);
 void append_ray(RayWorkStack *w, const RayPacket *ray);
 void split_ray(const RayPacket *parent, RayPacket children[4]);
 
@@ -92,12 +91,8 @@ void raytrace_treewalk(RayPacket *ray, RayWorkStack *work, RayExportBuffer *expo
 void star_feedback(void);
 #endif
 
-#if defined(WINDS) || defined(RADIATION_PRESSURE) || defined(SUPERNOVAE)
-void star_perform_end_of_step_physics(void);
-#endif
-
 #ifdef STAR_FEEDBACK_ACTIVE
-void star_exit(void);
+void star_perform_end_of_step_physics(void);
 #endif
 
 #endif

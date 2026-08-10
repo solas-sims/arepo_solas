@@ -4,16 +4,19 @@
 #  Enable/Disable compile-time options as needed #
 ##################################################
 
-#--------------------------------------- SOLAS additions
+#---------------------------------------- SOLAS additions
 
 #---------------------------------------- Metal parameters
 #PASSIVE_SCALARS=1      # Number of passive scalar fields advected with fluid (default: 0)
+#METALS                 # Advect all metals, ie metal mass fraction, as a PASSIVE_SCALARS
+
+#---------------------------------------- Cooling parameters
+#USE_GRACKLE
+#GRACKLE_CHEMISTRY=0    # Curretly only grackle mode=0 (lookup tables) with no chemistry network is supported
 
 #ENABLE_PROFILE_UTIL
 #_MPI
 #IGNORE_CODE
-#STAR_BY_STAR
-#USE_CELIB              # Use the CELib libraries
 
 #---------------------------------------- Star Formation options
 #EEOS_SF                # Default SF scheme in Arepo
@@ -66,8 +69,6 @@
 #OUTPUT_REFBHCOUNTER
 
 #---------------------------------------- Special behaviour
-#FEEDBACK_TESTING_RESTRICT_SNAPSHOTS     # Only dump snapshots after a feedback event
-
 #BLACKHOLE_SEEDING # Requires HALOS_SEEDING; seeds black holes in halos. Requires at least one of BH_SEED_ON_MASS /
                    # BH_SEED_ON_ZERO_METALLICITY below (channels OR together if more than one is enabled); a halo already
                    # hosting a black hole is never reseeded regardless of channel.
@@ -75,15 +76,6 @@
 #BH_SEED_ON_ZERO_METALLICITY # Requires BLACKHOLE_SEEDING and METALS; seed pristine halos, i.e. every gas cell's metal mass
                              # fraction <= ZeroMetallicityThresholdForFOFSeeding (param.txt)
 
-#--------------------------------------- Cooling parameters
-#USE_GRACKLE
-#GRACKLE_CHEMISTRY=0 # Curretly only grackle mode=0 (lookup tables) with no chemistry network is supported
-#NOUVBACKGROUND
-
-#--------------------------------------- Metal parameters
-#METALS # Advect all metals, ie metal mass fraction, as a PASSIVE_SCALARS.
-
-#WENDLAND_C2_KERNEL
 
 #--------------------------------------- Inline halo finding
 #HALO_SEEDING # Requires FOF; seeds halos above a certain mass threshold with collisionless particles; this can be used for example to seed black holes in halos (with BLACKHOLE_SEEDING)

@@ -5,20 +5,25 @@
 
 
 #define TAG_RAD 18
-#define RAD_TRUNC_FRAC 0.01 
-#define MAX_NUM_RAYS 12288 
-#define RAY_STACK_SIZE 64
 
+#define RAD_TRUNC_FRAC 0.01 
+
+#define RAY_STACK_SIZE 512
+#define RAY_PENDING_SIZE 64 
+
+/* Healpix: Multiples of 2! */
 #define NSIDE_MIN 1
-#define NSIDE_MAX 32  
+#define NSIDE_MAX 128  
+
+/* Starting number of rays */
+#define NRays (12 * NSIDE_MIN * NSIDE_MIN)
 
 /* Dissociation of H2 */
 #define SIGMA_DISS 2.47e-18 /* cm^2, dissociation-weighted eff. cross 
-                               section (Rollig+07 rate / DB96 flux;
-                               Baczynski+15) */
+                               section (DB96, Baczynski+15) */
 
 #define F_DISS 0.15 /* dissociation branching per absorption */
-#define SIGMA_PUMP (SIGMA_DISS / F_DISS) /* total line absorption   */
+#define SIGMA_PUMP (SIGMA_DISS / F_DISS) /* total line absorption */
  
 #define H2_SHIELD_B5 3.0 /* Doppler b / (km/s); fixed */
  
@@ -32,10 +37,6 @@
 #define NO_IR_ACTIVE ((uint8_t)(ALL_BANDS_ACTIVE & ~(1u << INFRARED)))
 #define NO_IONIZING_ACTIVE ((uint8_t)(ALL_BANDS_ACTIVE & ~(1u << IONIZING_HI) & ~(1u << IONIZING_HeI) & ~(1u << IONIZING_HeII)))
 #define ONLY_IONIZING_ACTIVE ((uint8_t)(ALL_BANDS_ACTIVE & ((1u << IONIZING_HI) | (1u << IONIZING_HeI) | (1u << IONIZING_HeII))))
-
-extern double HealpixDirs[MAX_NUM_RAYS][3];
-/* 12*NSIDE^2 */
-extern int NRays;
 
 /* 
  * INFRARED: inf A - 12398.4 A (0 eV - 1 eV)
@@ -88,48 +89,55 @@ typedef struct StackEntry
 
 typedef struct RayPacket
 {
+  MyIDType star_id;
+
   double pos[3];
   double dir[3];
+
   double t;
   double t_exit;
   double t_maximum;
+
+  int nside; /* Current HEALPix nside level */
+  int healpix_pixel; /* HEALPix basis rotation seed (per star) */
+  unsigned long long rotation_seed; /* HEALPix basis rotation seed (per star) */
 
   /* Bitmask: bit w is SET while band w is still alive */
   /* Cleared when Radiated[w] < RAD_TRUNC_FRAC * Radiated_Init[w] */
   /* When active_bands == 0 the ray is fully absorbed - return immediately */
   uint8_t  active_bands;
 
+  /* Ray energy and photons */
   WavebandData Radiated[WAVEBANDS];
   WavebandData Radiated_Init[WAVEBANDS];
 
-  double N_H2; /* accumulated H2 column since source */
+  /* Accumulated H2 column since source */
+  double N_H2; 
 
+  /* Ray bookkeeping */
   int ray_id;
   int home_task;
   
-  /* Pending top-level nodes still to traverse after current domain */
-  StackEntry pending[RAY_STACK_SIZE];
-  int n_pending;
   int target_node;
   int is_paused;
-  
-  int nside; /* Current HEALPix nside level */
-  int healpix_pixel; /* Pixel index in nested scheme */
+    
+  int n_pending;
+  StackEntry pending[RAY_PENDING_SIZE];
 } RayPacket;
 
 typedef struct RayWorkStack
 {
   long long n; /* Number of rays on this stack */
   long long capacity; /* Allocated capacity */
-  RayPacket *rays; /* Ray information */
+  RayPacket *rays;
 } RayWorkStack;
 
 typedef struct RayExportBuffer
 {
   long long n; /* Number of rays to export */
   long long capacity; /* Allocated capacity */
-  int *task; /* Which task to send each ray to */
-  RayPacket *rays; /* Ray information */
+  int *task; /* Where to send each ray */
+  RayPacket *rays; 
 } RayExportBuffer;
 
 extern struct rad_resultsactiveimported_data

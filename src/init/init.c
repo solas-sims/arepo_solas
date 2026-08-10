@@ -51,8 +51,6 @@
 
 #include "../fof/fof_seeding.h"
 
-#include "../../celib/src/config.h"
-
 /*! \brief Prepares the loaded initial conditions for the run.
  *
  *  It is only called if RestartFlag !=1. Various counters and variables are
@@ -551,33 +549,39 @@ int init(void)
   free_mesh();
 
 #ifdef STAR_PARTICLES
-if(ThisTask == 0)
-  {
-    build_imf_cdf();
+  if(ThisTask == 0)
+    {
+      build_imf_cdf();
 
 #if defined(STAR_PARTICLES) && STAR_PARTICLES < 2
-    setup_mass_bins();
+      setup_mass_bins();
 #endif
 
 #if STAR_PARTICLES == 0
-    setup_imf_integrals();
+      setup_imf_integrals();
 #endif
-  }
-MPI_Bcast(cdf_masses, N_CDF_BINS + 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-MPI_Bcast(cdf_values, N_CDF_BINS + 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    }
+  
+  MPI_Bcast(cdf_masses, N_CDF_BINS + 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+  MPI_Bcast(cdf_values, N_CDF_BINS + 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
 #if defined(STAR_PARTICLES) && STAR_PARTICLES < 2
-MPI_Bcast(StarMeanMassInBins, NBINS, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+  MPI_Bcast(StarMeanMassInBins, NBINS, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 #endif
 
 #if STAR_PARTICLES == 0
-MPI_Bcast(&norm, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-MPI_Bcast(bin_imf, NBINS, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+  MPI_Bcast(&norm, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+  MPI_Bcast(bin_imf, NBINS, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
 #include <gsl/gsl_rng.h>
 
-rng = gsl_rng_alloc(gsl_rng_mt19937);
-gsl_rng_set(rng, ThisTask + 1);
+  rng = gsl_rng_alloc(gsl_rng_mt19937);
+  gsl_rng_set(rng, ThisTask + 1);
+#endif
+
+#if defined(STAR_PARTICLES) && STAR_PARTICLES < 2
+  for(i = 0; i < NumStars; i++)
+    sample_star_particle(PPS(i).Mass * All.cf_UnitMass_in_Msun, SP[i].NumOfStarsInBins);
 #endif
 
 #endif
@@ -594,7 +598,6 @@ gsl_rng_set(rng, ThisTask + 1);
 
 #ifdef STAR_RADIATION_ACTIVE
   init_h2shield();
-  start_healpix();
 #endif
 
 #ifdef BH_ACCRETION_ACTIVE 

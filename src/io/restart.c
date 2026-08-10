@@ -1274,9 +1274,9 @@ static void contents_restart_file(int modus)
   byten(TimeBinsStar.LastInTimeBin, TIMEBINS * sizeof(int), modus);
 #endif
 
-#ifdef BLACKHOLES
+#ifdef BLACKHOLES 
   in(&NumBhs, modus);
-
+  
     if(NumBhs > 0)
     {
       /* Bh-Particle data  */

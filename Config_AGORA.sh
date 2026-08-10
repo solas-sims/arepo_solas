@@ -58,7 +58,7 @@ TREE_BASED_TIMESTEPS          # non-local timestep criterion (take 'signal speed
 
 #--------------------------------------- Single/Double Precision
 DOUBLEPRECISION=1             # Mode of double precision: not defined: single; 1: full double precision 2: mixed, 3: mixed, fewer single precisions; unless short of memory, use 1.
-#NGB_TREE_DOUBLEPRECISION      # if this is enabled, double precision is used for the neighbor node extension
+NGB_TREE_DOUBLEPRECISION      # if this is enabled, double precision is used for the neighbor node extension
 
 #--------------------------------------- output options
 PROCESS_TIMES_OF_OUTPUTLIST   # goes through times of output list prior to starting the simulaiton to ensure that outputs are written as close to the desired time as possible (as opposed to at next possible time if this flag is not active)

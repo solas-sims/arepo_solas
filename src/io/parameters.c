@@ -627,6 +627,7 @@ void read_parameter_file(char *fname)
       strcpy(tag[nt], "RadOpeningAngle");
       addr[nt] = &All.RadOpeningAngle;
       id[nt++] = REAL;
+#endif  
 
       strcpy(tag[nt], "NodeAspectRatio");
       addr[nt] = &All.NodeAspectRatio;
@@ -636,6 +637,12 @@ void read_parameter_file(char *fname)
 #ifdef PHOTOIONIZATION
       strcpy(tag[nt], "RTIonizationTimestepFraction");
       addr[nt] = &All.RTIonizationTimestepFraction;
+      id[nt++] = REAL;
+#endif  
+
+#ifdef RADIATION_PRESSURE
+      strcpy(tag[nt], "IRDtauMomentumBoostCoeff");
+      addr[nt] = &All.IRDtauMomentumBoostCoeff;
       id[nt++] = REAL;
 #endif  
 

@@ -1460,6 +1460,10 @@ double InitMetallicityinSolar;
   double RTIonizationTimestepFraction;
 #endif
 
+#ifdef RADIATION_PRESSURE
+  double IRDtauMomentumBoostCoeff;
+#endif
+
 #if defined (BH_ACCRETION_ACTIVE) || defined(BH_FEEDBACK_ACTIVE)
   /* for parameter file */
 #ifdef BH_CONSTANT_RADIUS
@@ -1503,6 +1507,12 @@ double InitMetallicityinSolar;
   int DesLinkNgb;
   double ErrTolThetaSubfind;
 #endif /* #ifdef SUBFIND */
+
+#ifdef FIND_HALOS
+  double TimeOfFirstHaloFinding;
+  double NextTimeOfHaloFinding;
+  double TimeBetweenHaloFinding;
+#endif
 } All;
 
 /*****************************************************************************

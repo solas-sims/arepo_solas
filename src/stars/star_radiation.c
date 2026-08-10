@@ -4,10 +4,6 @@
 #include "../extern/chealpix.h"
 
 
-double HealpixDirs[MAX_NUM_RAYS][3];
-
-int NRays; 
-
 /* Effective attenuation kappa_ext*(1 - a*<g>) [cm^2/g gas, solar Z]
    Band-averaged over Draine 2003 (renorm. WD01) MW R_V=3.1 model,
    kext_albedo_WD_MW_3.1_60_D03.all, energy and photon-weighted 4e4 K BB.
@@ -113,6 +109,7 @@ void update_dtau(void)
     }
 }
 
+#ifdef RADIATION_PRESSURE
 double dtau_IR(int i, double length)
 {
   double Units = All.cf_UnitLength_in_cm * All.cf_UnitLength_in_cm / All.cf_UnitMass_in_g;
@@ -125,10 +122,11 @@ double dtau_IR(int i, double length)
 
  double Density = (P[i].Mass + SphP[i].StarMassFeed) / SphP[i].Volume;
 
-  double Dtau_IR = (1.0 / Units) * Zsol * Density * length;
+  double Dtau_IR = All.IRDtauMomentumBoostCoeff * (1.0 / Units) * Zsol * Density * length;
 
   return Dtau_IR;
 }
+#endif
 
 static double H2Tab_A[H2TAB_N]; /* A at table nodes */
 static double H2Tab_dlogN; /* log10 spacing */
@@ -137,7 +135,7 @@ static double H2Tab_A_thinmin; /* A(NMIN) = SIGMA_PUMP * NMIN */
 /* Wolcott-Green et al. (2011) self-shielding function */
 static inline double f_selfshield_H2(double N_H2)
 {
-  double x  = N_H2 / 5.0e14;
+  double x = N_H2 / 5.0e14;
   double sq = sqrt(1.0 + x);
   return 0.965 / pow(1.0 + x / H2_SHIELD_B5, 1.1)
        + 0.035 / sq * exp(-8.5e-4 * sq);
@@ -166,6 +164,7 @@ void init_h2shield(void)
           double Na = N0 + k * dN;
           A += 0.5 * (f_selfshield_H2(Na) + f_selfshield_H2(Na + dN)) * dN * SIGMA_PUMP;
         }
+      
       H2Tab_A[i] = A;
     }
 }
@@ -204,15 +203,77 @@ double h2shield_dtau(double N_H2, double dN_H2)
   return dtau > 0.0 ? dtau : 0.0;
 }
 
-void start_healpix(void) 
+/* Helpers for rotation */
+static inline unsigned long long splitmix64(unsigned long long *s)
 {
-  int nside = NSIDE_MIN;
-  NRays = 12 * nside * nside;
+  unsigned long long z = (*s += 0x9E3779B97F4A7C15ull);
+  z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ull;
+  z = (z ^ (z >> 27)) * 0x94D049BB133111EBull;
+  return z ^ (z >> 31);
+}
 
-  for(int ipix = 0; ipix < NRays; ipix++)
+static inline double splitmix_uniform(unsigned long long *s)
+{
+  return (splitmix64(s) >> 11) * (1.0 / 9007199254740992.0); /* [0,1) */
+}
+
+/* Shoemake (1992): uniform random quaternion -> rotation matrix */
+static void get_ray_rotation(unsigned long long seed, double R[3][3])
+{
+  unsigned long long s = seed * 0x2545F4914F6CDD1Dull + 0x9E3779B97F4A7C15ull;
+
+  double u1 = splitmix_uniform(&s);
+  double u2 = splitmix_uniform(&s);
+  double u3 = splitmix_uniform(&s);
+
+  double r1 = sqrt(1.0 - u1), r2 = sqrt(u1);
+  double t1 = 2.0 * M_PI * u2, t2 = 2.0 * M_PI * u3;
+
+  double x = r1 * sin(t1), y = r1 * cos(t1);
+  double z = r2 * sin(t2), w = r2 * cos(t2);
+
+  R[0][0] = 1.0 - 2.0 * (y*y + z*z);
+  R[0][1] = 2.0 * (x*y - z*w);
+  R[0][2] = 2.0 * (x*z + y*w);
+
+  R[1][0] = 2.0 * (x*y + z*w);
+  R[1][1] = 1.0 - 2.0 * (x*x + z*z);
+  R[1][2] = 2.0 * (y*z - x*w);
+
+  R[2][0] = 2.0 * (x*z - y*w);
+  R[2][1] = 2.0 * (y*z + x*w);
+  R[2][2] = 1.0 - 2.0 * (x*x + y*y);
+}
+
+/* Seed from the star's global ID: stable under domain decomposition and
+   identical on every rank, so a ray splitting on an imported domain
+   reproduces the same children as its home rank would have */
+static inline unsigned long long seed_rotation(MyIDType id)
+{
+  unsigned long long seed = (unsigned long long)id;
+  seed = seed * 0x9E3779B97F4A7C15ull + (unsigned long long)All.Ti_Current;
+  return seed;
+}
+
+/* Rotated HEALPix direction */
+static inline void healpix_dir(unsigned long long seed, int nside, int ipix, double *dir)
+{
+  static unsigned long long cached_seed = 0;
+  static int cached_valid = 0;
+  static double R[3][3];
+
+  if(!cached_valid || seed != cached_seed)
     {
-      pix2vec_nest(nside, ipix, HealpixDirs[ipix]);
+      get_ray_rotation(seed, R);
+      cached_seed  = seed;
+      cached_valid = 1;
     }
+
+  double v[3];
+  pix2vec_nest(nside, ipix, v);
+
+  for(int k = 0; k < 3; k++)
+    dir[k] = R[k][0] * v[0] + R[k][1] * v[1] + R[k][2] * v[2];
 }
 
 static RayWorkStack *init_work_stack(long long capacity)
@@ -251,6 +312,8 @@ static void init_rays(RayWorkStack *work)
     {
       Mechanical_Feedback_Data *MechanicalFeedbackData = &MechanicalFeedbackEvents.MechanicalFeedbackData[ev];
       Mechanical_Feedback *MechanicalFeedback = &MechanicalFeedbackData->MechanicalFeedback;
+
+      unsigned long long rotation_seed = seed_rotation(MechanicalFeedbackData->StarID);
         
       /* Loop over rays for this star */
       for(int iray = 0; iray < NRays; iray++)
@@ -258,15 +321,21 @@ static void init_rays(RayWorkStack *work)
           /* Initialize ray from star i */
           RayPacket ray = {0};
 
+          ray.star_id = MechanicalFeedbackData->StarID;
+
           ray.pos[0] = MechanicalFeedback->StarPosition[0];      
           ray.pos[1] = MechanicalFeedback->StarPosition[1]; 
           ray.pos[2] = MechanicalFeedback->StarPosition[2]; 
-          ray.dir[0] = HealpixDirs[iray][0];        
-          ray.dir[1] = HealpixDirs[iray][1];
-          ray.dir[2] = HealpixDirs[iray][2];
+
+          ray.rotation_seed = rotation_seed;
+          healpix_dir(rotation_seed, NSIDE_MIN, iray, ray.dir);
+
           ray.t = 0.0;
           ray.t_exit = MAX_REAL_NUMBER;
           ray.t_maximum = SQRT3 * All.BoxSize;
+
+          ray.nside = NSIDE_MIN;        
+          ray.healpix_pixel = iray;    
 
           ray.active_bands = NO_IR_ACTIVE;
 
@@ -284,15 +353,12 @@ static void init_rays(RayWorkStack *work)
           
           ray.ray_id = ray_idx;
           ray.home_task = ThisTask;
+
+          ray.target_node = -1;
+          ray.is_paused = 0;  
           
           ray.n_pending = 0;
-          ray.target_node = -1;
-
-          ray.is_paused = 0;
-
-          ray.nside = NSIDE_MIN;        
-          ray.healpix_pixel = iray;            
-            
+        
           ray_idx++;
 
           append_ray(work, &ray);
@@ -313,7 +379,7 @@ void split_ray(const RayPacket *parent, RayPacket children[4])
       children[k].nside = new_nside;
       children[k].healpix_pixel = 4 * parent->healpix_pixel + k;
 
-      pix2vec_nest(new_nside, children[k].healpix_pixel, children[k].dir);
+      healpix_dir(parent->rotation_seed, new_nside, children[k].healpix_pixel, children[k].dir);
 
       for(int w = 0; w < WAVEBANDS; w++)
         {
@@ -793,10 +859,11 @@ static void rt_timestep(void)
           + SphP[i].GrackleSpeciesConserved(GRACKLE_HDI);
 #endif
     
+      double rate = 0.0;
       if(m_H > 0)
         {
           double x_HI = m_HI / m_H;
-          rate = fmax(rate, SphP[i].HI_IonizationRate * x_HI);
+          rate = SphP[i].HI_IonizationRate * x_HI;
         }
 
       SphP[i].RT_Timestep = (rate > 0.0) ? eps_ion / rate : All.MaxSizeTimestep / All.cf_hubble_a;
@@ -877,6 +944,9 @@ void star_radiation(void)
       if(n_global > 0 && iter > 0)
         mpi_printf("STAR_RADIATION: Rad iteration %3d: need to repeat for %12lld rays. (took %g sec)\n", iter, n_global,
         timediff(t0, t1));
+      
+      if(iter > MAXITER)
+        terminate("STAR_RADIATION: %lld rays still in flight after %d iterations\n", n_global, iter);
       
     } while(n_global > 0);
     
