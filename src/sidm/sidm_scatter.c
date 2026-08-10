@@ -189,14 +189,23 @@ static void sidm_random_unit_vector(double e[3])
 }
 
 /*! Live conservation diagnostic -- same role as the local-only version,
- *  now shared by both the local and cross-task kick paths. */
-static long long sidm_scatter_count_local     = 0;
-static long long sidm_scatter_count_cross_task = 0;
-static double    sidm_max_momentum_error      = 0.0;
-static double    sidm_max_energy_error        = 0.0;
+ *  now shared by both the local and cross-task kick paths.
+ *
+ *  max_p/ke_error are tracked SEPARATELY for the local and cross-task
+ *  paths (rather than one pooled max) so the SIDM_SCATTER summary line
+ *  can actually answer "does conservation hold for cross-task kicks
+ *  specifically" -- a pooled max can't distinguish a clean cross-task
+ *  path from one masked by a majority of clean local kicks whenever
+ *  cross-task events are the minority (the usual case). */
+static long long sidm_scatter_count_local           = 0;
+static long long sidm_scatter_count_cross_task       = 0;
+static double    sidm_max_momentum_error_local       = 0.0;
+static double    sidm_max_energy_error_local         = 0.0;
+static double    sidm_max_momentum_error_cross_task  = 0.0;
+static double    sidm_max_energy_error_cross_task    = 0.0;
 
 static void sidm_check_conservation(int i, double p_before[3], double ke_before, double p_after[3], double ke_after,
-                                     long long other_id)
+                                     long long other_id, int is_cross_task)
 {
   double p_mag_before = sqrt(p_before[0] * p_before[0] + p_before[1] * p_before[1] + p_before[2] * p_before[2]);
   double dp[3]  = {p_after[0] - p_before[0], p_after[1] - p_before[1], p_after[2] - p_before[2]};
@@ -204,14 +213,24 @@ static void sidm_check_conservation(int i, double p_before[3], double ke_before,
   double p_rel_err  = (p_mag_before > 0) ? dp_mag / p_mag_before : dp_mag;
   double ke_rel_err = (ke_before > 0) ? fabs(ke_after - ke_before) / ke_before : fabs(ke_after - ke_before);
 
-  if(p_rel_err > sidm_max_momentum_error)
-    sidm_max_momentum_error = p_rel_err;
-  if(ke_rel_err > sidm_max_energy_error)
-    sidm_max_energy_error = ke_rel_err;
+  if(is_cross_task)
+    {
+      if(p_rel_err > sidm_max_momentum_error_cross_task)
+        sidm_max_momentum_error_cross_task = p_rel_err;
+      if(ke_rel_err > sidm_max_energy_error_cross_task)
+        sidm_max_energy_error_cross_task = ke_rel_err;
+    }
+  else
+    {
+      if(p_rel_err > sidm_max_momentum_error_local)
+        sidm_max_momentum_error_local = p_rel_err;
+      if(ke_rel_err > sidm_max_energy_error_local)
+        sidm_max_energy_error_local = ke_rel_err;
+    }
 
   if(p_rel_err > 1e-10 || ke_rel_err > 1e-10)
-    printf("SIDM_SCATTER conservation WARNING: task=%d IDs=(%lld,%lld) p_rel_err=%.3e ke_rel_err=%.3e\n", ThisTask,
-           (long long)P[i].ID, other_id, p_rel_err, ke_rel_err);
+    printf("SIDM_SCATTER conservation WARNING: task=%d IDs=(%lld,%lld) cross_task=%d p_rel_err=%.3e ke_rel_err=%.3e\n",
+           ThisTask, (long long)P[i].ID, other_id, is_cross_task, p_rel_err, ke_rel_err);
 
   sidm_scatter_count_local++;
 }
@@ -410,7 +429,7 @@ static void sidm_apply_kick_local(int i, int j)
   ke_after = 0.5 * P[i].Mass * (P[i].Vel[0] * P[i].Vel[0] + P[i].Vel[1] * P[i].Vel[1] + P[i].Vel[2] * P[i].Vel[2]) +
              0.5 * P[j].Mass * (P[j].Vel[0] * P[j].Vel[0] + P[j].Vel[1] * P[j].Vel[1] + P[j].Vel[2] * P[j].Vel[2]);
 
-  sidm_check_conservation(i, p_before, ke_before, p_after, ke_after, (long long)P[j].ID);
+  sidm_check_conservation(i, p_before, ke_before, p_after, ke_after, (long long)P[j].ID, 0);
 
   DMPS(i).SidmLastScatterTime = All.Ti_Current;
   DMPS(j).SidmLastScatterTime = All.Ti_Current;
@@ -494,7 +513,7 @@ static void sidm_apply_kick_cross_task(int i, const sidm_candidate *cand, sidm_k
 
   /* Remote particle's real ID isn't carried into sidm_candidate to keep
    * that struct lean -- report -1 rather than fabricate one. */
-  sidm_check_conservation(i, p_before, ke_before, p_after, ke_after, -1);
+  sidm_check_conservation(i, p_before, ke_before, p_after, ke_after, -1, 1);
 
   for(int k = 0; k < 3; k++)
     P[i].Vel[k] = new_vel_i[k];
@@ -1046,17 +1065,37 @@ void sidm_scatter(int timebin)
   myfree(SidmCandCount);
   myfree(SidmCandBuf);
 
-  /* MPI-reduced scatter-count and conservation-error summary. */
+  /* MPI-reduced scatter-count, conservation-error, and timestep-binding
+   * summary. All quantities here are CUMULATIVE since the start of the
+   * run (matching the pre-existing "cumulative scatters" convention),
+   * not per-call -- so the timestep-binding fraction in particular
+   * answers "has the SIDM criterion ever bound, over the whole run so
+   * far" rather than "did it bind this step". */
   long long global_count, global_cross_task_count;
-  double    global_max_p_err, global_max_ke_err;
+  double    global_max_p_err_local, global_max_ke_err_local;
+  double    global_max_p_err_cross_task, global_max_ke_err_cross_task;
+  long long global_timestep_checks, global_timestep_binding;
   MPI_Allreduce(&sidm_scatter_count_local, &global_count, 1, MPI_LONG_LONG, MPI_SUM, MPI_COMM_WORLD);
   MPI_Allreduce(&sidm_scatter_count_cross_task, &global_cross_task_count, 1, MPI_LONG_LONG, MPI_SUM, MPI_COMM_WORLD);
-  MPI_Allreduce(&sidm_max_momentum_error, &global_max_p_err, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
-  MPI_Allreduce(&sidm_max_energy_error, &global_max_ke_err, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+  MPI_Allreduce(&sidm_max_momentum_error_local, &global_max_p_err_local, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+  MPI_Allreduce(&sidm_max_energy_error_local, &global_max_ke_err_local, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+  MPI_Allreduce(&sidm_max_momentum_error_cross_task, &global_max_p_err_cross_task, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+  MPI_Allreduce(&sidm_max_energy_error_cross_task, &global_max_ke_err_cross_task, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+  MPI_Allreduce(&SidmTimestepChecks, &global_timestep_checks, 1, MPI_LONG_LONG, MPI_SUM, MPI_COMM_WORLD);
+  MPI_Allreduce(&SidmTimestepBinding, &global_timestep_binding, 1, MPI_LONG_LONG, MPI_SUM, MPI_COMM_WORLD);
 
   if(global_count > 0)
-    mpi_printf("SIDM_SCATTER: timebin=%d cumulative scatters=%lld (cross_task=%lld)  max_p_rel_err=%.3e  max_ke_rel_err=%.3e\n",
-               timebin, global_count, global_cross_task_count, global_max_p_err, global_max_ke_err);
+    mpi_printf(
+        "SIDM_SCATTER: timebin=%d cumulative scatters=%lld (cross_task=%lld)  "
+        "max_p_rel_err_local=%.3e max_ke_rel_err_local=%.3e  "
+        "max_p_rel_err_cross_task=%.3e max_ke_rel_err_cross_task=%.3e"
+        "%s  "
+        "timestep_binding=%lld/%lld (%.3f%%)\n",
+        timebin, global_count, global_cross_task_count, global_max_p_err_local, global_max_ke_err_local,
+        global_max_p_err_cross_task, global_max_ke_err_cross_task,
+        global_cross_task_count > 0 ? "" : " (no cross-task events yet -- these two are not meaningful)",
+        global_timestep_binding, global_timestep_checks,
+        global_timestep_checks > 0 ? 100.0 * (double)global_timestep_binding / (double)global_timestep_checks : 0.0);
 }
 
 #endif /* #ifdef SIDM */

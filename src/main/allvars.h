@@ -960,6 +960,16 @@ extern FILE *FdSidmCollisions; /**< per-task file handle for sidm_collisions_<ta
                                  *   (SIDM item-4 diagnostic mode, see sidm_scatter.c). */
 #endif                         /* #ifdef SIDM_LOG_COLLISIONS */
 
+#ifdef SIDM
+extern long long SidmTimestepChecks;  /**< cumulative (per-task) count of Type==1 particles for which the SIDM
+                                        *   term in get_timestep_gravity() (timestep.c) was evaluated. */
+extern long long SidmTimestepBinding; /**< cumulative (per-task) subset of the above where the SIDM term was
+                                        *   actually the smallest, i.e. bound the particle's timestep. Reduced
+                                        *   and printed alongside the SIDM_SCATTER diagnostic (sidm_scatter.c)
+                                        *   to answer "does the SIDM timestep criterion ever actually bind in
+                                        *   a real run" (SIDM.md TODO). */
+#endif /* #ifdef SIDM */
+
 #ifdef OUTPUT_CPU_CSV
 extern FILE *FdCPUCSV; /**< file handle for cpu.csv log-file. Used if the cpu log is printed in csv format as well. */
 #endif                 /* #ifdef OUTPUT_CPU_CSV */

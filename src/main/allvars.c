@@ -196,6 +196,11 @@ FILE *FdDetailed;
 FILE *FdSidmCollisions;
 #endif /* #ifdef SIDM_LOG_COLLISIONS */
 
+#ifdef SIDM
+long long SidmTimestepChecks  = 0;
+long long SidmTimestepBinding = 0;
+#endif /* #ifdef SIDM */
+
 #ifdef OUTPUT_CPU_CSV
 FILE *FdCPUCSV;
 #endif /* #ifdef OUTPUT_CPU_CSV */

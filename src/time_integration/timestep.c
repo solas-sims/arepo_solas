@@ -406,8 +406,19 @@ integertime get_timestep_gravity(int p)
         if(rate > 0)
           {
             double dt_sidm = SIDM_TIMESTEP_SAFETY_FACTOR / rate;
+
+            /* Cumulative (per-task) diagnostic for whether the SIDM term
+             * ever actually binds in a real run -- reduced and printed
+             * alongside the SIDM_SCATTER summary in sidm_scatter.c, not
+             * here (this function runs once per particle per timestep
+             * reassignment, far too often for its own print). See
+             * SidmTimestepChecks/SidmTimestepBinding in allvars.h. */
+            SidmTimestepChecks++;
             if(dt_sidm < dt)
-              dt = dt_sidm;
+              {
+                SidmTimestepBinding++;
+                dt = dt_sidm;
+              }
           }
       }
 #endif /* #ifdef SIDM */
