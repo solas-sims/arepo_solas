@@ -7,6 +7,13 @@
 
 #--------------------------------------- Dark Matter treatment
 SIDM
+#SIDM_KICK_POSITION_CORRECTION            # apply a post-kick position correction and force-wake any passively-kicked
+                                          # neighbour onto the finest active timebin (SIDM item-3 gap fix); off by
+                                          # default to A/B test against the pre-fix (velocity-only kick) behaviour
+#SIDM_LOG_COLLISIONS                      # diagnostic mode: log every detected/accepted collision to
+                                          # sidm_collisions_<task>.txt instead of applying it (SIDM item-4 validation
+                                          # test); off by default -- enable only for the isolated-halo scattering-rate
+                                          # check, never for a production run
 
 #--------------------------------------- Gravity treatment
 SELFGRAVITY                              # gravitational intraction between simulation particles/cells  	 

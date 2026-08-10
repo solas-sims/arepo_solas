@@ -65,6 +65,32 @@
  *              it would NOT hold if domain decomposition or particle
  *              migration ran between gathering and delivery, which is
  *              why both happen back-to-back in this same function.
+ *
+ *              SIDM_KICK_POSITION_CORRECTION (Config.sh flag, off by
+ *              default): gates the position-correction + neighbour
+ *              wake-up fix for the KDK-hook gap identified in the SIDM
+ *              item-3 gap report (kicks were velocity-only, with no
+ *              adjustment to the particle's position for the velocity
+ *              change, and no mechanism to bring a passively-kicked
+ *              inactive neighbour back onto an appropriate timebin).
+ *              Off by default so the exact pre-patch behaviour stays
+ *              available for A/B comparison on the isolated-halo test
+ *              before this fix is trusted. See
+ *              sidm_apply_position_correction()/sidm_wake_particle()
+ *              below for the implementation and its caveats.
+ *
+ *              SIDM_LOG_COLLISIONS (Config.sh flag, off by default):
+ *              diagnostic mode for the SIDM item-4 validation test. When
+ *              set, sidm_scatter()'s dispatch calls sidm_log_collision()
+ *              instead of the normal kick path -- every detected,
+ *              accepted collision is appended to a per-task
+ *              sidm_collisions_<task>.txt file (time, timebin, dt,
+ *              initiator ID/position, pair separation r, local/remote,
+ *              p_ij) and P[] is left completely untouched, so a halo's
+ *              density profile stays fixed and known for the whole run.
+ *              Meant to be compared against the analytic Gamma(r)
+ *              prediction by an external script, not used in production
+ *              runs (see sidm_log_collision() below).
  */
 
 #include <math.h>
@@ -95,6 +121,13 @@ typedef struct
   double r;
   double p_ij;
   double vel[3]; /*!< only populated/used for remote candidates -- local candidates re-read P[index].Vel live */
+#ifdef SIDM_LOG_COLLISIONS
+  double pos[3]; /*!< only populated/used for remote candidates -- local candidates re-read P[index].Pos live.
+                   * Shipped through the candidate-gathering data_out response purely for
+                   * sidm_log_collision()'s radial binning; gated behind SIDM_LOG_COLLISIONS so the normal
+                   * physics path pays nothing extra for it (bigger data_out payload, extra packing) when
+                   * diagnostic mode is off. */
+#endif /* #ifdef SIDM_LOG_COLLISIONS */
 } sidm_candidate;
 
 static sidm_candidate *SidmCandBuf;   /*!< flattened [NumPart][MAX_CAND_TOTAL] */
@@ -183,6 +216,138 @@ static void sidm_check_conservation(int i, double p_before[3], double ke_before,
   sidm_scatter_count_local++;
 }
 
+#ifdef SIDM_KICK_POSITION_CORRECTION
+/*! \brief Half-step position correction after an SIDM velocity kick.
+ *
+ *  Gated behind SIDM_KICK_POSITION_CORRECTION (Config.sh flag, off by
+ *  default) so the pre-patch behaviour -- velocity-only kicks, no
+ *  position correction, no neighbour wake-up -- remains available for
+ *  A/B comparison against this fix on the isolated-halo test before it
+ *  is trusted. See SIDM item-3 gap report for the correctness argument.
+ *
+ *  Correa et al. (2022, Sec 2.3) interleave the SIDM kick BETWEEN the
+ *  drift and the final half of a KDK step, and correct positions for the
+ *  resulting velocity discontinuity with an explicit backward/forward
+ *  D(dt/2) pair straddling that point. Our own hook is different:
+ *  sidm_scatter() is called AFTER this timebin's gravity kick has
+ *  already been fully applied (see do_gravity_hydro.c), so there is no
+ *  "half-kick" point left to split at. This applies the same physical
+ *  idea -- retroactively correcting position for the velocity change --
+ *  as a single dt_i/2 correction at our own (later) hook point. This is
+ *  an ADAPTATION of Correa's scheme to this codebase's KDK structure,
+ *  not a literal transcription, and the choice of "half of the
+ *  initiator's own timebin step" as the correction window is a judgment
+ *  call, not a derived quantity -- flagged for review, see the SIDM
+ *  item-3 gap report this patch responds to.
+ *
+ *  Uses get_drift_factor() (the same comoving-aware mechanism
+ *  drift_particle() itself uses, see predict.c) rather than a raw
+ *  v*dt/2, since a raw multiply is wrong for a comoving run.
+ */
+static void sidm_apply_position_correction(int p, const double v_old[3], const double v_new[3])
+{
+  integertime t_end   = All.Ti_Current;
+  integertime ti_step = sidm_scatter_current_timebin ? (((integertime)1) << sidm_scatter_current_timebin) : 0;
+  integertime t_half  = t_end - ti_step / 2;
+
+  double dt_drift_half;
+  if(All.ComovingIntegrationOn)
+    dt_drift_half = get_drift_factor(t_half, t_end);
+  else
+    dt_drift_half = (t_end - t_half) * All.Timebase_interval;
+
+  for(int k = 0; k < 3; k++)
+    P[p].Pos[k] += (v_new[k] - v_old[k]) * dt_drift_half;
+}
+
+/*! \brief Forces a DM particle that was just kicked by an SIDM scatter
+ *  onto the finest currently-active gravity timebin, so the ordinary
+ *  gravity/timestep cascade in do_gravity_hydro.c (test_if_grav_timestep_
+ *  is_too_large / timebin_move_particle) picks the particle up again at
+ *  the very next global step -- instead of silently carrying its new,
+ *  post-kick velocity forward on whatever (possibly much coarser)
+ *  timebin it happened to occupy before the kick, until that bin's own
+ *  schedule next comes around. This is the individual-timestepping
+ *  analogue of Correa et al. (2022, Sec 2.3)'s explicit warning about
+ *  waking a kicked neighbour.
+ *
+ *  Gated behind SIDM_KICK_POSITION_CORRECTION, same rationale as
+ *  sidm_apply_position_correction() above.
+ *
+ *  Deliberately only updates the particle's persistent TimeBinGrav /
+ *  linked-list membership, NOT TimeBinsGravity's active-particle-list
+ *  snapshot for the step currently in progress -- do_gravity_step_
+ *  second_half is mid-iteration over that snapshot when this can be
+ *  called (from the local/cross-task kick paths, and from the poke-
+ *  delivery loop), and inserting into it here would be unsafe. The
+ *  particle therefore does not participate further in THIS step, only
+ *  from the next synchronization onward -- a smaller staleness window
+ *  than before this patch, not a fully event-driven wake. Flagged as a
+ *  design choice worth confirming, not a definitively "correct" target
+ *  bin (All.LowestActiveTimeBin was chosen as the finest bin guaranteed
+ *  active at the next global step; a case could be made for other
+ *  targets).
+ */
+static void sidm_wake_particle(int p)
+{
+  int binold = P[p].TimeBinGrav;
+  if(binold > All.LowestActiveTimeBin)
+    {
+      timebin_move_particle(&TimeBinsGravity, p, binold, All.LowestActiveTimeBin);
+      P[p].TimeBinGrav = All.LowestActiveTimeBin;
+    }
+}
+#endif /* #ifdef SIDM_KICK_POSITION_CORRECTION */
+
+#ifdef SIDM_LOG_COLLISIONS
+/*! \brief Diagnostic mode (SIDM item 4): logs a detected, accepted
+ *  collision to the per-task sidm_collisions_<task>.txt file WITHOUT
+ *  applying any velocity or position change -- see the dispatch in
+ *  sidm_scatter() below, which calls this instead of (not in addition
+ *  to) the normal kick path when this flag is set. Off by default, so
+ *  it has zero cost (no file I/O, no branch even) in production runs.
+ *
+ *  Intended use: an isolated-halo test run with scattering "detection"
+ *  left on but effects off, so the halo's density profile stays exactly
+ *  fixed and known throughout -- letting a post-processing script bin
+ *  these logged events radially and compare the measured scattering
+ *  rate against the analytic Gamma(r) = rho(r) * <sigma/m * v_pair>(r)
+ *  prediction (Correa et al. 2022, Appendix A2/B1).
+ *
+ *  Logs BOTH particles' actual positions: the initiator's (P[i].Pos,
+ *  always locally resident) and the partner's -- read live from
+ *  P[cand->index].Pos for a local candidate, or from cand->pos (shipped
+ *  through the candidate-gathering data_out response specifically for
+ *  this, see sidm_candidate.pos / data_out.pos above) for a remote one.
+ *  Logging both, rather than only the initiator's as an r<<R_vir proxy,
+ *  gives the analysis script the true pair location for radial binning
+ *  without relying on that approximation.
+ */
+static void sidm_log_collision(int i, const sidm_candidate *cand)
+{
+  if(!FdSidmCollisions)
+    return;
+
+  double partner_pos[3];
+  if(cand->is_remote)
+    {
+      partner_pos[0] = cand->pos[0];
+      partner_pos[1] = cand->pos[1];
+      partner_pos[2] = cand->pos[2];
+    }
+  else
+    {
+      partner_pos[0] = P[cand->index].Pos[0];
+      partner_pos[1] = P[cand->index].Pos[1];
+      partner_pos[2] = P[cand->index].Pos[2];
+    }
+
+  fprintf(FdSidmCollisions, "%.8e %d %.8e %lld %.8e %.8e %.8e %.8e %.8e %.8e %.8e %d %.8e\n", All.Time,
+          sidm_scatter_current_timebin, sidm_scatter_current_dt_i, (long long)P[i].ID, P[i].Pos[0], P[i].Pos[1],
+          P[i].Pos[2], partner_pos[0], partner_pos[1], partner_pos[2], cand->r, cand->is_remote, cand->p_ij);
+}
+#endif /* #ifdef SIDM_LOG_COLLISIONS */
+
 /*! \brief Applies the isotropic elastic two-body kick when BOTH particles
  *  are local (Vogelsberger et al. 2012, Eq. 20).
  *
@@ -199,6 +364,15 @@ static void sidm_apply_kick_local(int i, int j)
   ke_before = 0.5 * P[i].Mass * (P[i].Vel[0] * P[i].Vel[0] + P[i].Vel[1] * P[i].Vel[1] + P[i].Vel[2] * P[i].Vel[2]) +
               0.5 * P[j].Mass * (P[j].Vel[0] * P[j].Vel[0] + P[j].Vel[1] * P[j].Vel[1] + P[j].Vel[2] * P[j].Vel[2]);
 
+#ifdef SIDM_KICK_POSITION_CORRECTION
+  double v_old_i[3], v_old_j[3];
+  for(int k = 0; k < 3; k++)
+    {
+      v_old_i[k] = P[i].Vel[k];
+      v_old_j[k] = P[j].Vel[k];
+    }
+#endif /* #ifdef SIDM_KICK_POSITION_CORRECTION */
+
   double vij[3], V[3], e[3];
   for(int k = 0; k < 3; k++)
     {
@@ -208,11 +382,27 @@ static void sidm_apply_kick_local(int i, int j)
   double v_rel = sqrt(vij[0] * vij[0] + vij[1] * vij[1] + vij[2] * vij[2]);
   sidm_random_unit_vector(e);
 
+  double v_new_i[3], v_new_j[3];
   for(int k = 0; k < 3; k++)
     {
-      P[i].Vel[k] = V[k] + 0.5 * v_rel * e[k];
-      P[j].Vel[k] = V[k] - 0.5 * v_rel * e[k];
+      v_new_i[k] = V[k] + 0.5 * v_rel * e[k];
+      v_new_j[k] = V[k] - 0.5 * v_rel * e[k];
+      P[i].Vel[k] = v_new_i[k];
+      P[j].Vel[k] = v_new_j[k];
     }
+
+#ifdef SIDM_KICK_POSITION_CORRECTION
+  /* Position-correction + wake-up gap fix (SIDM item 3): see
+   * sidm_apply_position_correction()/sidm_wake_particle() headers above.
+   * j is woken unconditionally -- it may not be active at this timebin
+   * at all (it was found by a distance search, not an activity filter),
+   * whereas i is guaranteed active this timebin by construction (it's
+   * the initiator, drawn from TimeBinsGravity.ActiveParticleList at
+   * exactly this timebin), so waking i is unnecessary. */
+  sidm_apply_position_correction(i, v_old_i, v_new_i);
+  sidm_apply_position_correction(j, v_old_j, v_new_j);
+  sidm_wake_particle(j);
+#endif /* #ifdef SIDM_KICK_POSITION_CORRECTION */
 
   double p_after[3], ke_after;
   for(int k = 0; k < 3; k++)
@@ -239,6 +429,20 @@ typedef struct
 {
   int         remote_index;
   MyFloat     new_vel[3];
+#ifdef SIDM_KICK_POSITION_CORRECTION
+  MyFloat     dv[3]; /*!< new_vel - pre-kick vel, shipped so the receiving
+                       * task can apply its own position correction (see
+                       * sidm_apply_position_correction()) -- the pre-kick
+                       * velocity itself isn't otherwise available on the
+                       * receiving side. Inherits the same staleness
+                       * caveat already documented in this file's header
+                       * (KNOWN, ACCEPTED APPROXIMATION): the "pre-kick"
+                       * velocity used here is the value sampled during
+                       * candidate gathering, which could in principle
+                       * already be stale if the remote particle was
+                       * kicked again by a different local scatter on its
+                       * own task before this poke arrives. */
+#endif /* #ifdef SIDM_KICK_POSITION_CORRECTION */
   integertime scatter_time;
 } sidm_kick_poke;
 
@@ -259,6 +463,12 @@ static void sidm_apply_kick_cross_task(int i, const sidm_candidate *cand, sidm_k
     p_before[k] = P[i].Mass * P[i].Vel[k] + P[i].Mass * cand->vel[k];
   ke_before = 0.5 * P[i].Mass * (P[i].Vel[0] * P[i].Vel[0] + P[i].Vel[1] * P[i].Vel[1] + P[i].Vel[2] * P[i].Vel[2]) +
               0.5 * P[i].Mass * (cand->vel[0] * cand->vel[0] + cand->vel[1] * cand->vel[1] + cand->vel[2] * cand->vel[2]);
+
+#ifdef SIDM_KICK_POSITION_CORRECTION
+  double v_old_i[3];
+  for(int k = 0; k < 3; k++)
+    v_old_i[k] = P[i].Vel[k];
+#endif /* #ifdef SIDM_KICK_POSITION_CORRECTION */
 
   double vij[3], V[3], e[3];
   for(int k = 0; k < 3; k++)
@@ -288,6 +498,15 @@ static void sidm_apply_kick_cross_task(int i, const sidm_candidate *cand, sidm_k
 
   for(int k = 0; k < 3; k++)
     P[i].Vel[k] = new_vel_i[k];
+
+#ifdef SIDM_KICK_POSITION_CORRECTION
+  /* Position-correction fix (SIDM item 3) for the local half of the
+   * pair. i is guaranteed active this timebin (it's the initiator), so
+   * no wake needed here -- only the remote half (delivered via the poke
+   * below) needs sidm_wake_particle(), applied on the receiving task. */
+  sidm_apply_position_correction(i, v_old_i, new_vel_i);
+#endif /* #ifdef SIDM_KICK_POSITION_CORRECTION */
+
   DMPS(i).SidmLastScatterTime = All.Ti_Current;
   DMPS(i).SidmScatterFlag     = 1;
   DMPS(i).SidmScatterCount++;
@@ -310,6 +529,11 @@ static void sidm_apply_kick_cross_task(int i, const sidm_candidate *cand, sidm_k
   poke_buf[t][slot].new_vel[0]   = new_vel_j[0];
   poke_buf[t][slot].new_vel[1]   = new_vel_j[1];
   poke_buf[t][slot].new_vel[2]   = new_vel_j[2];
+#ifdef SIDM_KICK_POSITION_CORRECTION
+  poke_buf[t][slot].dv[0]        = new_vel_j[0] - cand->vel[0];
+  poke_buf[t][slot].dv[1]        = new_vel_j[1] - cand->vel[1];
+  poke_buf[t][slot].dv[2]        = new_vel_j[2] - cand->vel[2];
+#endif /* #ifdef SIDM_KICK_POSITION_CORRECTION */
   poke_buf[t][slot].scatter_time = All.Ti_Current;
 }
 
@@ -342,6 +566,11 @@ typedef struct
   MyFloat  vel[MAX_REMOTE_RESPONSE][3];
   MyFloat  r[MAX_REMOTE_RESPONSE];
   int      remote_index[MAX_REMOTE_RESPONSE];
+#ifdef SIDM_LOG_COLLISIONS
+  MyFloat pos[MAX_REMOTE_RESPONSE][3]; /*!< remote candidate's own position, for sidm_log_collision()'s
+                                          * radial binning -- gated behind SIDM_LOG_COLLISIONS, see
+                                          * sidm_candidate.pos above. */
+#endif                                  /* #ifdef SIDM_LOG_COLLISIONS */
 } data_out;
 
 static data_out *DataResult, *DataOut;
@@ -388,6 +617,11 @@ static void out2particle(data_out *out, int i, int mode)
       SidmCandBuf[base].vel[0]      = out->vel[c][0];
       SidmCandBuf[base].vel[1]      = out->vel[c][1];
       SidmCandBuf[base].vel[2]      = out->vel[c][2];
+#ifdef SIDM_LOG_COLLISIONS
+      SidmCandBuf[base].pos[0]      = out->pos[c][0];
+      SidmCandBuf[base].pos[1]      = out->pos[c][1];
+      SidmCandBuf[base].pos[2]      = out->pos[c][2];
+#endif /* #ifdef SIDM_LOG_COLLISIONS */
       SidmCandCount[i]++;
     }
 }
@@ -527,6 +761,11 @@ static int sidm_scatter_walk(int target, int mode, int threadid)
                   target_result->vel[c][2]        = P[p].Vel[2];
                   target_result->r[c]             = r;
                   target_result->remote_index[c]  = p;
+#ifdef SIDM_LOG_COLLISIONS
+                  target_result->pos[c][0]        = P[p].Pos[0];
+                  target_result->pos[c][1]        = P[p].Pos[1];
+                  target_result->pos[c][2]        = P[p].Pos[2];
+#endif /* #ifdef SIDM_LOG_COLLISIONS */
                   target_result->ncand++;
                 }
             }
@@ -695,6 +934,16 @@ void sidm_scatter(int timebin)
       if(chosen < 0)
         chosen = ncand - 1;
 
+#ifdef SIDM_LOG_COLLISIONS
+      /* Diagnostic mode (SIDM item 4): log the detected collision only,
+       * as a distinct code path from the normal dispatch below -- not a
+       * "kick then undo". This guarantees there is no way for a
+       * partially-applied kick, a stale conservation-diagnostic counter,
+       * or a cross-task poke to leak through while this flag is set;
+       * P[] velocities and positions are provably untouched by anything
+       * in this branch. */
+      sidm_log_collision(i, &cand[chosen]);
+#else  /* #ifdef SIDM_LOG_COLLISIONS */
       if(!cand[chosen].is_remote)
         sidm_apply_kick_local(i, cand[chosen].index);
       else if(cand[chosen].remote_task == ThisTask)
@@ -725,6 +974,7 @@ void sidm_scatter(int timebin)
         }
       else
         sidm_apply_kick_cross_task(i, &cand[chosen], poke_buf, poke_count, poke_capacity);
+#endif /* #ifdef SIDM_LOG_COLLISIONS #else */
     }
 
   /* Deliver the batched pokes: a plain Sendrecv loop over tasks is
@@ -749,8 +999,27 @@ void sidm_scatter(int timebin)
       for(int p = 0; p < nrecv; p++)
         {
           int ri = recv_buf[p].remote_index;
+
+#ifdef SIDM_KICK_POSITION_CORRECTION
+          double v_old[3], v_new[3];
+          for(int k = 0; k < 3; k++)
+            {
+              v_new[k] = recv_buf[p].new_vel[k];
+              v_old[k] = v_new[k] - recv_buf[p].dv[k];
+              P[ri].Vel[k] = v_new[k];
+            }
+
+          /* Position-correction + wake-up gap fixes (SIDM item 3) for
+           * the remote half of a cross-task kick -- this is the task
+           * that actually owns P[ri], so both must happen here, not on
+           * the originating task. */
+          sidm_apply_position_correction(ri, v_old, v_new);
+          sidm_wake_particle(ri);
+#else  /* #ifdef SIDM_KICK_POSITION_CORRECTION */
           for(int k = 0; k < 3; k++)
             P[ri].Vel[k] = recv_buf[p].new_vel[k];
+#endif /* #ifdef SIDM_KICK_POSITION_CORRECTION #else */
+
           DMPS(ri).SidmLastScatterTime = recv_buf[p].scatter_time;
           DMPS(ri).SidmScatterFlag     = 1;
           DMPS(ri).SidmScatterCount++;

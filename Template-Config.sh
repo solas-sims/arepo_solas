@@ -10,6 +10,8 @@
 #SIDM                   # Self-interacting Dark Matter - allows for particle scattering following Vogelsberger et al. 2019
 #SIDM_H
 #SIDM_TREE_H
+#SIDM_KICK_POSITION_CORRECTION   # SIDM: post-kick position correction + neighbour wake-up (see sidm_scatter.c); off by default
+#SIDM_LOG_COLLISIONS             # SIDM: diagnostic mode, logs detected collisions without applying them (see sidm_scatter.c); off by default
 
 
 #---------------------------------------- Metal parameters

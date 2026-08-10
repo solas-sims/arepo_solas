@@ -955,6 +955,11 @@ extern FILE *FdInfo, /*!< file handle for info.txt log-file. */
 extern FILE *FdDetailed;
 #endif /* #ifdef DETAILEDTIMINGS */
 
+#ifdef SIDM_LOG_COLLISIONS
+extern FILE *FdSidmCollisions; /**< per-task file handle for sidm_collisions_<task>.txt diagnostic log
+                                 *   (SIDM item-4 diagnostic mode, see sidm_scatter.c). */
+#endif                         /* #ifdef SIDM_LOG_COLLISIONS */
+
 #ifdef OUTPUT_CPU_CSV
 extern FILE *FdCPUCSV; /**< file handle for cpu.csv log-file. Used if the cpu log is printed in csv format as well. */
 #endif                 /* #ifdef OUTPUT_CPU_CSV */
