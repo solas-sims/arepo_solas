@@ -427,20 +427,12 @@ void calculate_non_standard_physics_with_valid_gravity_tree_always(void) {}
  */
 void calculate_non_standard_physics_prior_mesh_construction(void)
 {
-  if(All.Time > 0) 
+  if(All.Time > 0)
     {
-#ifdef FIND_HALOS
-      if(All.Time>=All.NextTimeOfHaloFinding)
-        {
-          fof_seeding();
-          mpi_printf("FOF_SEEDING: Found %d FOF groups at %g...\n",TotNgroups, All.Time);
-          All.NextTimeOfHaloFinding *= All.TimeBetweenHaloFinding;
-        }
-#endif
 
 #if defined(COOLING) && defined(USE_SFR) && !defined(INDIVIDUAL_STAR_BY_STAR_FORMATION)
       sfr_create_star_particles();
-#endif 
+#endif
 
 #ifdef INDIVIDUAL_STAR_BY_STAR_FORMATION
       individual_starbystar_formation();
@@ -492,12 +484,16 @@ void calculate_non_standard_physics_end_of_step(void)
       star_radiation();
 #endif
 
-#ifdef STAR_FEEDBACK_ACTIVE
+#if defined(WINDS) || defined(RADIATION_PRESSURE) || defined(SUPERNOVAE)
       star_perform_end_of_step_physics();
 #endif
 
 #ifdef BH_ACTIVE
       bh_perform_end_of_step_physics();
+#endif
+
+#ifdef BH_MERGER
+      bh_merger();
 #endif
 
 #ifdef COOLING

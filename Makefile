@@ -15,6 +15,12 @@ endif
 include config-makefile
 -include Makefile.systype
 
+# Normalize SYSTYPE: Makefile.systype conventionally sets it quoted
+# (SYSTYPE="MACOSX"), but the platform blocks below match on the bare
+# word (via $(filter ...)). Strip any quote characters here so both
+# quoted and unquoted values from Makefile.systype work.
+SYSTYPE := $(strip $(subst ",,$(SYSTYPE)))
+
 $(info Build configuration:)
 $(info SYSTYPE: $(SYSTYPE))
 $(info CONFIG: $(CONFIG))
@@ -59,19 +65,24 @@ HWLOC_INCL =
 HWLOC_LIB =
 endif
 
+# GRACKLE_DIR points at a Grackle install (containing include/ and lib{,64}/); override
+# per-machine by setting it in Makefile.systype (e.g. GRACKLE_DIR = $(HOME)/software/grackle_solas)
+# or on the command line (make GRACKLE_DIR=...), same convention as SYSTYPE above.
+GRACKLE_DIR ?= $(HOME)/software/grackle_solas/
+GRACKLE_LIBDIR := $(or $(firstword $(wildcard $(GRACKLE_DIR)/lib64 $(GRACKLE_DIR)/lib)),$(GRACKLE_DIR)/lib)
+
 ifeq (USE_GRACKLE,$(findstring USE_GRACKLE,$(CONFIGVARS)))
 OPTIONS += -DCONFIG_BFLOAT_8
-GRACKLE_INCL = -I$(HOME)/Codes/grackle/include
-GRACKLE_LIB = -L$(HOME)/Codes/grackle/lib -lgrackle -Wl,-rpath,$(HOME)/Codes/grackle/lib
-ifeq ($(SYSTYPE),"MACOSX")
-LDFLAGS += -L$(shell BREW --prefix gcc)/lib/gcc/current -lgfortran -lquadmath
+GRACKLE_INCL = -I$(GRACKLE_DIR)/include
+GRACKLE_LIB = -L$(GRACKLE_LIBDIR) -lgrackle -Wl,-rpath,$(GRACKLE_LIBDIR)
+ifeq ($(SYSTYPE),MACOSX)
+LDFLAGS += -L$(shell brew --prefix gcc)/lib/gcc/current -lgfortran -lquadmath
 else
 LDFLAGS += -lgfortran -lquadmath
 endif
 else
 GRACKLE_INCL =
 GRACKLE_LIB =
-LDFLAGS +=
 endif
 
 #Mac OS using MacPorts modules for openmpi, fftw, gsl, hdf5 and hwloc
@@ -117,10 +128,10 @@ HDF5_LIB  = -L$(shell $(BREW) --prefix hdf5)/lib
 HWLOC_INCL= -I$(shell $(BREW) --prefix hwloc)/include
 HWLOC_LIB = -L$(shell $(BREW) --prefix hwloc)/lib -lhwloc
 endif
-# end of Darwin
+# end of MACOSX
 
 #Linux
-ifeq ($(filter LINUX,$(SYSTYPE)),"LINUX")
+ifeq ($(filter LINUX,$(SYSTYPE)),LINUX)
 # compiler and its optimization options
 CC        = mpicc
 OPTIMIZE  = -std=c11 -ggdb -g -O0 -fno-omit-frame-pointer -Wall -Wno-format-security -Wno-unknown-pragmas -Wno-unused-function
@@ -141,7 +152,7 @@ endif
 # end of Linux
 
 #Ngarrgu Tindebeek
-ifeq ($(filter NT,$(SYSTYPE)),"NT")
+ifeq ($(filter NT,$(SYSTYPE)),NT)
 # compiler and its optimization options
 CC        =  mpicc
 OPTIMIZE  =  -std=c11 -ggdb -O3 -Wall -Wno-format-security -Wno-unknown-pragmas -Wno-unused-function
@@ -368,6 +379,12 @@ ifneq ($(word 2,$(SF_MODELS)),)
 $(error Only one SF model may be active at a time. Currently enabled: $(SF_MODELS))
 endif
 
+ifneq (,$(filter SF_THRESHOLD_HALO_MASS_DEPENDENT,$(CONFIGVARS)))
+ifeq (,$(filter USE_SFR,$(CONFIGVARS)))
+$(error SF_THRESHOLD_HALO_MASS_DEPENDENT requires USE_SFR (and one of EEOS_SF/AGORA_SF/JEANS_SF))
+endif
+endif
+
 ifneq (,$(filter EEOS_SF,$(CONFIGVARS)))
 OBJS  += star_formation/sfr_eEOS.o
 endif
@@ -560,7 +577,15 @@ OBJS += blackholes/bh_accretion.o \
 endif
 
 ifneq (,$(filter BH_FEEDBACK_ACTIVE,$(CONFIGVARS)))
-OBJS += blackholes/bh_feedback.o   
+OBJS += blackholes/bh_feedback.o
+endif
+
+ifneq (,$(filter BH_MERGER,$(CONFIGVARS)))
+ifeq (,$(filter BH_ACTIVE,$(CONFIGVARS)))
+$(error BH_MERGER requires BH_ACTIVE)
+endif
+OBJS += blackholes/bh_merger.o
+INCL += blackholes/bh_proto.h
 endif
 
 ifeq (FOF,$(findstring FOF,$(CONFIGVARS)))
@@ -573,14 +598,6 @@ OBJS += fof/fof.o \
         fof/fof_vars.o
 INCL += fof/fof.h
 SUBDIRS += fof
-
-ifeq (FIND_HALOS,$(findstring FIND_HALOS,$(CONFIGVARS)))
-OBJS += fof/fof_seeding.o 
-endif
-endif
-
-endif
-
 ifeq (HALO_SEEDING,$(findstring HALO_SEEDING,$(CONFIGVARS)))
 OBJS    += fof/fof_seeding.o \
 		   fof/fof_seeding_registry.o

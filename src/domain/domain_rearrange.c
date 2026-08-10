@@ -118,6 +118,56 @@ void domain_rearrange_particle_sequence(void)
             NumGas--;
             count_gaselim++;
           }
+        else
+          {
+            /* If the ELIMINATED particle (P[i], before being overwritten below) is itself a
+             * black hole or star, its own BhP[]/SP[] slot must be reclaimed here -- via
+             * swap-with-last on BhP[]/SP[] itself, decrementing NumBhs/NumStars -- BEFORE
+             * P[i] is overwritten, since P[i].BhID/SID is the only way to find that slot.
+             * Without this, NumBhs/NumStars never shrinks even though the particle is gone
+             * (e.g. after bh_merger() zeroes out a merged-away BH's Mass/ID expecting this
+             * function to clean it up), leaving an orphaned BhP[]/SP[] entry that's still
+             * counted -- exactly the kind of mismatch that made fill_write_buffer()'s A_BH
+             * scan walk off the end of the array in the original bug this mirrors. */
+#ifdef BLACKHOLES
+            if(P[i].Type == 5)
+              {
+                int bhid = P[i].BhID;
+                BhP[bhid] = BhP[NumBhs - 1];
+                P[BhP[bhid].PID].BhID = bhid;
+                NumBhs--;
+              }
+#endif
+#ifdef STARS
+            if(P[i].Type == 4)
+              {
+                int sid = P[i].SID;
+                SP[sid] = SP[NumStars - 1];
+                P[SP[sid].PID].SID = sid;
+                NumStars--;
+              }
+#endif
+
+            /* non-gas particle being eliminated (a Type 4 star with zero mass, or any
+             * non-gas type matching Mass==0 && ID==0): swap the true last particle into
+             * this slot before NumPart shrinks, mirroring the gas branch above. Without
+             * this, NumPart simply shrinks without removing this slot's stale data,
+             * silently dropping whatever particle genuinely occupied the last slot
+             * instead (and leaving the eliminated particle's own stale, still-flagged-
+             * for-elimination data sitting within the new, smaller NumPart bound) */
+            P[i]   = P[NumPart - 1];
+            Key[i] = Key[NumPart - 1];
+
+#ifdef STARS
+            if(P[i].Type == 4)
+              SPP(i).PID = i;
+#endif
+
+#ifdef BLACKHOLES
+            if(P[i].Type == 5)
+              BPP(i).PID = i;
+#endif
+          }
 
         NumPart--;
         i--;

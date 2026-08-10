@@ -51,14 +51,19 @@
 #endif /* #ifndef FOF */
 
 #ifdef BLACKHOLE_SEEDING
-#if !defined(BH_SEED_ON_MASS) && !defined(BH_SEED_ON_ZERO_METALLICITY)
-#error "BLACKHOLE_SEEDING requires at least one seeding channel: BH_SEED_ON_MASS and/or BH_SEED_ON_ZERO_METALLICITY"
+#if !defined(BH_SEED_ON_MASS) && !defined(BH_SEED_ON_ZERO_METALLICITY) && !defined(BH_SEED_ON_VELDISP)
+#error "BLACKHOLE_SEEDING requires at least one seeding channel: BH_SEED_ON_MASS, BH_SEED_ON_ZERO_METALLICITY, and/or BH_SEED_ON_VELDISP"
 #endif
 #ifdef BH_SEED_ON_ZERO_METALLICITY
 #ifndef METALS
 #error "BH_SEED_ON_ZERO_METALLICITY requires METALS to be defined (per-cell metal mass is needed to judge a halo pristine)"
 #endif /* #ifndef METALS */
 #endif /* #ifdef BH_SEED_ON_ZERO_METALLICITY */
+#ifdef BH_SEED_ON_POTENTIAL_POSITION
+#ifndef EVALPOTENTIAL
+#error "BH_SEED_ON_POTENTIAL_POSITION requires EVALPOTENTIAL (per-particle gravitational potential)"
+#endif /* #ifndef EVALPOTENTIAL */
+#endif /* #ifdef BH_SEED_ON_POTENTIAL_POSITION */
 #endif /* #ifdef BLACKHOLE_SEEDING */
 
 #include "fof.h"
@@ -221,6 +226,276 @@ static void fof_seeding_tag_host_halo_mass(void)
 
   myfree(query);
 }
+
+#ifdef BH_SEED_ON_POTENTIAL_POSITION
+/*! \brief Record threaded through the three phases of the potential-anchored
+ *  donor search below: (A) broadcast out each group's finalized
+ *  MinPotentialPos from its owning task (Pos filled in by the answer);
+ *  (B) each task walks its own local gas cells and records its own best
+ *  candidate within the donor-search cutoff (Density/CandID/CandTask/
+ *  CandIndex filled in); (C) candidates are routed back to Task (the
+ *  group's owning task), which keeps only the densest one received. */
+struct donor_pos_query
+{
+  MyIDType MinID;
+  int Task;        /*!< group's owning task: source of Pos in phase A, destination in phase C */
+  MyDouble Pos[3];  /*!< group's finalized MinPotentialPos (absolute, periodic-wrapped) */
+  MyFloat Density;  /*!< local best candidate density found in phase B; -1 if none found locally */
+  MyIDType CandID;
+  int CandTask;
+  int CandIndex;
+};
+
+static int fof_seeding_compare_donor_query_task(const void *a, const void *b)
+{
+  if(((struct donor_pos_query *)a)->Task < ((struct donor_pos_query *)b)->Task)
+    return -1;
+  if(((struct donor_pos_query *)a)->Task > ((struct donor_pos_query *)b)->Task)
+    return +1;
+  return 0;
+}
+
+static int fof_seeding_compare_donor_query_minid(const void *a, const void *b)
+{
+  if(((struct donor_pos_query *)a)->MinID < ((struct donor_pos_query *)b)->MinID)
+    return -1;
+  if(((struct donor_pos_query *)a)->MinID > ((struct donor_pos_query *)b)->MinID)
+    return +1;
+  return 0;
+}
+
+/*! \brief Find, for every group, the densest gas cell within
+ *  All.PotentialDonorSearchNSoft x (DM softening length) of the group's
+ *  gravitational-potential minimum, across ALL particle types (gas and stars
+ *  sink deeper via dissipative collapse than DM's collisionless dynamics
+ *  allow, so restricting the search to DM would throw away the particles
+ *  most likely to sit near the true minimum). Fills
+ *  Group[].MaxGasDensNearPotential and its ID/Task/Index companions; -1 if no
+ *  gas cell of the group was found within range.
+ *
+ *  Must be called while FOF_PList / FOF_GList / Group are still allocated
+ *  (i.e. from within fof_seeding_list, after fof_finish_group_properties) --
+ *  the same placement constraint fof_seeding_tag_host_halo_mass() has.
+ *
+ *  No gas cell can evaluate its own distance to a group's potential minimum
+ *  until that minimum is finalized (after fof_finish_group_properties()), and
+ *  the cell's owning task may differ from the task that found the minimum:
+ *  phase A broadcasts the finalized position out (mirroring
+ *  fof_seeding_tag_host_halo_mass()'s query/route/answer/return sequence
+ *  exactly), phase B is a purely local search, and phase C gathers each
+ *  task's local best candidate back to the group's owning task.
+ *
+ *  \return void
+ */
+static void fof_seeding_find_potential_donor(void)
+{
+  int i, j, ngrp, recvTask, nimport;
+
+  double cutoff  = All.PotentialDonorSearchNSoft * All.ForceSoftening[All.SofteningTypeOfPartType[1]];
+  double cutoff2 = cutoff * cutoff;
+
+  struct donor_pos_query *query =
+      (struct donor_pos_query *)mymalloc("donor_pos_query", (NgroupsExt > 0 ? NgroupsExt : 1) * sizeof(struct donor_pos_query));
+
+  for(i = 0; i < NgroupsExt; i++)
+    {
+      query[i].MinID     = FOF_GList[i].MinID;
+      query[i].Task      = FOF_GList[i].MinIDTask;
+      query[i].Density   = -1;
+      query[i].CandID    = 0;
+      query[i].CandTask  = -1;
+      query[i].CandIndex = -1;
+      for(j = 0; j < 3; j++)
+        query[i].Pos[j] = 0;
+    }
+
+  /* --- Phase A: route the queries to the owning tasks and answer with MinPotentialPos --- */
+  mysort(query, NgroupsExt, sizeof(struct donor_pos_query), fof_seeding_compare_donor_query_task);
+
+  for(i = 0; i < NTask; i++)
+    Send_count[i] = 0;
+  for(i = 0; i < NgroupsExt; i++)
+    Send_count[query[i].Task]++;
+
+  MPI_Alltoall(Send_count, 1, MPI_INT, Recv_count, 1, MPI_INT, MPI_COMM_WORLD);
+
+  for(j = 0, nimport = 0, Recv_offset[0] = Send_offset[0] = 0; j < NTask; j++)
+    {
+      nimport += Recv_count[j];
+
+      if(j > 0)
+        {
+          Send_offset[j] = Send_offset[j - 1] + Send_count[j - 1];
+          Recv_offset[j] = Recv_offset[j - 1] + Recv_count[j - 1];
+        }
+    }
+
+  struct donor_pos_query *import =
+      (struct donor_pos_query *)mymalloc("donor_pos_import", (nimport > 0 ? nimport : 1) * sizeof(struct donor_pos_query));
+
+  for(ngrp = 0; ngrp < (1 << PTask); ngrp++) /* note: ngrp == 0 handles the local (self) queries */
+    {
+      recvTask = ThisTask ^ ngrp;
+
+      if(recvTask < NTask)
+        if(Send_count[recvTask] > 0 || Recv_count[recvTask] > 0)
+          MPI_Sendrecv(&query[Send_offset[recvTask]], Send_count[recvTask] * sizeof(struct donor_pos_query), MPI_BYTE, recvTask,
+                       TAG_FOF_SEEDING_DONOR_POS, &import[Recv_offset[recvTask]], Recv_count[recvTask] * sizeof(struct donor_pos_query),
+                       MPI_BYTE, recvTask, TAG_FOF_SEEDING_DONOR_POS, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    }
+
+  /* answer the queries from the owned group catalogue (Group is sorted by MinID) */
+  for(i = 0; i < nimport; i++)
+    {
+      int lo = 0, hi = Ngroups - 1, found = -1;
+
+      while(lo <= hi)
+        {
+          int mid = (lo + hi) / 2;
+
+          if(Group[mid].MinID == import[i].MinID)
+            {
+              found = mid;
+              break;
+            }
+          else if(Group[mid].MinID < import[i].MinID)
+            lo = mid + 1;
+          else
+            hi = mid - 1;
+        }
+
+      if(found < 0)
+        terminate("FOF_SEEDING: donor-position query for MinID=%llu not found on task %d", (unsigned long long)import[i].MinID,
+                   ThisTask);
+
+      for(j = 0; j < 3; j++)
+        import[i].Pos[j] = Group[found].MinPotentialPos[j];
+    }
+
+  /* return the answers; blocks come back in the order they were sent */
+  for(ngrp = 0; ngrp < (1 << PTask); ngrp++)
+    {
+      recvTask = ThisTask ^ ngrp;
+
+      if(recvTask < NTask)
+        if(Send_count[recvTask] > 0 || Recv_count[recvTask] > 0)
+          MPI_Sendrecv(&import[Recv_offset[recvTask]], Recv_count[recvTask] * sizeof(struct donor_pos_query), MPI_BYTE, recvTask,
+                       TAG_FOF_SEEDING_DONOR_POS_B, &query[Send_offset[recvTask]], Send_count[recvTask] * sizeof(struct donor_pos_query),
+                       MPI_BYTE, recvTask, TAG_FOF_SEEDING_DONOR_POS_B, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    }
+
+  myfree(import);
+
+  /* --- Phase B: tandem walk against FOF_PList, find this task's own best candidate per group --- */
+  mysort(query, NgroupsExt, sizeof(struct donor_pos_query), fof_seeding_compare_donor_query_minid);
+
+  int start = 0;
+
+  for(i = 0; i < NgroupsExt; i++)
+    {
+      while(start < NumPart && FOF_PList[start].MinID < query[i].MinID)
+        start++;
+
+      while(start < NumPart && FOF_PList[start].MinID == query[i].MinID)
+        {
+          int p = FOF_PList[start].Pindex;
+
+          if(P[p].Type == 0 && P[p].Mass > 0)
+            {
+              double dx = fof_periodic(P[p].Pos[0] - query[i].Pos[0]);
+              double dy = fof_periodic(P[p].Pos[1] - query[i].Pos[1]);
+              double dz = fof_periodic(P[p].Pos[2] - query[i].Pos[2]);
+              double r2 = dx * dx + dy * dy + dz * dz;
+
+              if(r2 <= cutoff2 && SphP[p].Density > query[i].Density)
+                {
+                  query[i].Density   = SphP[p].Density;
+                  query[i].CandID    = P[p].ID;
+                  query[i].CandTask  = ThisTask;
+                  query[i].CandIndex = p;
+                }
+            }
+
+          start++;
+        }
+    }
+
+  /* --- Phase C: route candidates back to the owning task; it keeps the densest one received --- */
+  mysort(query, NgroupsExt, sizeof(struct donor_pos_query), fof_seeding_compare_donor_query_task);
+
+  for(i = 0; i < NTask; i++)
+    Send_count[i] = 0;
+  for(i = 0; i < NgroupsExt; i++)
+    Send_count[query[i].Task]++;
+
+  MPI_Alltoall(Send_count, 1, MPI_INT, Recv_count, 1, MPI_INT, MPI_COMM_WORLD);
+
+  for(j = 0, nimport = 0, Recv_offset[0] = Send_offset[0] = 0; j < NTask; j++)
+    {
+      nimport += Recv_count[j];
+
+      if(j > 0)
+        {
+          Send_offset[j] = Send_offset[j - 1] + Send_count[j - 1];
+          Recv_offset[j] = Recv_offset[j - 1] + Recv_count[j - 1];
+        }
+    }
+
+  struct donor_pos_query *candidates =
+      (struct donor_pos_query *)mymalloc("donor_candidates", (nimport > 0 ? nimport : 1) * sizeof(struct donor_pos_query));
+
+  for(ngrp = 0; ngrp < (1 << PTask); ngrp++)
+    {
+      recvTask = ThisTask ^ ngrp;
+
+      if(recvTask < NTask)
+        if(Send_count[recvTask] > 0 || Recv_count[recvTask] > 0)
+          MPI_Sendrecv(&query[Send_offset[recvTask]], Send_count[recvTask] * sizeof(struct donor_pos_query), MPI_BYTE, recvTask,
+                       TAG_FOF_SEEDING_DONOR_CAND, &candidates[Recv_offset[recvTask]],
+                       Recv_count[recvTask] * sizeof(struct donor_pos_query), MPI_BYTE, recvTask, TAG_FOF_SEEDING_DONOR_CAND,
+                       MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    }
+
+  /* keep the densest candidate received across all fragments/tasks for each owned group */
+  for(i = 0; i < nimport; i++)
+    {
+      if(candidates[i].Density < 0)
+        continue;
+
+      int lo = 0, hi = Ngroups - 1, found = -1;
+
+      while(lo <= hi)
+        {
+          int mid = (lo + hi) / 2;
+
+          if(Group[mid].MinID == candidates[i].MinID)
+            {
+              found = mid;
+              break;
+            }
+          else if(Group[mid].MinID < candidates[i].MinID)
+            lo = mid + 1;
+          else
+            hi = mid - 1;
+        }
+
+      if(found < 0)
+        terminate("FOF_SEEDING: donor candidate for MinID=%llu not found on task %d", (unsigned long long)candidates[i].MinID,
+                   ThisTask);
+
+      if(candidates[i].Density > Group[found].MaxGasDensNearPotential)
+        {
+          Group[found].MaxGasDensNearPotential      = candidates[i].Density;
+          Group[found].MaxGasDensNearPotentialID    = candidates[i].CandID;
+          Group[found].MaxGasDensNearPotentialTask  = candidates[i].CandTask;
+          Group[found].MaxGasDensNearPotentialIndex = candidates[i].CandIndex;
+        }
+    }
+
+  myfree(candidates);
+  myfree(query);
+}
+#endif /* #ifdef BH_SEED_ON_POTENTIAL_POSITION */
 
 /*! \brief Main routine to execute the friend of friends group finder.
  *
@@ -411,6 +686,13 @@ int fof_seeding_list(HaloSeedEvent *events, int max_events)
   t1 = second();
   mpi_printf("FOF_SEEDING: tagging gas cells with host halo mass took = %g sec\n", timediff(t0, t1));
 
+#ifdef BH_SEED_ON_POTENTIAL_POSITION
+  t0 = second();
+  fof_seeding_find_potential_donor();
+  t1 = second();
+  mpi_printf("FOF_SEEDING: potential-anchored donor search took = %g sec\n", timediff(t0, t1));
+#endif /* #ifdef BH_SEED_ON_POTENTIAL_POSITION */
+
   /* Collect seed candidates among the groups owned by this task */
   int n_local = 0;
 
@@ -428,25 +710,58 @@ int fof_seeding_list(HaloSeedEvent *events, int max_events)
       if(Group[n].LenType[5] > 0)
         continue;
 
+      /* every channel is evaluated unconditionally (not short-circuited) so
+       * that FormationChannel below records all channels that fired, not
+       * just whichever happened to be checked first */
       int seed_this = 0;
+      int formation_channel = 0;
 
 #ifdef BH_SEED_ON_MASS
       if(Group[n].Mass >= All.MinHaloMassForFOFSeeding)
-        seed_this = 1;
+        {
+          seed_this = 1;
+          formation_channel |= BH_SEED_CHANNEL_MASS;
+        }
 #endif /* #ifdef BH_SEED_ON_MASS */
 
 #ifdef BH_SEED_ON_ZERO_METALLICITY
       /* whole-halo pristine check: even the most enriched gas cell must be
        * below threshold (MaxGasMetallicity == -1 means no gas at all, handled
        * by the MaxGasDens<0 deferral below) */
-      if(!seed_this && Group[n].MaxGasMetallicity >= 0 &&
-         Group[n].MaxGasMetallicity <= All.ZeroMetallicityThresholdForFOFSeeding)
-        seed_this = 1;
+      if(Group[n].MaxGasMetallicity >= 0 && Group[n].MaxGasMetallicity <= All.ZeroMetallicityThresholdForFOFSeeding)
+        {
+          seed_this = 1;
+          formation_channel |= BH_SEED_CHANNEL_ZERO_METALLICITY;
+        }
 #endif /* #ifdef BH_SEED_ON_ZERO_METALLICITY */
+
+#ifdef BH_SEED_ON_VELDISP
+      /* VelDispDM == -1 means the group has no DM at all */
+      if(Group[n].VelDispDM >= 0 && Group[n].VelDispDM >= All.MinVelDispForFOFSeeding)
+        {
+          seed_this = 1;
+          formation_channel |= BH_SEED_CHANNEL_VELDISP;
+        }
+#endif /* #ifdef BH_SEED_ON_VELDISP */
 
       if(!seed_this)
         continue;
 
+#ifdef BH_SEED_ON_POTENTIAL_POSITION
+      if(Group[n].MaxGasDensNearPotential < 0)
+        {
+          /* halo satisfies a seeding channel but has no gas cell within the
+             donor-search cutoff of the potential minimum: defer -- do not
+             fall back to the unrestricted MaxGasDens and do not mark seeded */
+          printf("FOF_SEEDING: Task %d: group MinID=%llu (M=%g) has no gas cell near the potential minimum, deferring seeding.\n",
+                 ThisTask, (unsigned long long)Group[n].MinID, Group[n].Mass);
+          continue;
+        }
+
+      local_events[n_local].DonorID    = Group[n].MaxGasDensNearPotentialID;
+      local_events[n_local].DonorTask  = Group[n].MaxGasDensNearPotentialTask;
+      local_events[n_local].DonorIndex = Group[n].MaxGasDensNearPotentialIndex;
+#else /* #ifdef BH_SEED_ON_POTENTIAL_POSITION */
       if(Group[n].MaxGasDens < 0)
         {
           /* halo satisfies a seeding channel but contains no gas: do not mark
@@ -456,11 +771,16 @@ int fof_seeding_list(HaloSeedEvent *events, int max_events)
           continue;
         }
 
-      local_events[n_local].HaloMinID  = Group[n].MinID;
-      local_events[n_local].HaloMass   = Group[n].Mass;
       local_events[n_local].DonorID    = Group[n].MaxGasDensID;
       local_events[n_local].DonorTask  = Group[n].MaxGasDensTask;
       local_events[n_local].DonorIndex = Group[n].MaxGasDensIndex;
+#endif /* #ifdef BH_SEED_ON_POTENTIAL_POSITION #else */
+
+      local_events[n_local].HaloMinID        = Group[n].MinID;
+      local_events[n_local].HaloMass         = Group[n].Mass;
+      for(int k = 0; k < 3; k++)
+        local_events[n_local].HaloVel[k] = Group[n].Vel[k];
+      local_events[n_local].FormationChannel = formation_channel;
       n_local++;
     }
 
@@ -486,10 +806,6 @@ int fof_seeding_list(HaloSeedEvent *events, int max_events)
 
   MPI_Allgatherv(local_events, n_local * sizeof(HaloSeedEvent), MPI_BYTE, events, bcounts, bdispls, MPI_BYTE, MPI_COMM_WORLD);
 
-  /* every task records every seeded halo -> registries stay in lockstep */
-  for(i = 0; i < n_global; i++)
-    halo_mark_seeded(&HaloSeeds, events[i].HaloMinID);
-
   myfree(bdispls);
   myfree(bcounts);
   myfree(counts);
@@ -498,8 +814,22 @@ int fof_seeding_list(HaloSeedEvent *events, int max_events)
   myfree_movable(FOF_GList);
   myfree_movable(FOF_PList);
 
-  myfree_movable(Group);   
-  myfree_movable(PS);              
+  myfree_movable(Group);
+  myfree_movable(PS);
+
+  /* every task records every seeded halo -> registries stay in lockstep.
+   * Done only after every local scratch allocation above (both movable and
+   * non-movable) has been freed: HaloSeeds.ids is a long-lived movable block
+   * allocated once, far earlier, at program start/restart; growing it via
+   * myrealloc_movable() requires every block allocated *after* it in the
+   * arena to also be movable, and local_events/counts/bcounts/bdispls above
+   * are plain mymalloc() (non-movable) -- calling halo_mark_seeded() (which
+   * can trigger that growth) while they were still alive violated that
+   * invariant. events[]/n_global are populated above and don't depend on
+   * any of the freed arrays, so this reordering doesn't change what gets
+   * recorded, only when. */
+  for(i = 0; i < n_global; i++)
+    halo_mark_seeded(&HaloSeeds, events[i].HaloMinID);
 
   TIMER_STOP(CPU_FOF);
   mpi_printf("FOF_SEEDING: All FOF related work finished, %d seed events identified.\n", n_global);
