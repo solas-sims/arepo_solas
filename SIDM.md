@@ -2,6 +2,8 @@
 
 **Status as of this writing: full v1 pipeline built, compiling, and running — density estimation validated, timestep criterion in place, scattering/kick routine implemented with cross-task partner support and a live conservation check, `DMSP[]` side-array migration complete (including restart checkpointing and snapshot I/O), and a first isolated-halo test shows the expected qualitative cusp-to-core signature. Careful quantitative validation against Vogelsberger et al. (2012) is the next milestone.**
 
+**Update following an external review against Correa et al. (2022, TangoSIDM)**: two real gaps were found in the KDK integration hook (no position correction for the velocity change, no wake-up for a passively-kicked inactive neighbour) and fixed, gated behind `SIDM_KICK_POSITION_CORRECTION` (off by default) — see §3.10. A diagnostic mode (log detected collisions without applying them, for the isolated-halo `Gamma(r)` validation test) was added behind `SIDM_LOG_COLLISIONS` (off by default) — see §3.11. The conservation and timestep-binding diagnostics were also split/extended to directly answer two items on the TODO list below (§3.11). **All of this is unvalidated** — it compiles and links cleanly in every flag combination but has not yet been run. The kernel-overlap scattering-probability form (§3.5) was reviewed against Correa's symmetric double-kernel alternative and kept as-is; this is a closed design decision, not an open item.
+
 This document is intended as the entry point for anyone (including future-you) picking this work back up. Read this before diving into the source. For a precise, function-by-function reference of what's implemented and where, see `IMPLEMENTATION.md` alongside this file.
 
 ---
@@ -24,7 +26,10 @@ This document is intended as the entry point for anyone (including future-you) p
 | Timestep criterion (`timestep.c`, `get_timestep_gravity`) | Implemented, comoving-aware |
 | `DMSP[]` side array | **Complete.** Struct, macros, allocation (lockstep with `P[]`), full `domain_exchange.c` mirroring of the `STARS` swap-compaction pattern, `peano.c`/`domain_rearrange.c`/`mesh/refinement.c` back-reference fixes, IC-read initial assignment, restart checkpointing. See §3.3 and §3.9 for the debugging history — several genuine gaps were found and fixed here, not just the obvious struct/macro work. |
 | I/O (`io_fields.c` + `A_DMSP`) | **Complete.** Four fields (`SidmDensity`, `SidmHsml`, `SidmNumNgb`, `SidmVelDisp`) write to snapshots correctly via the new `A_DMSP` array-source dispatch (mirrors `A_S` throughout `io.c`/`read_ic.c`) |
-| Scattering/kick routine (`sidm_scatter.c`) | **Local and cross-task partners both implemented.** Momentum/energy conservation verified live on real runs (both the cosmological box and the isolated halo), errors at floating-point noise level. Cross-task path compiles/links/launches cleanly but has not yet been exercised on a real multi-task run long enough to trigger actual cross-task scatters — check the `cross_task=N` count in the `SIDM_SCATTER:` diagnostic line to confirm. |
+| Scattering/kick routine (`sidm_scatter.c`) | **Local and cross-task partners both implemented.** Momentum/energy conservation verified live on real runs (both the cosmological box and the isolated halo), errors at floating-point noise level. Cross-task path compiles/links/launches cleanly but has not yet been exercised on a real multi-task run long enough to trigger actual cross-task scatters — check the `cross_task=N` count in the `SIDM_SCATTER:` diagnostic line to confirm (the line now also splits max conservation error by local vs. cross-task specifically, see §3.11). |
+| KDK position-correction + neighbour wake-up (`SIDM_KICK_POSITION_CORRECTION`) | **Implemented, gated, off by default. Unvalidated.** Closes two gaps found reviewing against Correa et al. (2022): kicked positions were never corrected for the velocity discontinuity, and a passively-kicked inactive neighbour had no mechanism to be brought back onto an active timebin. See §3.10. Needs an A/B run against the flag-off behaviour before being trusted/turned on by default. |
+| Collision-logging diagnostic mode (`SIDM_LOG_COLLISIONS`) | **Implemented, gated, off by default.** Logs every detected/accepted collision (both particles' positions, `r`, `p_ij`, timebin, dt) to a per-task `sidm_collisions_<task>.txt` instead of applying it, for the isolated-halo `Gamma(r)` validation test. See §3.11. The Hernquist IC generator and the `Gamma(r)` analysis script that consume this log are **not yet built** — this is the logging hook only. |
+| SIDM timestep-criterion binding diagnostic (`SidmTimestepChecks`/`SidmTimestepBinding`) | **Implemented, ungated, cumulative.** Answers "does the SIDM term in `get_timestep_gravity()` ever actually bind" directly from the `SIDM_SCATTER:` line — see §3.11. Not yet read from an actual run. |
 | First isolated-halo test (NFW, M=10¹² M☉/h, c=10, σ/m≈1 cm²/g) | Qualitatively healthy: monotonic core suppression over 0→120→370 Myr, outskirts (>10-20 kpc) essentially unchanged across all three snapshots (correctly localized effect), rough relaxation-timescale estimate matches the observed onset. **Not yet a quantitative match to a specific published number** — see TODO. |
 | Quantitative validation against Vogelsberger's test suite | **Not started.** This is the actual "is v1 done" criterion — everything above is necessary but not sufficient. |
 
@@ -92,6 +97,8 @@ The source algorithm has each particle in a pair independently evaluate the inte
 
 **One likely typo in the secondary source, corrected**: Valdarnini (2023) states the accept condition as "P_i ≤ x" (probability less than the random draw triggers a scatter) — backwards from every standard Monte Carlo convention. Treated as a transcription error; implemented as the standard `x < P_i`.
 
+**Reviewed against Correa et al. (2022, TangoSIDM) and kept as-is**: Correa's `g_ij` is a symmetric convolution integral of *both* particles' kernels (their Eq. 5-6, closed-form for the cubic spline in their Appendix A1.1), whereas `W(r_ij, h_i)` above uses only the initiator's own smoothing length — kernel-weighted (distance matters, not a fixed-radius uniform probability) but asymmetric, not a true overlap integral. This is a legitimate middle ground with its own citation (Valdarnini 2023 Eq. 19, the actual source used here), not an oversight. Explicitly discussed and closed as a design decision, not carried forward as an open item.
+
 ### 3.6 Cross-task partners — implemented
 
 Originally a v1 restriction (local partners only), later implemented once the basic pipeline was validated. The core difficulty: density only ever needed to *gather* a scalar back to wherever a query originated; scattering needs to *act* on a remote particle, which the existing comm pattern was never built for.
@@ -121,6 +128,31 @@ Two separate instances of the same mistake — inserting a new `#ifdef SIDM` blo
 2. `domain_vars.c` — missed initially (masked by the sandbox's default `STARS`-on config, see §3.3), found via a real build failure on a `STARS`-off build, then fixed. The fix was verified by rebuilding with `STARS` off specifically to surface any *other* instances of the same mistake across every file touched that session — there was only the one remaining.
 
 **Practical lesson, not just a fixed bug**: verify any change touching a file with adjacent `#ifdef` guards in *both* configurations you actually use, not just whichever one happens to be the default build environment.
+
+### 3.10 KDK hook gaps closed: post-kick position correction + neighbour wake-up, gated behind `SIDM_KICK_POSITION_CORRECTION`
+
+Found reviewing the KDK integration hook against Correa et al. (2022, Sec 2.3)'s SWIFT implementation. Their scheme interleaves the SIDM kick *between* the drift and the final half-kick of a KDK step, and corrects positions with an explicit backward/forward `D(dt/2)` pair straddling that point; they also explicitly warn that an active particle kicking an otherwise-inactive neighbour must wake that neighbour for the following timestep.
+
+**Our hook is structurally different**: `sidm_scatter()` is called from `do_gravity_hydro.c` *after* this timebin's gravity kick has already fully completed (not between a split half-kick), so there's no clean midpoint to straddle the way Correa's scheme does. Before this fix, the kick functions (`sidm_apply_kick_local`/`sidm_apply_kick_cross_task`, and the cross-task kick-delivery receive loop) only ever touched `P[].Vel` — positions were never corrected for the velocity discontinuity, and a passively-kicked particle's `TimeBinGrav` was never touched, so it could carry a stale, too-long timestep for many steps after being kicked.
+
+**Fix, both gated behind `SIDM_KICK_POSITION_CORRECTION` (off by default)**:
+- `sidm_apply_position_correction()` retroactively corrects `P[].Pos` by `(v_new - v_old) * dt_drift_half`, using `get_drift_factor()` (the same comoving-aware mechanism `drift_particle()` itself uses, not a raw `v*dt/2`) over half of the *initiator's own* timebin step. This is an **adaptation** of Correa's scheme to this codebase's different hook point, not a transcription — the choice of "half the initiator's step" as the correction window is a judgment call, not a derived quantity.
+- `sidm_wake_particle()` forces a kicked-but-otherwise-inactive particle's `TimeBinGrav` down to `All.LowestActiveTimeBin` via `timebin_move_particle()`, so it's picked up by the ordinary gravity/timestep cascade at the next global step. Deliberately only touches the particle's persistent bin membership, not the in-progress `TimeBinsGravity` active-list snapshot (unsafe to mutate mid-iteration).
+- For the cross-task path, a `dv[3]` field was added to `sidm_kick_poke` so the *receiving* task (which owns the kicked particle) can apply both fixes itself — the originating task can't do either for a particle it doesn't own.
+
+**Off by default, deliberately**: this changes physics (positions, and which timebin a particle sits on), so the exact pre-fix behaviour needs to stay available for an A/B comparison against this fix on the isolated-halo test before it's trusted. See TODO.
+
+### 3.11 Validation diagnostics: conservation split by local/cross-task, timestep-binding counter, and collision-only logging mode
+
+Three additions, all aimed at making the existing TODO items ("confirm cross-task scattering is exercised and conserves cleanly", "verify the timestep criterion actually binds") answerable from a real run's output rather than inferred indirectly.
+
+**Conservation error, split**: `sidm_check_conservation()` now takes an `is_cross_task` flag and tracks momentum/energy error maxima *separately* for local vs. cross-task kicks (`sidm_max_momentum_error_local`/`_cross_task` etc.), rather than one pooled max. A pooled max can't tell you whether cross-task kicks conserve cleanly if they're a small minority of a run's total scatters — the previous single-max version was silently unable to answer that TODO item even with real cross-task data in hand. Printed as separate columns in the `SIDM_SCATTER:` line, with a note appended when `cross_task=0` so the columns aren't misread as "cross-task conserves perfectly" when really no cross-task event has happened yet.
+
+**Timestep-binding counter**: new cumulative (not per-step) globals `SidmTimestepChecks`/`SidmTimestepBinding` (`allvars.h`/`.c`), incremented in `get_timestep_gravity()`'s SIDM block (`timestep.c`) every time the term is evaluated / actually turns out to be the smallest. Reduced and printed in the `SIDM_SCATTER:` line as `timestep_binding=N/M (X%)` — printed from `sidm_scatter.c`, not `timestep.c` itself, since the latter runs once per particle per timestep reassignment, far too often for its own diagnostic print. Ungated (a few integer increments, no I/O) since it answers an existing validation question rather than changing physics.
+
+**Collision-only logging mode, `SIDM_LOG_COLLISIONS` (off by default)**: for the isolated-halo `Gamma(r)` validation test (§6 TODO, and the eventual analysis script this feeds). When set, `sidm_scatter()`'s dispatch calls `sidm_log_collision()` **instead of** the normal kick path — a genuinely separate branch, not a "kick then undo" — so `P[]` is provably untouched and the halo's density profile stays fixed and known for the whole run. Logs both particles' actual positions (not just the initiator's): for a local candidate, the partner's position is read live from `P[cand->index].Pos`; for a remote candidate, it's shipped through the existing candidate-gathering `data_out` response (a new `pos[MAX_REMOTE_RESPONSE][3]` field, mirroring how `vel` was already shipped), gated the same way so the normal physics path pays nothing extra for it. Output goes to a per-task `sidm_collisions_<task>.txt` (mirrors the pre-existing `FdDetailed`/`DETAILEDTIMINGS` per-task-file pattern in `logs.c`, since collisions are detected wherever the initiating particle lives, not just on the root task).
+
+**Still needed for the actual validation test** (not built by this diagnostic hook alone): the Hernquist-only isolated-halo IC (reuse `examples/isolated_galaxy_collisionless_3d`'s GalIC setup with `MD=MB=N_DISK=N_BULGE=0` — not yet confirmed this degenerates cleanly to halo-only), and the Python script that bins the logged collisions radially and compares against the analytic `Gamma(r)` prediction.
 
 ---
 
@@ -155,9 +187,12 @@ Touched outside src/sidm/:
   src/domain/domain_rearrange.c — DM back-reference fixup (cell elimination)
   src/domain/peano.c            — DM back-reference fixup (Peano-key cycle-sort)
   src/mesh/refinement.c         — DM back-reference fixup (gas cell refinement)
-  src/time_integration/timestep.c        — SIDM timestep criterion in get_timestep_gravity
+  src/time_integration/timestep.c        — SIDM timestep criterion in get_timestep_gravity;
+                                            SidmTimestepChecks/SidmTimestepBinding increments (§3.11)
   src/time_integration/do_gravity_hydro.c — sidm_scatter() call site, after gravity's per-timebin kick
-  Config.sh                  — SIDM flag
+  src/io/logs.c              — FdSidmCollisions open/close (SIDM_LOG_COLLISIONS, §3.11)
+  Config.sh                  — SIDM flag; SIDM_KICK_POSITION_CORRECTION (§3.10) and
+                                SIDM_LOG_COLLISIONS (§3.11), both off by default
   Makefile                   — sidm/*.o build rules
 ```
 
@@ -180,16 +215,18 @@ Before making further changes, read (in this order):
 ## 6. TODO / known limitations, roughly in priority order
 
 ### Blocking "v1 is actually done"
-- [ ] **Careful quantitative validation against Vogelsberger et al. (2012)'s own test suite.** The isolated-halo run so far is a genuine, encouraging qualitative match (monotonic core suppression, correctly localized to small radii, rough relaxation-timescale agreement) — but "looks right" and "quantitatively matches a specific published number at a specific time" are different bars. This is the actual "done" criterion.
-- [ ] Confirm cross-task scattering is genuinely exercised on a real run (check `cross_task=N` in the diagnostic) and that conservation still holds cleanly for cross-task kicks specifically, not just local ones.
-- [ ] Verify the timestep criterion actually *binds* somewhere in a real run.
+- [ ] **Careful quantitative validation against Vogelsberger et al. (2012)'s own test suite.** The isolated-halo run so far is a genuine, encouraging qualitative match (monotonic core suppression, correctly localized to small radii, rough relaxation-timescale agreement) — but "looks right" and "quantitatively matches a specific published number at a specific time" are different bars. This is the actual "done" criterion. The `SIDM_LOG_COLLISIONS` diagnostic mode (§3.11) is a step toward this but is not itself the validation — still need the Hernquist-only IC and the `Gamma(r)` analysis script.
+- [ ] Confirm cross-task scattering is genuinely exercised on a real run (check `cross_task=N` in the diagnostic) and that conservation still holds cleanly for cross-task kicks specifically, not just local ones. **The diagnostic can now answer this directly** (`SIDM_SCATTER:` line splits `max_p/ke_rel_err` by local/cross-task, §3.11) — just needs an actual ≥2-task run to read the output from.
+- [ ] Verify the timestep criterion actually *binds* somewhere in a real run. **The diagnostic can now answer this directly** (`timestep_binding=N/M` in the `SIDM_SCATTER:` line, §3.11) — same as above, needs a real run.
+- [ ] **New**: A/B the `SIDM_KICK_POSITION_CORRECTION` fix (§3.10) against the pre-fix behaviour on the isolated-halo test. The fix compiles and links cleanly in every flag combination but has not been run — don't assume it's a net improvement (or even harmless) without actually comparing density profiles and the conservation diagnostic flag-on vs. flag-off.
+- [x] ~~Kernel-overlap scattering-probability form (external review item)~~ — reviewed against Correa et al. (2022)'s symmetric double-kernel alternative and kept as-is; closed as a design decision, see §3.5.
 
 ### Architecture, deferred by deliberate choice (not urgent, but real)
 - [ ] Non-`HIERARCHICAL_GRAVITY` build path — `sidm_scatter()` is not wired into `do_gravity_hydro.c`'s non-hierarchical branch (structurally different active-list handling; not exercised by any current build).
 - [ ] A fully rigorous cross-task staleness fix (atomic remote claims + retry) — explicitly not done for v1, see §3.6.
 
 ### Smaller, worth tracking
-- [ ] `SIDM_TIMESTEP_SAFETY_FACTOR` is hardcoded (`0.1`) rather than a `param.txt` entry.
+- [ ] `SIDM_TIMESTEP_SAFETY_FACTOR` is hardcoded (`0.1`) rather than a `param.txt` entry — **and, separately, its actual value is an open question**: Vogelsberger/Correa's own `kappa` is `1e-2`, a full order of magnitude tighter than the `0.1` used here. Not yet decided whether to tighten it or justify `0.1` explicitly; needs testing before either call.
 - [ ] `MAX_CAND_TOTAL` (128) / `MAX_REMOTE_RESPONSE` (16) in `sidm_scatter.c` are generous fixed caps, not dynamically sized — silently drop excess candidates rather than erroring if ever exceeded (worth an occasional check that this isn't happening in practice).
 - [ ] The pre-existing `TAG_BHDATA`/`TAG_STARDATA` mismatch found in the *original* `STARS` code (`domain_exchange.c`'s `Sendrecv` for star exchange uses different send/recv tags — a real latent bug, not ours, not fixed by us) — flagged to Nick (owns that code) separately.
 - [ ] The `Config_AGORA.sh` Grackle discrepancy noted very early on (the version pasted at project start had `USE_GRACKLE`/`METALS` disabled; the version on GitHub's `Star_feedback_radiation` branch has them active) was flagged once and never resolved.

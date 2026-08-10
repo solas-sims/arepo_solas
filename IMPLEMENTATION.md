@@ -18,7 +18,12 @@ typedef struct DM_Particle_Data
   MyFloat     SidmVelDisp;
   int         SidmNumNgb;
   integertime SidmLastScatterTime;
-  int         SidmScatterFlag;
+  int         SidmScatterFlag;     // set by the Monte Carlo step; written but not currently read
+                                     // back anywhere (no explicit double-scatter guard -- the
+                                     // codebase relies on the timestep criterion instead, see
+                                     // SIDM §2/timestep-binding diagnostic in §3.11)
+  int         SidmScatterCount;    // cumulative, never reset -- differencing across snapshots
+                                     // gives an empirical scattering rate for Gamma(r) validation
 } DM_Particle_Data;
 ```
 `PIndex` mirrors `Star_Particle_Data.PID` mechanically but is named for clarity (it's an array index, not a persistent ID, despite the star-module convention calling the equivalent field `PID`).
@@ -93,7 +98,7 @@ Monte Carlo pairwise elastic scattering/kick, local and cross-task partners.
 
 **`enum { MAX_CAND_TOTAL = 128, MAX_REMOTE_RESPONSE = 16 };`** — fixed caps (SIDM TODO: not dynamically sized).
 
-**`struct sidm_candidate`** — unified local/remote candidate: `is_remote`, `index` (local `P[]` index, or remote `P[]` index on `remote_task` if `is_remote`), `remote_task`, `r`, `p_ij`, `vel[3]` (only populated/used if remote).
+**`struct sidm_candidate`** — unified local/remote candidate: `is_remote`, `index` (local `P[]` index, or remote `P[]` index on `remote_task` if `is_remote`), `remote_task`, `r`, `p_ij`, `vel[3]` (only populated/used if remote), and `pos[3]` (only under `#ifdef SIDM_LOG_COLLISIONS` — only populated/used if remote, since a local candidate's position is re-read live from `P[index].Pos`; shipped purely for `sidm_log_collision()`'s radial binning, see below).
 
 **`SidmCandBuf`** (flattened `[NumPart][MAX_CAND_TOTAL]`) / **`SidmCandCount`** — per-particle candidate list and count, built during the comm-pattern walk, consumed by the accept/reject pass afterward.
 
@@ -101,23 +106,29 @@ Monte Carlo pairwise elastic scattering/kick, local and cross-task partners.
 
 **`sidm_random_unit_vector(double e[3])`** (static) — isotropic kick direction.
 
-**`sidm_check_conservation(...)`** (static) — shared momentum/energy diagnostic, called by both kick paths below. Prints a warning if relative error exceeds `1e-10`; tracks running max for the summary print.
+**`sidm_check_conservation(int i, p_before, ke_before, p_after, ke_after, other_id, int is_cross_task)`** (static) — shared momentum/energy diagnostic, called by both kick paths below. Prints a warning if relative error exceeds `1e-10`; tracks running max **separately for local vs. cross-task** (`sidm_max_momentum_error_local`/`_cross_task` and the energy equivalents) via the `is_cross_task` argument — added so the `SIDM_SCATTER:` summary can actually answer whether cross-task kicks conserve cleanly, rather than that signal being maskable by a pooled max dominated by local kicks (see SIDM §3.11).
 
-**`sidm_apply_kick_local(int i, int j)`** (static) — both particles local. Direct port of the pre-cross-task-support version: CM-frame isotropic kick, Eq. 20.
+**`sidm_apply_kick_local(int i, int j)`** (static) — both particles local. Direct port of the pre-cross-task-support version: CM-frame isotropic kick, Eq. 20. Under `#ifdef SIDM_KICK_POSITION_CORRECTION`: captures `v_old_i`/`v_old_j` before the kick, then after applying it calls `sidm_apply_position_correction()` for both `i` and `j` and `sidm_wake_particle(j)` (only `j` — `i` is already active this timebin by construction, being the initiator).
 
-**`struct sidm_kick_poke`** — `{ int remote_index; MyFloat new_vel[3]; integertime scatter_time; }` — the one-way "set this velocity" instruction for a remote kick.
+**`sidm_apply_position_correction(int p, const double v_old[3], const double v_new[3])`** (static, `#ifdef SIDM_KICK_POSITION_CORRECTION` only) — moves `P[p].Pos` by `(v_new - v_old) * dt_drift_half`, where `dt_drift_half` is `get_drift_factor()` (comoving-aware, same mechanism `drift_particle()` uses) over half of `sidm_scatter_current_timebin`'s own step. Adapts Correa et al. (2022, Sec 2.3)'s KDK position-correction idea to this codebase's different hook point (scatter happens *after* the full gravity kick here, not between a split half-kick) — see SIDM §3.10 for the full rationale and the judgment calls involved.
 
-**`sidm_apply_kick_cross_task(int i, const sidm_candidate *cand, sidm_kick_poke **poke_buf, int *poke_count, int poke_capacity)`** (static) — computes both new velocities using `cand->vel` (already fetched during gathering), applies the local half immediately, queues the remote half into `poke_buf[cand->remote_task]`. `terminate()`s if `remote_task` is out of range (defensive — should be unreachable if self-reporting worked) or if the per-task poke buffer overflows its provisioned capacity.
+**`sidm_wake_particle(int p)`** (static, `#ifdef SIDM_KICK_POSITION_CORRECTION` only) — if `P[p].TimeBinGrav > All.LowestActiveTimeBin`, moves it there via `timebin_move_particle(&TimeBinsGravity, ...)` and updates `P[p].TimeBinGrav`. Only touches persistent bin membership, not the in-progress `TimeBinsGravity` active-particle-list snapshot (unsafe to mutate mid-iteration from within a kick call). See SIDM §3.10.
+
+**`sidm_log_collision(int i, const sidm_candidate *cand)`** (static, `#ifdef SIDM_LOG_COLLISIONS` only) — diagnostic-mode logger, called by `sidm_scatter()`'s dispatch **instead of** the kick functions (a separate branch, not a "kick then undo") when the flag is set. Resolves the partner's actual position (`P[cand->index].Pos` if local, `cand->pos` if remote) and appends one line to `FdSidmCollisions`: `time timebin dt_i initiator_ID init_pos(3) partner_pos(3) r is_remote p_ij`. See SIDM §3.11.
+
+**`struct sidm_kick_poke`** — `{ int remote_index; MyFloat new_vel[3]; MyFloat dv[3] /* #ifdef SIDM_KICK_POSITION_CORRECTION only */; integertime scatter_time; }` — the one-way "set this velocity" instruction for a remote kick. `dv` (new velocity minus pre-kick velocity) is shipped so the *receiving* task — which owns the kicked particle and is the only one that can apply `sidm_apply_position_correction()`/`sidm_wake_particle()` to it — has what it needs without a second round-trip.
+
+**`sidm_apply_kick_cross_task(int i, const sidm_candidate *cand, sidm_kick_poke **poke_buf, int *poke_count, int poke_capacity)`** (static) — computes both new velocities using `cand->vel` (already fetched during gathering), applies the local half immediately, queues the remote half into `poke_buf[cand->remote_task]`. Under `#ifdef SIDM_KICK_POSITION_CORRECTION`: also applies `sidm_apply_position_correction()` for the local half (`i`, no wake needed — already active) and fills `dv[3]` in the queued poke for the remote half. `terminate()`s if `remote_task` is out of range (defensive — should be unreachable if self-reporting worked) or if the per-task poke buffer overflows its provisioned capacity.
 
 **`data_in`** (candidate-gathering query) — `Pos[3]`, `Hsml`, `SelfID` (needed for the remote side's lower-ID-initiates filter), `Firstnode`.
 
-**`data_out`** (candidate-gathering response) — `ncand`, `remote_task` (**self-reported** `ThisTask` — the comm framework doesn't otherwise tell the originating side which task a response came from), then per-candidate `id[]`, `vel[][3]`, `r[]`, `remote_index[]`, up to `MAX_REMOTE_RESPONSE`.
+**`data_out`** (candidate-gathering response) — `ncand`, `remote_task` (**self-reported** `ThisTask` — the comm framework doesn't otherwise tell the originating side which task a response came from), then per-candidate `id[]`, `vel[][3]`, `r[]`, `remote_index[]`, up to `MAX_REMOTE_RESPONSE`. Under `#ifdef SIDM_LOG_COLLISIONS`: also `pos[MAX_REMOTE_RESPONSE][3]`, the remote candidate's own position, mirroring how `vel` is shipped (populated in the walk's remote-response branch, consumed in `out2particle` into `sidm_candidate.pos`).
 
 **`particle2in`** — packs a query, mirrors `sidm_density.c`.
 
-**`out2particle(data_out *out, int i, int mode)`** — `MODE_LOCAL_PARTICLES` is a no-op (local candidates are appended directly into `SidmCandBuf` *during* the walk, not here). `MODE_IMPORTED_PARTICLES` computes `p_ij` for each returned candidate (using `i`'s own `Mass`/`Vel`, available on the originating task) and appends into `SidmCandBuf[i]`.
+**`out2particle(data_out *out, int i, int mode)`** — `MODE_LOCAL_PARTICLES` is a no-op (local candidates are appended directly into `SidmCandBuf` *during* the walk, not here). `MODE_IMPORTED_PARTICLES` computes `p_ij` for each returned candidate (using `i`'s own `Mass`/`Vel`, available on the originating task) and appends into `SidmCandBuf[i]`, including `pos[3]` from `out->pos[c]` under `#ifdef SIDM_LOG_COLLISIONS`.
 
-**`sidm_scatter_walk(int target, int mode, int threadid)`** (static) — the shared walk, used both for a particle's own local search (`MODE_LOCAL_PARTICLES`, appending directly into `SidmCandBuf`) and for serving a remote query (`MODE_IMPORTED_PARTICLES`, packing into the `data_out` response, self-reporting `remote_task = ThisTask`). Unlike `sidm_density_evaluate`, this one **genuinely follows pseudo-particle branches** via `sidm_treefind_export_node_threads` rather than skipping them — this is the actual cross-task-support change.
+**`sidm_scatter_walk(int target, int mode, int threadid)`** (static) — the shared walk, used both for a particle's own local search (`MODE_LOCAL_PARTICLES`, appending directly into `SidmCandBuf`) and for serving a remote query (`MODE_IMPORTED_PARTICLES`, packing into the `data_out` response, self-reporting `remote_task = ThisTask`). Unlike `sidm_density_evaluate`, this one **genuinely follows pseudo-particle branches** via `sidm_treefind_export_node_threads` rather than skipping them — this is the actual cross-task-support change. Under `#ifdef SIDM_LOG_COLLISIONS`, the remote-response branch also fills `target_result->pos[c]` from `P[p].Pos`.
 
 **`kernel_local(void)` / `kernel_imported(void)`** (static) — standard shape; `kernel_local` additionally filters to `P[i].TimeBinGrav == sidm_scatter_current_timebin` (see below) and resets `SidmCandCount[i] = 0` before walking.
 
@@ -125,9 +136,9 @@ Monte Carlo pairwise elastic scattering/kick, local and cross-task partners.
 1. Computes `dt_i`, stores it in file-static `sidm_scatter_current_dt_i` (read by `out2particle`/the walk).
 2. Allocates `SidmCandBuf`/`SidmCandCount`, runs `generic_comm_pattern(kernel_local, kernel_imported)` — candidate gathering, local + remote.
 3. Allocates per-destination-task pending-poke buffers (`poke_buf[t]`, fixed capacity `TimeBinsGravity.NActiveParticles` per task).
-4. Iterates active particles at exactly `timebin` (matching `P[i].TimeBinGrav == timebin` — **not** the cumulative hierarchical active list gravity's own kick uses, which would re-roll a particle's scatter dice once per coarser timebin pass): accept/reject + partner selection over the combined candidate list; dispatches to `sidm_apply_kick_local` or `sidm_apply_kick_cross_task`.
-5. **Kick delivery**: a plain per-task `MPI_Sendrecv` loop (count exchange on `TAG_N`, payload on `TAG_DMDATA`) delivering queued pokes; the receiving side applies `P[ri].Vel = new_vel`, `DMPS(ri).SidmLastScatterTime`/`SidmScatterFlag`.
-6. Frees everything in LIFO order; prints the MPI-reduced `SIDM_SCATTER:` diagnostic line, now including a separate `cross_task=N` count.
+4. Iterates active particles at exactly `timebin` (matching `P[i].TimeBinGrav == timebin` — **not** the cumulative hierarchical active list gravity's own kick uses, which would re-roll a particle's scatter dice once per coarser timebin pass): accept/reject + partner selection over the combined candidate list. **Dispatch is now two mutually exclusive paths** (`#ifdef SIDM_LOG_COLLISIONS` / `#else`): either `sidm_log_collision()` alone (diagnostic mode — no kick, no poke, `P[]` untouched), or the original dispatch to `sidm_apply_kick_local`/`sidm_apply_kick_cross_task`.
+5. **Kick delivery**: a plain per-task `MPI_Sendrecv` loop (count exchange on `TAG_N`, payload on `TAG_DMDATA`) delivering queued pokes (empty every call when `SIDM_LOG_COLLISIONS` is set, since no pokes are ever queued in that mode); the receiving side applies `P[ri].Vel = new_vel`, and under `#ifdef SIDM_KICK_POSITION_CORRECTION` also `sidm_apply_position_correction()` + `sidm_wake_particle()` for the just-arrived kick, then `DMPS(ri).SidmLastScatterTime`/`SidmScatterFlag`.
+6. Frees everything in LIFO order; prints the MPI-reduced `SIDM_SCATTER:` diagnostic line: cumulative scatters, `cross_task=N`, conservation-error maxima **split by local/cross-task** (with a note when `cross_task=0`), and **cumulative timestep-binding** `timestep_binding=N/M (X%)` reduced from `SidmTimestepChecks`/`SidmTimestepBinding` (incremented in `timestep.c`, see below).
 
 **Call site**: `do_gravity_hydro.c`, immediately after gravity's own per-timebin kick loop, inside the `HIERARCHICAL_GRAVITY` branch only (see SIDM TODO for the non-hierarchical gap).
 
@@ -135,12 +146,14 @@ Monte Carlo pairwise elastic scattering/kick, local and cross-task partners.
 
 ## Files touched outside `src/sidm/`
 
-### `src/main/allvars.h`
+### `src/main/allvars.h` / `allvars.c`
 - `particle_data.SIDMID` (`MyIDType`) — forward reference into `DMSP[]`.
 - `global_data_all_processes` (`All.`): `SidmDesNumNgb`, `SidmDesNumNgbDev`, `SidmCrossSection`.
 - `enum e_typelist`: `DM_ONLY = 2`.
 - `enum arrays`: `A_DMSP`.
 - `enum iofields`: `IO_SIDM_DENSITY`, `IO_SIDM_HSML`, `IO_SIDM_NUMNGB`, `IO_SIDM_VELDISP`.
+- `#ifdef SIDM_LOG_COLLISIONS`: `extern FILE *FdSidmCollisions;` (declared in `allvars.h`, defined in `allvars.c`) — per-task collision-log file handle, opened/closed in `logs.c`.
+- `#ifdef SIDM`: `extern long long SidmTimestepChecks, SidmTimestepBinding;` (declared in `allvars.h`, defined+zero-initialized in `allvars.c`) — cumulative counters incremented in `timestep.c`, read and reduced in `sidm_scatter.c`'s diagnostic print. See SIDM §3.11.
 
 ### `src/main/run.c`
 - Includes `sidm.h`.
@@ -199,13 +212,18 @@ The largest single mirror of the `STARS` pattern — roughly 20 distinct touch p
 - `move_collisionless_particle()` — DM back-reference fixup, alongside `STARS`/`BLACKHOLES`. This function's own doc comment confirms it moves *any* collisionless particle when gas refinement shifts the gas/non-gas boundary — includes DM by definition, and this can happen more often than domain decomposition itself in a real AGORA run.
 
 ### `src/time_integration/timestep.c`
-- `get_timestep_gravity(int p)` — SIDM criterion added right after the `EXTERNALGRAVITY` block: `dt_sidm = SIDM_TIMESTEP_SAFETY_FACTOR / (rho_phys · σ/m · v_rel)`, `rho_phys` via `All.cf_a3inv`, `v_rel` via `All.cf_atime` (matching this file's own existing precedent in `get_timestep_hydro`, not independently derived). Skipped if `DMPS(p).SidmDensity <= 0` (density never computed for this particle yet).
+- `get_timestep_gravity(int p)` — SIDM criterion added right after the `EXTERNALGRAVITY` block: `dt_sidm = SIDM_TIMESTEP_SAFETY_FACTOR / (rho_phys · σ/m · v_rel)`, `rho_phys` via `All.cf_a3inv`, `v_rel` via `All.cf_atime` (matching this file's own existing precedent in `get_timestep_hydro`, not independently derived). Skipped if `DMPS(p).SidmDensity <= 0` (density never computed for this particle yet). `SidmTimestepChecks++` on every evaluation, `SidmTimestepBinding++` additionally whenever `dt_sidm < dt` (i.e. the SIDM term actually wins) — see SIDM §3.11.
 
 ### `src/time_integration/do_gravity_hydro.c`
 - `sidm_scatter(timebin)` call, right after the per-timebin `kick_particle` loop, inside the `HIERARCHICAL_GRAVITY` branch. The non-hierarchical branch is explicitly *not* wired (see SIDM TODO) — flagged with a comment rather than silently left blank.
 
-### `Config.sh` / `Makefile`
+### `src/io/logs.c`
+- `open_logfiles()` / `close_logfiles()` — under `#ifdef SIDM_LOG_COLLISIONS`: opens/closes a per-task `sidm_collisions_<ThisTask>.txt` via `FdSidmCollisions`, mirroring the pre-existing `FdDetailed`/`DETAILEDTIMINGS` per-task-file pattern (opened *before* the `if(ThisTask != 0) return;` early-exit most other log files hit, since collisions are detected wherever the initiating particle lives). Writes a `#`-prefixed column header on a fresh (non-restart) start. Closed unconditionally, unlike `FdDetailed` (a pre-existing gap in this function that this new code doesn't repeat).
+
+### `Config.sh` / `Template-Config.sh` / `Makefile`
 - `SIDM` flag; `sidm/sidm_density.o`, `sidm/sidm_tree.o`, `sidm/sidm_scatter.o` build rules; `sidm/sidm.h`, `sidm/sidm_tree.h` in `INCL`.
+- `SIDM_KICK_POSITION_CORRECTION` (off by default) — gates the position-correction + neighbour wake-up fix, SIDM §3.10.
+- `SIDM_LOG_COLLISIONS` (off by default) — gates the collision-only diagnostic logging mode, SIDM §3.11. Both new flags are registered in `Template-Config.sh` (required for `check.py`'s "illegal define macros" build-time validation to accept them) as well as `Config_SIDM.sh`.
 
 ---
 
@@ -218,5 +236,10 @@ The largest single mirror of the `STARS` pattern — roughly 20 distinct touch p
 | `SidmVelDisp` | `sidm_density()`, **after** the bisection loop converges (mean-subtracted) | `DMPS(i).SidmVelDisp` |
 | `SidmNumNgb` | `sidm_density_evaluate()` | `DMPS(i).SidmNumNgb` |
 | Scattering probability `P_ij` | `sidm_scatter_walk()` (local) / `out2particle()` (remote) | transient, in `SidmCandBuf` only |
-| `SidmLastScatterTime`/`SidmScatterFlag` | `sidm_apply_kick_local()` / `sidm_apply_kick_cross_task()` / kick-delivery receive loop | `DMPS(i).Sidm*` |
+| `SidmLastScatterTime`/`SidmScatterFlag`/`SidmScatterCount` | `sidm_apply_kick_local()` / `sidm_apply_kick_cross_task()` / kick-delivery receive loop | `DMPS(i).Sidm*` |
 | `σ/m` in code units | *you*, from `param.txt` `SidmCrossSection` | `All.SidmCrossSection` — see SIDM §3.4 for the conversion |
+| Position correction (`#ifdef SIDM_KICK_POSITION_CORRECTION`) | `sidm_apply_position_correction()`, called from both kick functions and the kick-delivery receive loop | `P[p].Pos` |
+| Neighbour wake-up (`#ifdef SIDM_KICK_POSITION_CORRECTION`) | `sidm_wake_particle()`, same call sites | `P[p].TimeBinGrav` |
+| Collision log (`#ifdef SIDM_LOG_COLLISIONS`) | `sidm_log_collision()`, called from `sidm_scatter()`'s dispatch instead of the kick functions | `sidm_collisions_<task>.txt` via `FdSidmCollisions` |
+| Conservation error, local vs. cross-task | `sidm_check_conservation()` | file-static `sidm_max_{momentum,energy}_error_{local,cross_task}`, reduced/printed in `sidm_scatter()` |
+| Timestep-binding count | `get_timestep_gravity()` (`timestep.c`) | `SidmTimestepChecks`/`SidmTimestepBinding`, reduced/printed in `sidm_scatter()` |
