@@ -148,14 +148,15 @@ under `REFINEMENT_AROUND_BH` and not currently in the Development Guide's flag t
 
 ## Black hole merging (`BH_MERGER` — not mentioned in the Development Guide or Code page at all)
 
-Full mechanism (donor/survivor selection, drain clamp, merge-count bookkeeping) is documented in
-`documentation/source/technical-reference.md` §2.3 (`bh_merger.c`) — worth reading before touching
-either parameter below rather than inferring behaviour from the names.
+Requires `BH_ACTIVE` — enforced at compile time (`Makefile` errors out with "BH_MERGER requires
+BH_ACTIVE" otherwise). Full mechanism (donor/survivor selection, drain clamp, merge-count
+bookkeeping) is documented in `documentation/source/technical-reference.md` §2.3 (`bh_merger.c`) —
+worth reading before touching either parameter below rather than inferring behaviour from the names.
 
-| Parameter | Type | Units | Notes |
-|---|---|---|---|
-| `BhMergerRadiusFactor` | REAL | ⚠️ dimensionless — `merger_radius = BhMergerRadiusFactor × h` | |
-| `BhMergerRadiusCriterion` | STRING | — | e.g. `"HSML"` reproduces old default behaviour exactly, per the comment at `parameters.c:760` — see `enum bh_merger_radius_criterion` in `src/blackholes/bh.h` for the other options. **This is a mandatory tag under `BH_MERGER`** — existing param files need it added explicitly. |
+| Parameter | Required flag(s) | Type | Units | Notes |
+|---|---|---|---|---|
+| `BhMergerRadiusFactor` | `BH_MERGER` (+ `BH_ACTIVE`) | REAL | ⚠️ dimensionless — `merger_radius = BhMergerRadiusFactor × h` | |
+| `BhMergerRadiusCriterion` | `BH_MERGER` (+ `BH_ACTIVE`) | STRING | — | e.g. `"HSML"` reproduces old default behaviour exactly, per the comment at `parameters.c:760` — see `enum bh_merger_radius_criterion` in `src/blackholes/bh.h` for the other options. **This is a mandatory tag under `BH_MERGER`** — existing param files need it added explicitly. |
 
 ## On-the-fly FOF halo / BH seeding (`HALO_SEEDING`)
 
