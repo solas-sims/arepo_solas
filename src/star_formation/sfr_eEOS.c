@@ -70,8 +70,6 @@ void cooling_and_starformation(void)
   double tsfr;
   double egyeff, x;
 
-  double eos_dens_threshold = All.PhysDensThresh;
-
   /* note: assuming FULL ionization */
   double u_to_temp_fac =
       (4 / (8 - 5 * (1 - HYDROGEN_MASSFRAC))) * PROTONMASS / BOLTZMANN * GAMMA_MINUS1 * All.UnitEnergy_in_cgs / All.UnitMass_in_g;
@@ -91,6 +89,15 @@ void cooling_and_starformation(void)
         continue; /* skip cells that have been swallowed or eliminated */
 
       dens = SphP[i].Density;
+
+      double eos_dens_threshold = All.PhysDensThresh;
+#ifdef SF_THRESHOLD_HALO_MASS_DEPENDENT
+      /* only the SF/cooling-regime gate below is halo-mass-dependent; calc_egyeff()'s own
+       * use of All.PhysDensThresh (the shape of the effective equation of state once a cell
+       * is already in that regime) is deliberately left unmodified -- see
+       * documentation/source/sf_threshold_halo_mass.md */
+      eos_dens_threshold *= sf_threshold_halo_mass_factor(i);
+#endif /* #ifdef SF_THRESHOLD_HALO_MASS_DEPENDENT */
 
       dt    = (P[i].TimeBinHydro ? (((integertime)1) << P[i].TimeBinHydro) : 0) * All.Timebase_interval;
       dtime = All.cf_atime * dt / All.cf_time_hubble_a;
@@ -209,6 +216,9 @@ double get_starformation_rate(int i)
       (4 / (8 - 5 * (1 - HYDROGEN_MASSFRAC))) * PROTONMASS / BOLTZMANN * GAMMA_MINUS1 * All.UnitEnergy_in_cgs / All.UnitMass_in_g;
 
   double eos_dens_threshold = All.PhysDensThresh;
+#ifdef SF_THRESHOLD_HALO_MASS_DEPENDENT
+  eos_dens_threshold *= sf_threshold_halo_mass_factor(i);
+#endif /* #ifdef SF_THRESHOLD_HALO_MASS_DEPENDENT */
 
   flag   = 1; /* default is normal cooling */
   egyeff = 0.0;
@@ -219,7 +229,7 @@ double get_starformation_rate(int i)
       egyeff = calc_egyeff(i, SphP[i].Density * All.cf_a3inv, &ne, &x, &tsfr, &factorEVP);
     }
 
-  if(SphP[i].Density * All.cf_a3inv >= All.PhysDensThresh)
+  if(SphP[i].Density * All.cf_a3inv >= eos_dens_threshold)
     if(SphP[i].Utherm <= 1.01 * egyeff || u_to_temp_fac * SphP[i].Utherm <= All.TemperatureThresh)
       flag = 0;
 
@@ -486,7 +496,9 @@ void set_units_sfr(void)
 {
   double meanweight;
 
-  All.OverDensThresh = All.CritOverDensity * All.OmegaBaryon * 3 * All.Hubble * All.Hubble / (8 * M_PI * All.G);
+  /* All.OverDensThresh is already set by set_overdens_thresh(), called from begrun.c
+   * alongside this function for EEOS_SF -- not recomputed here to keep one source of truth
+   * shared with AGORA_SF/JEANS_SF (see starformation.c). */
 
   All.PhysDensThresh = All.CritPhysDensity * PROTONMASS / HYDROGEN_MASSFRAC / All.UnitDensity_in_cgs;
 

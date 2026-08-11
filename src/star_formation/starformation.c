@@ -30,6 +30,8 @@
  *                  istar, MyDouble mass_of_star)
  *                void make_star(int idx, int i, double prob, MyDouble
  *                  mass_of_star, double *sum_mass_stars)
+ *                double sf_threshold_halo_mass_factor(int i)
+ *                void set_overdens_thresh(void)
  *
  * \par Major modifications and contributions:
  *
@@ -57,6 +59,74 @@ static int tot_stars_converted;     /*!< global number of gas cells converted in
 static int altogether_spawned;      /*!< local number of particles spawned in the time step */
 static int tot_altogether_spawned;  /*!< global number of particles spawned in the time step */
 static double cum_mass_stars = 0.0; /*!< cumulative mass of stars created in the time step (global value) */
+
+#if defined(EEOS_SF) || defined(AGORA_SF) || defined(JEANS_SF)
+/*! \brief Set All.OverDensThresh from All.CritOverDensity.
+ *
+ *  Shared by all three SF schemes: a comoving-overdensity floor (relative to the mean
+ *  baryon density) below which star formation is never allowed, regardless of whether the
+ *  scheme's own local density/temperature (or Jeans) gate is otherwise satisfied. Without
+ *  this, a scheme using comparatively permissive local thresholds (as AGORA_SF/JEANS_SF
+ *  typically do relative to EEOS_SF) can let diffuse, cosmologically-unvirialized gas
+ *  transiently satisfy its local criterion early in a run, forming stars well before any
+ *  real structure has collapsed. EEOS_SF has always guarded against this
+ *  (All.ComovingIntegrationOn && dens < All.OverDensThresh); AGORA_SF and JEANS_SF did not
+ *  until this was added, and needed it in practice once run with less conservative
+ *  parameters for a cosmological box.
+ *
+ *  Only meaningful together with All.ComovingIntegrationOn -- callers should still check
+ *  that themselves alongside the resulting All.OverDensThresh, since this function only
+ *  sets the value and does not know whether the run is comoving.
+ *
+ *  \return void
+ */
+void set_overdens_thresh(void)
+{
+  All.OverDensThresh = All.CritOverDensity * All.OmegaBaryon * 3 * All.Hubble * All.Hubble / (8 * M_PI * All.G);
+}
+#endif /* #if defined(EEOS_SF) || defined(AGORA_SF) || defined(JEANS_SF) */
+
+#ifdef SF_THRESHOLD_HALO_MASS_DEPENDENT
+#ifndef HALO_SEEDING
+#error "SF_THRESHOLD_HALO_MASS_DEPENDENT requires HALO_SEEDING (needs SphP[].HostHaloMass, refreshed each on-the-fly FOF pass)"
+#endif /* #ifndef HALO_SEEDING */
+
+/*! \brief Multiplicative factor for the active star-formation scheme's own density/mass
+ *  threshold, based on a gas cell's on-the-fly FOF host halo mass.
+ *
+ *  Deliberately scheme-agnostic: each SF scheme (EEOS_SF/AGORA_SF/JEANS_SF) has its own
+ *  differently-named, differently-unit'd threshold quantity (PhysDensThresh,
+ *  NumberDensThreshold, a Jeans-length/mass criterion). Rather than duplicating this
+ *  per scheme, each scheme's own star-formation criterion multiplies its own threshold by
+ *  this factor at the point of comparison, so the halo-mass dependence itself lives in one
+ *  place regardless of which scheme is compiled in.
+ *
+ *  This is a crude, single-knob stand-in for physics not otherwise modelled here -- e.g. a
+ *  background UV/Lyman-Werner radiation field suppressing cooling/self-shielding in small
+ *  halos, or a Pop III -> Pop II transition in the effective collapse threshold -- not a
+ *  first-principles calculation. It is a hard step at All.MinHaloMassForNormalSF, not a
+ *  smooth transition, and depends on halo mass alone (not metallicity, even though the
+ *  Pop III/Pop II motivation is more standardly metallicity-based in the literature). See
+ *  documentation/source/sf_threshold_halo_mass.md for the full rationale and what a
+ *  collaborator would need to change to improve on either of those simplifications.
+ *
+ *  SphP[i].HostHaloMass <= 0 (cell not currently in any FOF group) always returns 1 --
+ *  suppression is specifically an in-halo self-shielding question, not one that applies to
+ *  general diffuse gas.
+ *
+ *  \param[in] i Index in SphP/P (must be a gas cell).
+ *
+ *  \return All.LowMassHaloThresholdFactor if the cell's host halo mass is in
+ *          (0, All.MinHaloMassForNormalSF), otherwise 1.
+ */
+double sf_threshold_halo_mass_factor(int i)
+{
+  if(SphP[i].HostHaloMass > 0 && SphP[i].HostHaloMass < All.MinHaloMassForNormalSF)
+    return All.LowMassHaloThresholdFactor;
+
+  return 1.0;
+}
+#endif /* #ifdef SF_THRESHOLD_HALO_MASS_DEPENDENT */
 
 #ifdef EEOS_SF
 static int sfr_init_called = 0;
@@ -352,7 +422,7 @@ void convert_cell_into_star(int i, double birthtime)
   P[i].SID = NumStars;
   SP[NumStars].PID = i;
 #ifdef METALS 
-  SP[NumStars].Metallicity = SphP[i].GasMetallicity;
+  SP[NumStars].Metallicity = SphP[i].GasMetals / P[i].Mass;
 #endif 
 #endif 
 
@@ -444,7 +514,7 @@ void spawn_star_from_cell(int igas, double birthtime, int istar, MyDouble mass_o
   P[istar].SID = NumStars;
   SP[NumStars].PID = istar;
 #ifdef METALS 
-  SP[NumStars].Metallicity = SphP[igas].GasMetallicity;
+  SP[NumStars].Metallicity = SphP[igas].GasMetals / P[igas].Mass;
 #endif
 #endif
 

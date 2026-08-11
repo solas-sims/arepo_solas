@@ -209,11 +209,15 @@ void individual_starbystar_formation(void)
   sf_starbystar();
   sf_massdrain();
 
-  /* apply drain and finalize heavy stars */
+  /* Apply drain and finalize heavy stars */
   for(i = 0; i < NumStars; i++)
     {
-      if(PPS(i).Mass == 0 && SP[i].MassOfStar > 0) /* heavy star */
-        PPS(i).Mass = SP[i].MassOfStar;
+      /* Heavy star */
+      if(PPS(i).Mass == 0 && SP[i].MassOfStar > 0) 
+        {
+          PPS(i).Mass = SP[i].MassOfStar;
+          SP[i].Metallicity /= PPS(i).Mass;
+        }
     }
       
   for(idx = 0; idx < TimeBinsHydro.NActiveParticles; idx++)
@@ -369,7 +373,7 @@ static void spawn_light(int igas, double birthtime, int istar, MyDouble mass_of_
   SP[NumStars].PID = istar;
 
 #ifdef METALS 
-  SP[NumStars].Metallicity = SphP[igas].GasMetallicity;
+  SP[NumStars].Metallicity = SphP[igas].GasMetals / P[igas].Mass;
 #endif
 
 #ifdef STAR_FEEDBACK_ACTIVE

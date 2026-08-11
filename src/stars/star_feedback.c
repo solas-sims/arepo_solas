@@ -22,6 +22,9 @@ struct Feedback_Kick
 
 #ifdef WINDS
   MyDouble DeltaMass;
+#if GRACKLE_CHEMISTRY >= 1
+  MyDouble DeltaChem[GRACKLE_SPECIES_NUMBER];
+#endif
 #ifdef METALS
   MyDouble DeltaMetals;
 #endif
@@ -31,6 +34,9 @@ struct Feedback_Kick
 
 #ifdef SUPERNOVAE
   MyDouble SN_DeltaMass;
+#if GRACKLE_CHEMISTRY >= 1
+  MyDouble SN_DeltaChem[GRACKLE_SPECIES_NUMBER];
+#endif
 #ifdef METALS
   MyDouble SN_DeltaMetals;
 #endif
@@ -45,6 +51,10 @@ static void apply_kick(int j, const struct Feedback_Kick *Kick)
 #ifdef WINDS
   SphP[j].StarMassFeed += Kick->DeltaMass;
   All.StarFeedbackLocal[0] += Kick->DeltaMass;
+#if GRACKLE_CHEMISTRY >= 1
+  for(int s = 0; s < GRACKLE_SPECIES_NUMBER; s++)
+    SphP[j].StarChemFeed[s] += Kick->DeltaChem[s];
+#endif
 #ifdef METALS
   SphP[j].StarMetalsFeed += Kick->DeltaMetals;
   All.StarFeedbackLocal[1] += Kick->DeltaMetals;
@@ -59,6 +69,10 @@ static void apply_kick(int j, const struct Feedback_Kick *Kick)
 #ifdef SUPERNOVAE
   SphP[j].StarMassFeed += Kick->SN_DeltaMass;
   All.StarFeedbackLocal[0] += Kick->SN_DeltaMass;
+#if GRACKLE_CHEMISTRY >= 1
+  for(int s = 0; s < GRACKLE_SPECIES_NUMBER; s++)
+    SphP[j].StarChemFeed[s] += Kick->SN_DeltaChem[s];
+#endif
 #ifdef METALS
   SphP[j].StarMetalsFeed += Kick->SN_DeltaMetals;
   All.StarFeedbackLocal[1] += Kick->SN_DeltaMetals;
@@ -126,7 +140,7 @@ static void SN_compute(int ev, int h, double alpha, double beta, double gamma, d
   Mechanical_Feedback *MechanicalFeedback = &MechanicalFeedbackData->MechanicalFeedback;
 
   double E_SN  = MechanicalFeedback->SN_EnergyInject;
-  double E51 = E_SN * All.cf_UnitEnergy_in_cgs / 1.0e51;
+  double E51 = E_SN * All.cf_UnitEnergy_in_cgs / SN_ENERGY;
   
   double n_H = HYDROGEN_MASSFRAC * NgbsDensity * All.cf_UnitDensity_in_cgs / PROTONMASS;
   
@@ -171,7 +185,7 @@ static void Wind_feedback_host(int i, int ev, int h, int mode)
 /* 
  * Sedov/cooling radius check: is the host cell able to resolve the
  * pressure-driven expansion of this SN?
- * Kim & Ostriker (2015)-> r_SN = 22.6 pc * (E_SN / 1e51 erg)^0.29 * (rho_h / (1.4*m_p) / cm^-3)^(-0.42) 
+ * Kim & Ostriker (2015)-> r_SN = 22.6 pc * (E_SN / SN_ENERGY erg)^0.29 * (rho_h / (1.4*m_p) / cm^-3)^(-0.42) 
  */
 static int SN_feedback_radius(int i, int ev, int h)
 {
@@ -182,7 +196,7 @@ static int SN_feedback_radius(int i, int ev, int h)
   
   double E_SN = MechanicalFeedback->SN_EnergyInject;
  
-  double E51 = E_SN * All.cf_UnitEnergy_in_cgs / 1.0e51;
+  double E51 = E_SN * All.cf_UnitEnergy_in_cgs / SN_ENERGY;
   
   double rho = (P[i].Mass + SphP[i].StarMassFeed) / SphP[i].Volume;
   double rho_cgs = rho * All.cf_UnitDensity_in_cgs;
@@ -234,6 +248,10 @@ static void SN_feedback_host(int i, int ev, int h, int mode)
   Kick.CellIndex = i;
 
   Kick.SN_DeltaMass = m_ej;
+#if GRACKLE_CHEMISTRY >= 1
+  Kick.SN_DeltaChem[CHEM_HII] = MechanicalFeedback->SN_HLoss;
+  Kick.SN_DeltaChem[CHEM_HeIII] = MechanicalFeedback->SN_HeLoss;
+#endif
 #ifdef METALS
   Kick.SN_DeltaMetals = MechanicalFeedback->SN_MetalsLoss;
 #endif
@@ -521,27 +539,49 @@ void star_feedback(void)
           double p_SN = 0.0;
           double dU_SN_th = 0.0;
 
-          /* Ejecta mass and internal energy -> cold ejecta default */
+          /* Ejecta mass */
           double m_ej = MechanicalFeedback->SN_MassLoss;
+
+          /* Ejecta internal energy; cold ejecta default */
           double U_ej = 0.0;
+
+          /* Approximate SN shell mass */
+          double E_SN = MechanicalFeedback->SN_EnergyInject;
+
+          double E51 = E_SN * All.cf_UnitEnergy_in_cgs / SN_ENERGY;
+
+          double rho = (P[i].Mass + SphP[i].StarMassFeed) / SphP[i].Volume;
+          double rho_cgs = rho * All.cf_UnitDensity_in_cgs;
+
+          double n_cgs = rho_cgs / (1.4 * PROTONMASS);
+
+          /* Shell mass from Kim & Ostriker (2015) */
+          double Msh = (1680.0 / All.cf_UnitMass_in_Msun) * pow(E51, 0.87) * pow(n_cgs, -0.26);
 
           /* Host swept mass and internal energy */
           double m_h = P[i].Mass + SphP[i].StarMassFeed;
-          
+
+          double shell_sweep_frac = fmin(All.SN_HostShellSweepFrac, 0.9);
+          double dm_h = shell_sweep_frac * fmin(Msh, m_h);
+          dm_h = fmin(dm_h, m_h - 0.1 * P[i].Mass);
+          dm_h = fmax(dm_h, 0.0);
+
+#if GRACKLE_CHEMISTRY >= 1
+          double dmChem_h[GRACKLE_SPECIES_NUMBER];
+            for(int s = 0; s < GRACKLE_SPECIES_NUMBER; s++)
+              dmChem_h[s] = dm_h * (SphP[i].GrackleSpeciesConserved(GRACKLE_SPECIES_INDEX + s) + SphP[i].StarChemFeed[s]) / m_h;
+#endif
+
+#ifdef METALS
+          double dmZ_h = dm_h * (SphP[i].GasMetals + SphP[i].StarMetalsFeed) / m_h;
+#endif
+
           double p_h[3], v_h[3];
           for(k = 0; k < 3; k++)
             {
               p_h[k] = (SphP[i].Momentum[k] + SphP[i].StarMomentumFeed[k]);
               v_h[k] = (SphP[i].Momentum[k] + SphP[i].StarMomentumFeed[k]) / m_h;
             }
-          
-          double shell_sweep_frac = fmin(All.SNHostShellSweepFrac, 0.9);
-          double dm_h = fmin(shell_sweep_frac * m_h, m_h - 0.1 * P[i].Mass); 
-          dm_h = fmax(dm_h, 0.0);  
-
-#ifdef METALS
-          double dmZ_h = dm_h * (SphP[i].GasMetals + SphP[i].StarMetalsFeed) / m_h;
-#endif
 
           double K_h = (p_h[0]*p_h[0] + p_h[1]*p_h[1] + p_h[2]*p_h[2]) / (2 * m_h);
           double U_h = SphP[i].Energy + SphP[i].StarEnergyFeed - K_h;
@@ -614,9 +654,9 @@ void star_feedback(void)
                   /* Pre-kick momentum: neighbour + advected ejecta (at v_star) + advected swept host (at v_host) */
                   double ptilde[3];
                   for(k = 0; k < 3; k++)
-                    ptilde[k] = mj * vj[k] + sqrtsq_wbar * (m_ej * MechanicalFeedback->StarVelocity[k] + dm_h * v_h[k]);
+                    ptilde[k] = mj * vj[k] + (m_ej * MechanicalFeedback->StarVelocity[k] + dm_h * v_h[k]) * sqrtsq_wbar;
 
-                  double mfj = mj + sqrtsq_wbar * m_feed;
+                  double mfj = mj + m_feed * sqrtsq_wbar;
                   double sq_ptilde = ptilde[0]*ptilde[0] + ptilde[1]*ptilde[1] + ptilde[2]*ptilde[2];
                   double bw_dot_pt = wbar[0]*ptilde[0] + wbar[1]*ptilde[1] + wbar[2]*ptilde[2];
 
@@ -626,7 +666,7 @@ void star_feedback(void)
 
                   /* Kinetic energy dissipated in the inelastic merge of the
                    * (neighbour, ejecta, host) streams; thermalised in place. */
-                  double ke_streams = 0.5 * mj * sq_vj + 0.5 * sqrtsq_wbar * m_ej * sq_vstar + 0.5 * sqrtsq_wbar * dm_h * sq_vh;
+                  double ke_streams = 0.5 * mj * sq_vj + 0.5 * m_ej * sqrtsq_wbar * sq_vstar + 0.5 * dm_h * sqrtsq_wbar * sq_vh;
 
                   double D = ke_streams - 0.5 * sq_ptilde / mfj;
                   
@@ -657,8 +697,8 @@ void star_feedback(void)
                 }
 
               /* gamma = dU_SN,th - E_SN, then solve the quadratic for p_SN */
-              dU_SN_th = SN_F_THERMAL * MechanicalFeedback->SN_EnergyInject;
-              double gamma = dU_SN_th - MechanicalFeedback->SN_EnergyInject;
+              dU_SN_th = SN_F_THERMAL * E_SN;
+              double gamma = dU_SN_th - E_SN;
 
               SN_compute(ev, h, alpha, beta, gamma, NgbsDensity, NgbsMetallicity, &p_SN);
             }
@@ -691,6 +731,10 @@ void star_feedback(void)
               if(flag_wind && !flag_wind_host)
                 {
                   Kick.DeltaMass = MechanicalFeedback->MassLoss * sqrtsq_wbar;
+#if GRACKLE_CHEMISTRY >= 1
+                  Kick.DeltaChem[CHEM_HI] = MechanicalFeedback->HLoss * sqrtsq_wbar;
+                  Kick.DeltaChem[CHEM_HeI] = MechanicalFeedback->HeLoss * sqrtsq_wbar;
+#endif
 #ifdef METALS
                   Kick.DeltaMetals = MechanicalFeedback->MetalsLoss * sqrtsq_wbar;
 #endif    
@@ -712,14 +756,20 @@ void star_feedback(void)
               if(flag_sn && !flag_sn_host)
                 {
                   /* Advected mass = ejecta + swept host, shared by |wbar| */
-                  Kick.SN_DeltaMass = sqrtsq_wbar * m_feed;
+                  Kick.SN_DeltaMass = m_feed * sqrtsq_wbar;
+#if GRACKLE_CHEMISTRY >= 1
+                  for(int s = 0; s < GRACKLE_SPECIES_NUMBER; s++)
+                    Kick.SN_DeltaChem[s] = dmChem_h[s] * sqrtsq_wbar;
+                  Kick.SN_DeltaChem[CHEM_HII] += MechanicalFeedback->SN_HLoss * sqrtsq_wbar;
+                  Kick.SN_DeltaChem[CHEM_HeIII] += MechanicalFeedback->SN_HeLoss * sqrtsq_wbar;
+#endif 
 #ifdef METALS
-                  Kick.SN_DeltaMetals = sqrtsq_wbar * (MechanicalFeedback->SN_MetalsLoss + dmZ_h);
+                  Kick.SN_DeltaMetals = (MechanicalFeedback->SN_MetalsLoss + dmZ_h) * sqrtsq_wbar ;
 #endif
                   /* Momentum = advected (ejecta @ v_star + host @ v_host)
                    * + directed energy-conserving kick p_SN * wbar.          */
                   for(k = 0; k < 3; k++)
-                    Kick.SN_DeltaP[k] = sqrtsq_wbar * (m_ej * MechanicalFeedback->StarVelocity[k] + dm_h * v_h[k])
+                    Kick.SN_DeltaP[k] = (m_ej * MechanicalFeedback->StarVelocity[k] + dm_h * v_h[k]) * sqrtsq_wbar
                     + p_SN * wbar[k];
 
                   /* Total energy = kinetic change + internal-energy gain.
@@ -734,7 +784,7 @@ void star_feedback(void)
                   double sq_pf = pf[0]*pf[0] + pf[1]*pf[1] + pf[2]*pf[2];
 
                   double DKE = sq_pf / (2.0 * SN_mfj[f]) - SN_KEj[f];
-                  double dU  = sqrtsq_wbar * (U_ej + dU_h + dU_SN_th) + SN_Dj[f];
+                  double dU = (U_ej + dU_h + dU_SN_th) * sqrtsq_wbar + SN_Dj[f];
 
                   Kick.SN_DeltaE = DKE + dU;
                 }
@@ -770,6 +820,10 @@ void star_feedback(void)
               Kick_h.CellIndex = i;
 
               Kick_h.SN_DeltaMass = -dm_h;
+#if GRACKLE_CHEMISTRY >= 1
+              for(int s = 0; s < GRACKLE_SPECIES_NUMBER; s++)
+                Kick_h.SN_DeltaChem[s] = -dmChem_h[s];
+#endif
 #ifdef METALS
               Kick_h.SN_DeltaMetals = -dmZ_h;
 #endif

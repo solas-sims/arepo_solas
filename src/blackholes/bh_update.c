@@ -46,7 +46,7 @@ void bh_kernel(double u, double hinv3, double hinv4, double *wk, double *dwk)
 
 integertime bh_timestep(int i)
 { 
-  /* Neighbours Minimum Bin */
+  /* Neighbours minimum bin */
   double dt_ngbmin = (BhP[i].NgbsMinBin ? (((integertime)1) << BhP[i].NgbsMinBin) : 0) * All.Timebase_interval;
   
   double dt;
@@ -111,9 +111,34 @@ void bh_reconstruct_timebins(void)
   
   for(i = 0; i < NumBhs; i++)
     {
-      bin = BhP[i].TimeBinBh;
-      if(bin >= TIMEBINS)
+      /* skip BHs killed (e.g. by bh_merger()) since the last rebuild; their P[]/BhP[]
+       * slots persist until the next domain decomposition sweeps them up */
+      if(PPB(i).Mass == 0 && PPB(i).ID == 0)
         continue;
+
+      bin = BhP[i].TimeBinBh;
+      if(bin < 0 || bin >= TIMEBINS)
+        {
+          /* TIMEBINS is the established "inactive/parked" sentinel elsewhere in this
+           * codebase (see star_reconstruct_timebins()/deactivate_star()); a negative bin
+           * has no such meaning and indicates genuinely unexpected state (ASan caught this
+           * as a global-buffer-overflow read into TimeBinsBh.TimeBinCount[] via a stale
+           * BhP[i].TimeBinBh). Confirmed via production runs to be state baked into the
+           * restart checkpoint itself (predates any swap this run performs), not something
+           * introduced live -- so *skipping* this BH here would orphan it from the timebin
+           * linked list permanently: it would never again be picked up by
+           * bh_update_list_of_active_particles(), silently freezing its gravity/accretion
+           * out for the rest of the run. Reset to bin 0 (the same default a freshly seeded
+           * BH gets, see spawn_black_hole_from_cell()) and fall through to the normal
+           * insertion below instead, so it resumes being tracked -- self-healing rather than
+           * permanently dropping the particle. Flagged loudly since the underlying cause
+           * (how TimeBinBh went negative in the first place) is still unexplained. */
+          printf("WARNING: BH_UPDATE: BhP[%d] (ID=%llu) has invalid TimeBinBh=%d (valid range [0,%d)) -- resetting to bin 0\n", i,
+                 (unsigned long long)PPB(i).ID, bin, TIMEBINS);
+          myflush(stdout);
+          bin             = 0;
+          BhP[i].TimeBinBh = 0;
+        }
 
       if(TimeBinsBh.TimeBinCount[bin] > 0)
         {
@@ -178,6 +203,28 @@ void bh_perform_end_of_step_physics(void)
         continue;
 
       double original_mass = P[i].Mass;
+
+      /* each BH caps its own contribution to BhMassDrain at 0.9x the cell's mass, but
+       * multiple BHs sharing this cell as a neighbour add to the same accumulator without
+       * seeing each other's contributions, so the sum can still exceed the cell's mass.
+       * Guard against P[i].Mass itself already being non-positive (corrupted upstream, e.g.
+       * by the mesh flux update): the 0.9x-of-current-mass clamp below only makes sense for
+       * a positive mass -- applied to a negative one it flips sign and UNDER-clamps, letting
+       * the drain shrink the negative value's magnitude instead of being rejected outright. */
+      if(P[i].Mass > 0)
+        {
+          if(SphP[i].BhMassDrain > 0.9 * P[i].Mass)
+            SphP[i].BhMassDrain = 0.9 * P[i].Mass;
+        }
+      else
+        {
+          if(SphP[i].BhMassDrain != 0)
+            printf("BH_ACCRETION: WARNING Task %d: cell ID=%llu already has Mass=%g <= 0 before BhMassDrain=%g is applied "
+                   "-- corruption upstream of bh_perform_end_of_step_physics(), not from accretion draining\n",
+                   ThisTask, (unsigned long long)P[i].ID, P[i].Mass, SphP[i].BhMassDrain);
+
+          SphP[i].BhMassDrain = 0;
+        }
 
       P[i].Mass -= SphP[i].BhMassDrain;
 

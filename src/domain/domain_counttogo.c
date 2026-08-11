@@ -65,7 +65,7 @@ int domain_countToGo(void)
 #ifdef SIDM
       toGoDM[n] = 0;
 #endif
-    
+
 #ifdef BLACKHOLES
       toGoBhs[n] = 0;
 #endif

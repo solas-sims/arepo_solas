@@ -219,7 +219,7 @@ static int bh_swallow_evaluate(int target, int mode, int threadid)
   accretion = target_data->Accretion;
   h = target_data->Hsml;
 
-  //MyDouble hinv, hinv3, hinv4, u, dwk;
+  MyDouble hinv, hinv3, hinv4, u, dwk;
 
   //h2   = h * h;
   //hinv = 1.0 / h;

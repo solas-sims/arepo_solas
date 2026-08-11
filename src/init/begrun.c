@@ -148,12 +148,53 @@ void begrun1(void)
   gsl_rng_set(random_generator, 42 + ThisTask);
   gsl_rng_set(random_generator_aux, 31452 + ThisTask);
 
+#ifdef STAR_PARTICLES
+  /* IMF tables and RNG for star-particle mass sampling: these depend only on
+   * compile-time constants and All.IMF (already read by read_parameter_file()
+   * above), not on particle data, so set them up here unconditionally rather
+   * than in init(), which is skipped entirely when RestartFlag==1 -- leaving
+   * norm/bin_imf/rng permanently zero/NULL on every restart otherwise. */
+  if(ThisTask == 0)
+    {
+      build_imf_cdf();
+
+#if defined(STAR_PARTICLES) && STAR_PARTICLES < 2
+      setup_mass_bins();
+#endif
+
+#if STAR_PARTICLES == 0
+      setup_imf_integrals();
+#endif
+    }
+  MPI_Bcast(cdf_masses, N_CDF_BINS + 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+  MPI_Bcast(cdf_values, N_CDF_BINS + 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+
+#if defined(STAR_PARTICLES) && STAR_PARTICLES < 2
+  MPI_Bcast(StarMeanMassInBins, NBINS, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+#endif
+
+#if STAR_PARTICLES == 0
+  MPI_Bcast(&norm, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+  MPI_Bcast(bin_imf, NBINS, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+
+  rng = gsl_rng_alloc(gsl_rng_mt19937);
+  gsl_rng_set(rng, ThisTask + 1);
+#endif
+#endif /* #ifdef STAR_PARTICLES */
+
   timebins_init(&TimeBinsHydro, "Hydro", &All.MaxPartSph);
   timebins_init(&TimeBinsGravity, "Gravity", &All.MaxPart);
 
-#ifdef STAR_FEEDBACK_ACTIVE 
+#ifdef STAR_FEEDBACK_ACTIVE
   timebins_init(&TimeBinsStar, "Star", &All.MaxPartStars);
-#endif 
+
+  /* Loaded from a static input file, independent of restart state, so (like
+   * the IMF tables above) this must happen here rather than in init(), which
+   * is skipped on restart -- otherwise Z_VALUES/M_VALUES/N/Age stay NULL for
+   * the life of a restarted run. */
+  mpi_printf("BEGRUN: Loading star evolution tables\n");
+  load_star_tables(All.StarTablesFile);
+#endif
 
 #ifdef BH_ACTIVE
   timebins_init(&TimeBinsBh, "Bh", &All.MaxPartBhs);
@@ -252,15 +293,16 @@ void begrun2(void)
       All.Ti_nextoutput = find_next_outputtime(All.Ti_Current);
   }
 
+#ifdef HALO_SEEDING
+  if(RestartFlag != 1) /* when restarting from restart files, All.NextTimeOfHaloFinding is restored from them */
+    All.NextTimeOfHaloFinding = All.TimeOfFirstHaloFinding;
+#endif /* #ifdef HALO_SEEDING */
+
   All.TimeLastRestartFile = CPUThisRun;
 
 #ifdef REDUCE_FLUSH
   All.FlushLast = CPUThisRun;
 #endif /* #ifdef REDUCE_FLUSH */
-
-#ifdef FIND_HALOS
-  All.NextTimeOfHaloFinding=All.TimeOfFirstHaloFinding;
-#endif
 
 #if defined(FORCETEST) && defined(FORCETEST_TESTFORCELAW)
   gravity_forcetest_testforcelaw();
@@ -317,6 +359,10 @@ void set_units(void)
 
       mpi_printf("BEGRUN: MinEgySpec set to %g based on MinGasTemp=%g\n", All.MinEgySpec, All.MinGasTemp);
     }
+
+#if defined(EEOS_SF) || defined(AGORA_SF) || defined(JEANS_SF)
+  set_overdens_thresh();
+#endif /* #if defined(EEOS_SF) || defined(AGORA_SF) || defined(JEANS_SF) */
 
 #if defined EEOS_SF
   set_units_sfr();

@@ -18,6 +18,7 @@ REGULARIZE_MESH_FACE_ANGLE               # Use maximum face angle as roundness c
 #--------------------------------------- Gravity softening
 NSOFTTYPES=4                            # Number of different softening values to which particle types can be mapped.
 
+INPUT_IN_DOUBLEPRECISION
 
 #--------------------------------------- output options
 HAVE_HDF5                                # needed when HDF5 I/O support is desired (recommended)

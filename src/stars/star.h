@@ -20,6 +20,21 @@
 extern int NumStars;
 
 #ifdef STAR_FEEDBACK_ACTIVE
+/* Lowest stellar mass (in Msolar) which contributes to feedback */
+#define LOWEST_MASS_FEEDBACK 2 
+/* Lowest stellar mass (in Msolar) which explodes as an SN */
+#define LOWEST_MASS_SN 8
+
+#define STAR_MS 0
+#define STAR_SN 1
+#define STAR_POST_SN 2
+
+#define STAR_UNBORN 0
+#define STAR_ACTIVE 1
+#define STAR_INACTIVE (-1)  
+
+#define SN_ENERGY 1.0e51
+
 extern struct TimeBinData TimeBinsStar;
 
 typedef struct Star_Interpolate
@@ -29,6 +44,10 @@ typedef struct Star_Interpolate
 
 #ifdef WINDS
   MyDouble MassLossRate;
+#if GRACKLE_CHEMISTRY >= 1
+  MyDouble HLossRate;
+  MyDouble HeLossRate;
+#endif
 #ifdef METALS
   MyDouble MetalsLossRate;
 #endif
@@ -41,6 +60,10 @@ typedef struct Star_Interpolate
 
 #ifdef SUPERNOVAE
   MyDouble SN_MassLoss;
+#if GRACKLE_CHEMISTRY >= 1
+  MyDouble SN_HLoss;
+  MyDouble SN_HeLoss;
+#endif
 #ifdef METALS
   MyDouble SN_MetalsLoss;
 #endif
@@ -51,13 +74,24 @@ typedef struct Star_Interpolate
 typedef struct Star_Feedback
 {
 #if defined(TREE_BASED_TIMESTEPS) && defined(SUPERNOVAE)
-  double TimeSN;
+  MyDouble TimeToSN;
+  MyDouble NextSNEnergy;
 #endif
-  
-  int Stage; // 0:preSN, 1:SN, 2:postSN
+
+  /* 
+    STAR_MS: Main sequence, STAR_SN: Supernova (if any), STAR_POST_SN: After main sequence/Supernova
+  */  
+  int Stage; 
+
+  /* 1: Active, -1: Inactive */
+  int State;
 
 #ifdef WINDS
   MyDouble MassLoss;
+#if GRACKLE_CHEMISTRY >= 1
+  MyDouble HLoss;
+  MyDouble HeLoss;
+#endif
 #ifdef METALS
   MyDouble MetalsLoss;
 #endif
@@ -70,6 +104,10 @@ typedef struct Star_Feedback
 
 #ifdef SUPERNOVAE
   MyDouble SN_MassLoss;
+#if GRACKLE_CHEMISTRY >= 1
+  MyDouble SN_HLoss;
+  MyDouble SN_HeLoss;
+#endif
 #ifdef METALS
   MyDouble SN_MetalsLoss;
 #endif
@@ -84,6 +122,10 @@ typedef struct Mechanical_Feedback
 
 #ifdef WINDS 
   MyDouble MassLoss;
+#if GRACKLE_CHEMISTRY >= 1
+  MyDouble HLoss;
+  MyDouble HeLoss;
+#endif
 #ifdef METALS
   MyDouble MetalsLoss;
 #endif
@@ -96,6 +138,10 @@ typedef struct Mechanical_Feedback
 
 #ifdef SUPERNOVAE
   MyDouble SN_MassLoss;
+#if GRACKLE_CHEMISTRY >= 1
+  MyDouble SN_HLoss;
+  MyDouble SN_HeLoss;
+#endif
 #ifdef METALS
   MyDouble SN_MetalsLoss;
 #endif
@@ -147,19 +193,29 @@ typedef struct Star_Particle_Data
 #endif
 
 #if defined(TREE_BASED_TIMESTEPS) && defined(SUPERNOVAE)
-  MyDouble TimeSN_yr;
+  MyDouble TimeToSN;
+  MyDouble NextSNEnergy;
 #endif
 
 #ifdef STAR_FEEDBACK_ACTIVE
-  int Active;
-  int WithFeedback;
+  /* 
+    Permanent flag
+    STAR_UNBORN: before activation, STAR_ACTIVE: post activation, STAR_INACTIVE: inactive
+  */  
+  int Active; 
+  /* Per timestep-> 0: no feedback, 1: feedback (of any type) */
+  int WithFeedback; 
+  
   MyDouble Hsml;
+  int DensityFlag;
   MyDouble NgbsMass;
   MyDouble NgbsVolume;
   int HostHydroBin;
-  int DensityFlag;
   signed char TimeBinStar;
-  MyDouble PhysicalAge_yr;
+  
+  MyDouble Age;
+  MyDouble Birthtime;
+  
   Mechanical_Feedback MechanicalFeedback;
 #endif
 } Star_Particle_Data;

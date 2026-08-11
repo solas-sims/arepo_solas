@@ -562,11 +562,11 @@ double compute_mu(int i)
 {
   /* Level 1: atomic H and He */
 #if GRACKLE_CHEMISTRY >= 1
-  double XHI = SphP[i].GrackleSpecies(GRACKLE_HI);
-  double XHII = SphP[i].GrackleSpecies(GRACKLE_HII);
-  double XHeI = SphP[i].GrackleSpecies(GRACKLE_HeI);
-  double XHeII = SphP[i].GrackleSpecies(GRACKLE_HeII);
-  double XHeIII = SphP[i].GrackleSpecies(GRACKLE_HeIII);
+  double XHI = SphP[i].GrackleSpeciesConserved(GRACKLE_HI) / P[i].Mass;
+  double XHII = SphP[i].GrackleSpeciesConserved(GRACKLE_HII) / P[i].Mass;
+  double XHeI = SphP[i].GrackleSpeciesConserved(GRACKLE_HeI) / P[i].Mass;
+  double XHeII = SphP[i].GrackleSpeciesConserved(GRACKLE_HeII) / P[i].Mass;
+  double XHeIII = SphP[i].GrackleSpeciesConserved(GRACKLE_HeIII) / P[i].Mass;
 #else
   /* Fall back to fully neutral cosmic abundances */
   double XHI = HYDROGEN_MASSFRAC;
@@ -578,9 +578,9 @@ double compute_mu(int i)
 
   /* Level 2: molecular H and H- */
 #if GRACKLE_CHEMISTRY >= 2
-  double XH2I = SphP[i].GrackleSpecies(GRACKLE_H2I);
-  double XH2II = SphP[i].GrackleSpecies(GRACKLE_H2II);
-  double XHM = SphP[i].GrackleSpecies(GRACKLE_HM);
+  double XH2I = SphP[i].GrackleSpeciesConserved(GRACKLE_H2I) / P[i].Mass;
+  double XH2II = SphP[i].GrackleSpeciesConserved(GRACKLE_H2II) / P[i].Mass;
+  double XHM = SphP[i].GrackleSpeciesConserved(GRACKLE_HM) / P[i].Mass;
 #else
   double XH2I = 0.0;
   double XH2II = 0.0;
@@ -589,9 +589,9 @@ double compute_mu(int i)
 
   /* Level 3: deuterium species */
 #if GRACKLE_CHEMISTRY >= 3
-  double XDI = SphP[i].GrackleSpecies(GRACKLE_DI);
-  double XDII = SphP[i].GrackleSpecies(GRACKLE_DII);
-  double XHDI = SphP[i].GrackleSpecies(GRACKLE_HDI);
+  double XDI = SphP[i].GrackleSpeciesConserved(GRACKLE_DI) / P[i].Mass;
+  double XDII = SphP[i].GrackleSpeciesConserved(GRACKLE_DII) / P[i].Mass;
+  double XHDI = SphP[i].GrackleSpeciesConserved(GRACKLE_HDI) / P[i].Mass;
 #else
   double XDI = 0.0;
   double XDII = 0.0;
@@ -609,7 +609,7 @@ double compute_mu(int i)
 
 /* Metals, approximated as 16 m_H */
 #ifdef METALS
-  double Z = SphP[i].GasMetallicity;
+  double Z = SphP[i].GasMetals / P[i].Mass;
 #else
   double Z = 0; 
 #endif

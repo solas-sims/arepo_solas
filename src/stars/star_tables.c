@@ -10,6 +10,9 @@ int M_COUNT = 0;
 
 double *Z_VALUES = NULL;
 double *M_VALUES = NULL;
+
+double *logZ_VALUES = NULL;
+double *logM_VALUES = NULL;
    
 int **N = NULL;
 
@@ -20,6 +23,11 @@ double ***Temperature = NULL;
 #ifdef WINDS
 // Winds
 double ***MassLossRate = NULL;
+
+#if GRACKLE_CHEMISTRY >= 1
+double ***HLossRate = NULL;
+double ***HeLossRate = NULL;
+#endif
 #ifdef METALS
 double ***MetalsLossRate = NULL;
 #endif
@@ -33,7 +41,11 @@ WavebandData ***Flux[WAVEBANDS] = {0};
 
 #ifdef SUPERNOVAE
 // Supernovae 
-double **SN_MassLoss = NULL;  
+double **SN_MassLoss = NULL;
+#if GRACKLE_CHEMISTRY >= 1
+double **SN_HLoss = NULL;
+double **SN_HeLoss = NULL;
+#endif  
 #ifdef METALS  
 double **SN_MetalsLoss = NULL;
 #endif
@@ -60,6 +72,10 @@ void free_stellar_tables(void)
 
 #ifdef WINDS
             free(MassLossRate[z][m]);
+#if GRACKLE_CHEMISTRY >= 1
+            free(HLossRate[z][m]);
+            free(HeLossRate[z][m]);
+#endif
 #ifdef METALS
             free(MetalsLossRate[z][m]);
 #endif
@@ -82,6 +98,10 @@ void free_stellar_tables(void)
 
 #ifdef WINDS
           free(MassLossRate[z]);
+#if GRACKLE_CHEMISTRY >= 1
+          free(HLossRate[z]);
+          free(HeLossRate[z]);
+#endif
 #ifdef METALS
           free(MetalsLossRate[z]);
 #endif
@@ -95,6 +115,10 @@ void free_stellar_tables(void)
 
 #ifdef SUPERNOVAE
           free(SN_MassLoss[z]);
+#if GRACKLE_CHEMISTRY >= 1
+          free(SN_HLoss[z]);
+          free(SN_HeLoss[z]);
+#endif
 #ifdef METALS
           free(SN_MetalsLoss[z]);
 #endif
@@ -103,6 +127,9 @@ void free_stellar_tables(void)
 
       free(Z_VALUES);
       free(M_VALUES);
+
+      free(logZ_VALUES);
+      free(logM_VALUES);
       
       free(N);
       
@@ -112,6 +139,10 @@ void free_stellar_tables(void)
 
 #ifdef WINDS
       free(MassLossRate);
+#if GRACKLE_CHEMISTRY >= 1
+      free(HLossRate);
+      free(HeLossRate);
+#endif
 #ifdef METALS
       free(MetalsLossRate);
 #endif
@@ -125,6 +156,10 @@ void free_stellar_tables(void)
 
 #ifdef SUPERNOVAE
       free(SN_MassLoss);
+#if GRACKLE_CHEMISTRY >= 1
+      free(SN_HLoss);
+      free(SN_HeLoss);
+#endif
 #ifdef METALS
       free(SN_MetalsLoss);
 #endif
@@ -132,6 +167,9 @@ void free_stellar_tables(void)
 
       Z_VALUES = NULL;
       M_VALUES = NULL;
+
+      logZ_VALUES = NULL;
+      logM_VALUES = NULL;
       
       N = NULL;
       
@@ -141,6 +179,10 @@ void free_stellar_tables(void)
 
 #ifdef WINDS
       MassLossRate = NULL;
+#if GRACKLE_CHEMISTRY >= 1
+      HLossRate = NULL;
+      HeLossRate = NULL;
+#endif
 #ifdef METALS
       MetalsLossRate = NULL;
 #endif
@@ -154,6 +196,10 @@ void free_stellar_tables(void)
 
 #ifdef SUPERNOVAE
       SN_MassLoss = NULL;
+#if GRACKLE_CHEMISTRY >= 1
+      SN_HLoss = NULL;
+      SN_HeLoss = NULL;
+#endif
 #ifdef METALS
       SN_MetalsLoss = NULL;
 #endif
@@ -180,6 +226,9 @@ void load_star_tables(const char *filename)
 
       Z_VALUES = malloc(Z_COUNT * sizeof(double));
       M_VALUES = malloc(M_COUNT * sizeof(double));
+
+      logZ_VALUES = malloc(Z_COUNT * sizeof(double));
+      logM_VALUES = malloc(M_COUNT * sizeof(double));
       
       hid_t zv = my_H5Dopen(file_id, "Z_VALUES");
       hid_t mv = my_H5Dopen(file_id, "M_VALUES");
@@ -188,6 +237,24 @@ void load_star_tables(const char *filename)
               H5S_ALL, H5S_ALL, H5P_DEFAULT, Z_VALUES, "Z_VALUES");
       my_H5Dread(mv, H5T_NATIVE_DOUBLE, 
               H5S_ALL, H5S_ALL, H5P_DEFAULT, M_VALUES, "M_VALUES");
+
+      for(int z = 0; z < Z_COUNT; z++)
+        {
+          if(z > 0 && Z_VALUES[z] <= Z_VALUES[z - 1])
+            terminate("Z_VALUES not strictly increasing at z=%d (%g <= %g)", z, Z_VALUES[z], Z_VALUES[z - 1]);
+          if(Z_VALUES[z] <= 0.0)
+            terminate("Z_VALUES[%d] = %g; table must not contain Z <= 0", z, Z_VALUES[z]);
+          logZ_VALUES[z] = log10(Z_VALUES[z]);
+        }
+
+      for(int m = 0; m < M_COUNT; m++)
+        {
+          if(m > 0 && M_VALUES[m] <= M_VALUES[m - 1])
+            terminate("M_VALUES not strictly increasing at m=%d", m);
+          if(M_VALUES[m] <= 0.0)
+            terminate("M_VALUES[%d] = %g; table must not contain M <= 0", m, M_VALUES[m]);
+          logM_VALUES[m] = log10(M_VALUES[m]);
+        }
 
       my_H5Dclose(zv, "Z_VALUES");
       my_H5Dclose(mv, "M_VALUES");
@@ -200,10 +267,16 @@ void load_star_tables(const char *filename)
     {
       Z_VALUES = malloc(Z_COUNT * sizeof(double));
       M_VALUES = malloc(M_COUNT * sizeof(double));
+
+      logZ_VALUES = malloc(Z_COUNT * sizeof(double));
+      logM_VALUES = malloc(M_COUNT * sizeof(double));
     }
 
   MPI_Bcast(Z_VALUES, Z_COUNT, MPI_DOUBLE, 0, MPI_COMM_WORLD);
   MPI_Bcast(M_VALUES, M_COUNT, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+
+  MPI_Bcast(logZ_VALUES, Z_COUNT, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+  MPI_Bcast(logM_VALUES, M_COUNT, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
   N = malloc(Z_COUNT * sizeof(int*));
 
@@ -213,6 +286,10 @@ void load_star_tables(const char *filename)
 
 #ifdef WINDS
   MassLossRate = malloc(Z_COUNT * sizeof(double**));
+#if GRACKLE_CHEMISTRY >= 1
+  HLossRate = malloc(Z_COUNT * sizeof(double**));
+  HeLossRate = malloc(Z_COUNT * sizeof(double**));
+#endif
 #ifdef METALS
   MetalsLossRate = malloc(Z_COUNT * sizeof(double**));
 #endif
@@ -226,6 +303,10 @@ void load_star_tables(const char *filename)
 
 #ifdef SUPERNOVAE
   SN_MassLoss = malloc(Z_COUNT * sizeof(double *));
+#if GRACKLE_CHEMISTRY >= 1
+  SN_HLoss = malloc(Z_COUNT * sizeof(double *));
+  SN_HeLoss = malloc(Z_COUNT * sizeof(double *));
+#endif
 #ifdef METALS
   SN_MetalsLoss = malloc(Z_COUNT * sizeof(double *));
 #endif
@@ -241,6 +322,10 @@ void load_star_tables(const char *filename)
 
 #ifdef WINDS
       MassLossRate[z] = malloc(M_COUNT * sizeof(double*));
+#if GRACKLE_CHEMISTRY >= 1
+      HLossRate[z] = malloc(M_COUNT * sizeof(double*));
+      HeLossRate[z] = malloc(M_COUNT * sizeof(double*));
+#endif
 #ifdef METALS
       MetalsLossRate[z] = malloc(M_COUNT * sizeof(double*));
 #endif
@@ -254,6 +339,10 @@ void load_star_tables(const char *filename)
 
 #ifdef SUPERNOVAE
       SN_MassLoss[z] = malloc(M_COUNT * sizeof(double));
+#if GRACKLE_CHEMISTRY >= 1
+      SN_HLoss[z] = malloc(M_COUNT * sizeof(double));
+      SN_HeLoss[z] = malloc(M_COUNT * sizeof(double));
+#endif
 #ifdef METALS
       SN_MetalsLoss[z] = malloc(M_COUNT * sizeof(double));
 #endif
@@ -310,12 +399,20 @@ void load_star_tables(const char *filename)
 
 #ifdef WINDS
               hid_t d_ml = my_H5Dopen(mgrp, "MassLossRate");
+#if GRACKLE_CHEMISTRY >= 1
+              hid_t d_Hl  = my_H5Dopen(mgrp, "HLossRate");
+              hid_t d_Hel = my_H5Dopen(mgrp, "HeLossRate");
+#endif
 #ifdef METALS
               hid_t d_mz = my_H5Dopen(mgrp, "MetalsLossRate");
 #endif
               hid_t d_wv = my_H5Dopen(mgrp, "WindVelocity");
 
               MassLossRate[z][m] = malloc(N[z][m] * sizeof(double));
+#if GRACKLE_CHEMISTRY >= 1
+              HLossRate[z][m] = malloc(N[z][m] * sizeof(double));
+              HeLossRate[z][m] = malloc(N[z][m] * sizeof(double));
+#endif
 #ifdef METALS
               MetalsLossRate[z][m] = malloc(N[z][m] * sizeof(double));
 #endif
@@ -323,6 +420,12 @@ void load_star_tables(const char *filename)
 
               my_H5Dread(d_ml, H5T_NATIVE_DOUBLE,
                       H5S_ALL, H5S_ALL, H5P_DEFAULT, MassLossRate[z][m], "MassLossRate");
+#if GRACKLE_CHEMISTRY >= 1
+              my_H5Dread(d_Hl, H5T_NATIVE_DOUBLE,
+                      H5S_ALL, H5S_ALL, H5P_DEFAULT, HLossRate[z][m], "HLossRate");
+              my_H5Dread(d_Hel, H5T_NATIVE_DOUBLE,
+                      H5S_ALL, H5S_ALL, H5P_DEFAULT, HeLossRate[z][m], "HeLossRate");
+#endif
 #ifdef METALS
               my_H5Dread(d_mz, H5T_NATIVE_DOUBLE,
                       H5S_ALL, H5S_ALL, H5P_DEFAULT, MetalsLossRate[z][m], "MetalsLossRate");
@@ -330,11 +433,15 @@ void load_star_tables(const char *filename)
               my_H5Dread(d_wv, H5T_NATIVE_DOUBLE,
                       H5S_ALL, H5S_ALL, H5P_DEFAULT, WindVelocity[z][m], "WindVelocity");
 
-              my_H5Dclose(d_ml,  "MassLossRate");
-#ifdef METALS
-              my_H5Dclose(d_mz,  "MetalsLossRate");
+              my_H5Dclose(d_ml, "MassLossRate");
+#if GRACKLE_CHEMISTRY >= 1
+              my_H5Dclose(d_Hl, "HLossRate");
+              my_H5Dclose(d_Hel, "HeLossRate");
 #endif
-              my_H5Dclose(d_wv,  "WindVelocity");
+#ifdef METALS
+              my_H5Dclose(d_mz, "MetalsLossRate");
+#endif
+              my_H5Dclose(d_wv, "WindVelocity");
 #endif
 
 #ifdef STAR_RADIATION_ACTIVE
@@ -366,16 +473,30 @@ void load_star_tables(const char *filename)
 
 #ifdef SUPERNOVAE
               hid_t d_snml = my_H5Dopen(mgrp, "SN_MassLoss");
+#if GRACKLE_CHEMISTRY >= 1
+              hid_t d_snHl = my_H5Dopen(mgrp, "SN_HLoss");
+              hid_t d_snHel = my_H5Dopen(mgrp, "SN_HeLoss");
+#endif
 #ifdef METALS
               hid_t d_snmz = my_H5Dopen(mgrp, "SN_MetalsLoss");
 #endif
               my_H5Dread(d_snml, H5T_NATIVE_DOUBLE,
                       H5S_ALL, H5S_ALL, H5P_DEFAULT, &SN_MassLoss[z][m], "SN_MassLoss");
+#if GRACKLE_CHEMISTRY >= 1
+              my_H5Dread(d_snHl, H5T_NATIVE_DOUBLE,
+                      H5S_ALL, H5S_ALL, H5P_DEFAULT, &SN_HLoss[z][m], "SN_HLoss");
+              my_H5Dread(d_snHel, H5T_NATIVE_DOUBLE,
+                      H5S_ALL, H5S_ALL, H5P_DEFAULT, &SN_HeLoss[z][m], "SN_HeLoss");
+#endif
 #ifdef METALS
               my_H5Dread(d_snmz, H5T_NATIVE_DOUBLE,
                       H5S_ALL, H5S_ALL, H5P_DEFAULT, &SN_MetalsLoss[z][m], "SN_MetalsLoss");
 #endif
               my_H5Dclose(d_snml, "SN_MassLoss");
+#if GRACKLE_CHEMISTRY >= 1
+              my_H5Dclose(d_snHl, "SN_HLoss");
+              my_H5Dclose(d_snHel, "SN_HeLoss");
+#endif
 #ifdef METALS
               my_H5Dclose(d_snmz, "SN_MetalsLoss");
 #endif
@@ -394,6 +515,10 @@ void load_star_tables(const char *filename)
     {
 #ifdef SUPERNOVAE
       MPI_Bcast(SN_MassLoss[z], M_COUNT, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+#if GRACKLE_CHEMISTRY >= 1
+      MPI_Bcast(SN_HLoss[z], M_COUNT, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+      MPI_Bcast(SN_HeLoss[z], M_COUNT, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+#endif
 #ifdef METALS
       MPI_Bcast(SN_MetalsLoss[z], M_COUNT, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 #endif
@@ -409,6 +534,10 @@ void load_star_tables(const char *filename)
 
 #ifdef WINDS
                 MassLossRate[z][m] = malloc(N[z][m] * sizeof(double));
+#if GRACKLE_CHEMISTRY >= 1
+                HLossRate[z][m] = malloc(N[z][m] * sizeof(double));
+                HeLossRate[z][m] = malloc(N[z][m] * sizeof(double));
+#endif
 #ifdef METALS
                 MetalsLossRate[z][m] = malloc(N[z][m] * sizeof(double));
 #endif
@@ -427,6 +556,10 @@ void load_star_tables(const char *filename)
 
 #ifdef WINDS
             MPI_Bcast(MassLossRate[z][m], N[z][m], MPI_DOUBLE, 0, MPI_COMM_WORLD);
+#if GRACKLE_CHEMISTRY >= 1
+            MPI_Bcast(HLossRate[z][m], N[z][m], MPI_DOUBLE, 0, MPI_COMM_WORLD);
+            MPI_Bcast(HeLossRate[z][m], N[z][m], MPI_DOUBLE, 0, MPI_COMM_WORLD);
+#endif
 #ifdef METALS
             MPI_Bcast(MetalsLossRate[z][m], N[z][m], MPI_DOUBLE, 0, MPI_COMM_WORLD);
 #endif

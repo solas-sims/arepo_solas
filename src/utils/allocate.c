@@ -44,6 +44,7 @@
 #endif /* #ifdef SIDM */
 
 
+
 /*! \brief Allocates memory for global arrays.
  *
  *  This routine allocates memory for
@@ -183,12 +184,43 @@ void reallocate_memory_maxpartsph(void)
 #ifdef STARS
 void reallocate_memory_maxpartstars(void)
 {
+  /* entries [0, old_NumStars) already hold valid, non-garbage data; memory beyond that (whether
+   * pre-existing zeroed headroom or newly grown by this realloc) is zeroed below, matching the
+   * zero-init guarantee allocate_memory() gives SP[] at initial allocation -- myrealloc_movable()
+   * only preserves the old contents, it does not zero newly grown memory itself */
+  int old_NumStars = NumStars;
+
   mpi_printf("ALLOCATE: Changing to MaxPartStars= %d\n", All.MaxPartStars);
 
   SP = (Star_Particle_Data *)myrealloc_movable(SP, All.MaxPartStars * sizeof(Star_Particle_Data));
 
+  if(All.MaxPartStars > old_NumStars)
+    memset(SP + old_NumStars, 0, (All.MaxPartStars - old_NumStars) * sizeof(Star_Particle_Data));
+
 #ifdef STAR_FEEDBACK_ACTIVE
   timebins_reallocate(&TimeBinsStar);
+#endif
+}
+#endif
+
+#ifdef BLACKHOLES
+void reallocate_memory_maxpartbhs(void)
+{
+  /* entries [0, old_NumBhs) already hold valid, non-garbage data; memory beyond that (whether
+   * pre-existing zeroed headroom or newly grown by this realloc) is zeroed below, matching the
+   * zero-init guarantee allocate_memory() gives BhP[] at initial allocation -- myrealloc_movable()
+   * only preserves the old contents, it does not zero newly grown memory itself */
+  int old_NumBhs = NumBhs;
+
+  mpi_printf("ALLOCATE: Changing to MaxPartBhs= %d\n", All.MaxPartBhs);
+
+  BhP = (struct Bh_Particle_Data *)myrealloc_movable(BhP, All.MaxPartBhs * sizeof(struct Bh_Particle_Data));
+
+  if(All.MaxPartBhs > old_NumBhs)
+    memset(BhP + old_NumBhs, 0, (All.MaxPartBhs - old_NumBhs) * sizeof(struct Bh_Particle_Data));
+
+#ifdef BH_ACTIVE
+  timebins_reallocate(&TimeBinsBh);
 #endif
 }
 #endif

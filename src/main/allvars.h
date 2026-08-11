@@ -514,6 +514,7 @@ typedef unsigned long long peano1D;
 #ifdef USE_GRACKLE
 #define GRACKLE_TINY 1e-20
 
+/* In SphP PASSIVE_SCALARS */
 #if GRACKLE_CHEMISTRY >= 1
 #define GRACKLE_HI    (GRACKLE_SPECIES_INDEX)
 #define GRACKLE_HII   (GRACKLE_SPECIES_INDEX + 1)
@@ -532,6 +533,27 @@ typedef unsigned long long peano1D;
 #define GRACKLE_DI    (GRACKLE_SPECIES_INDEX + 8)
 #define GRACKLE_DII   (GRACKLE_SPECIES_INDEX + 9)
 #define GRACKLE_HDI   (GRACKLE_SPECIES_INDEX + 10)
+#endif
+
+/* Other uses */
+#if GRACKLE_CHEMISTRY >= 1
+#define CHEM_HI    0
+#define CHEM_HII   1
+#define CHEM_HeI   2
+#define CHEM_HeII  3
+#define CHEM_HeIII 4
+#endif
+
+#if GRACKLE_CHEMISTRY >= 2
+#define CHEM_H2I   5
+#define CHEM_H2II  6
+#define CHEM_HM    7
+#endif
+
+#if GRACKLE_CHEMISTRY >= 3
+#define CHEM_DI    8
+#define CHEM_DII   9
+#define CHEM_HDI   10
 #endif
 #endif
 
@@ -1066,7 +1088,47 @@ extern struct global_data_all_processes
   /* some SPH parameters */
 
   int DesNumNgb; /*!< Desired number of SPH neighbours */
-    
+#ifdef HALO_SEEDING
+#ifndef FOF
+#error "HALO_SEEDING requires FOF to be defined"
+#endif /* #ifndef FOF */
+  double TimeOfFirstHaloFinding;
+  double NextTimeOfHaloFinding;
+  double TimeBetweenHaloFinding;
+#ifdef BH_SEED_ON_MASS
+  double MinHaloMassForFOFSeeding;
+#endif /* #ifdef BH_SEED_ON_MASS */
+#ifdef BH_SEED_ON_ZERO_METALLICITY
+  double ZeroMetallicityThresholdForFOFSeeding; /*!< metal mass fraction below which a halo's most
+                                                      enriched gas cell still counts as "pristine" */
+#endif /* #ifdef BH_SEED_ON_ZERO_METALLICITY */
+#ifdef BH_SEED_ON_VELDISP
+  double MinVelDispForFOFSeeding; /*!< DM-only 3D velocity dispersion (sigma_3D) threshold above which a halo qualifies */
+#endif /* #ifdef BH_SEED_ON_VELDISP */
+#ifdef BH_SEED_ON_POTENTIAL_POSITION
+  double PotentialDonorSearchNSoft; /*!< donor-search cutoff radius around the potential minimum, in units
+                                          of the DM gravitational softening length (a force-resolution scale,
+                                          not a halo-boundary one like LinkL) */
+#endif /* #ifdef BH_SEED_ON_POTENTIAL_POSITION */
+#ifdef BLACKHOLE_SEEDING
+  double BlackHoleSeedMass;
+#endif
+#endif /* #ifdef HALO_SEEDING */
+
+#ifdef BH_MERGER
+  /* Independent of HALO_SEEDING: BH_MERGER is also used for non-cosmological runs with
+   * black holes already present in the IC (no on-the-fly FOF seeding involved). */
+  double BhMergerRadiusFactor; /*!< two black holes merge once their separation is below this factor times
+                                     the length scale selected by BhMergerRadiusCriterion, and they are
+                                     gravitationally bound to each other */
+  char BhMergerRadiusCriterionString[MAXLEN_PARAM_VALUE]; /*!< raw value from the parameter file: "HSML" (default,
+                                     reproduces the legacy factor*max(Hsml_i,Hsml_j) behaviour), "SOFTENING",
+                                     "MAX_HSML_SOFTENING", or "MIN_HSML_SOFTENING" -- resolved into
+                                     BhMergerRadiusCriterion by check_parameters(); see enum
+                                     bh_merger_radius_criterion in src/blackholes/bh.h */
+  int BhMergerRadiusCriterion; /*!< resolved enum value; set by check_parameters(), do not set directly */
+#endif /* #ifdef BH_MERGER */
+
   double TotCountReducedFluxes;
   double TotCountFluxes;
 
@@ -1368,10 +1430,16 @@ double InitMetallicityinSolar;
   char GrackleDataFile[100];
 #endif
 
-/* enable Springel & Hernquist model */
-#ifdef EEOS_SF
+#if defined(EEOS_SF) || defined(AGORA_SF) || defined(JEANS_SF)
+  /* shared by all three SF schemes: a comoving-overdensity floor below which star formation
+   * is never allowed, regardless of whether the local density/temperature (or Jeans) gate is
+   * otherwise satisfied -- see set_overdens_thresh() in starformation.c */
   double OverDensThresh;
   double CritOverDensity;
+#endif /* #if defined(EEOS_SF) || defined(AGORA_SF) || defined(JEANS_SF) */
+
+/* enable Springel & Hernquist model */
+#ifdef EEOS_SF
   double TemperatureThresh;
   double CritPhysDensity;
   double PhysDensThresh;
@@ -1382,13 +1450,23 @@ double InitMetallicityinSolar;
   double TempClouds;
   double MaxSfrTimescale;
   double FactorSN;
-#endif 
+#endif
 
 #ifdef AGORA_SF
-  double NumberDensThreshold;  
+  double NumberDensThreshold;
   double TemperatureThreshold;
   double StarFormationEfficiency;
 #endif
+
+#ifdef SF_THRESHOLD_HALO_MASS_DEPENDENT
+  /* scheme-agnostic: applies as a multiplicative factor on whichever SF scheme's own
+   * threshold quantity is active (EEOS_SF's PhysDensThresh, AGORA_SF's NumberDensThreshold,
+   * JEANS_SF's criterion) -- see sf_threshold_halo_mass_factor() in starformation.c */
+  double MinHaloMassForNormalSF;              /*!< halo mass above which the ordinary threshold applies; below it
+                                                    (and above 0), the raised threshold below is used instead */
+  double LowMassHaloThresholdFactor;          /*!< multiplier applied to the active scheme's own SF threshold for gas
+                                                    cells whose host halo mass is below MinHaloMassForNormalSF */
+#endif /* #ifdef SF_THRESHOLD_HALO_MASS_DEPENDENT */
 
 #ifdef JEANS_SF
 #ifdef JEANS_MASS_BASED
@@ -1407,16 +1485,19 @@ double InitMetallicityinSolar;
   int IMF;
 #endif
 
+#if defined(TREE_BASED_TIMESTEPS) && defined(SUPERNOVAE)
+  double SN_LeadTime;
+#endif
+
 #ifdef STAR_FEEDBACK_ACTIVE
   double StarFeedbackLocal[6];
   double StarFeedbackGlobal[6];
-  
-  /* For parameter file */
+
   char StarTablesFile[MAXLEN_PATH];
-#endif 
+#endif
 
 #ifdef SUPERNOVAE
-  double SNHostShellSweepFrac;
+  double SN_HostShellSweepFrac;
 #endif
 
 #ifdef SIDM
@@ -1436,6 +1517,10 @@ double InitMetallicityinSolar;
 
 #ifdef PHOTOIONIZATION
   double RTIonizationTimestepFraction;
+#endif
+
+#ifdef RADIATION_PRESSURE
+  double IRDtauMomentumBoostCoeff;
 #endif
 
 #if defined (BH_ACCRETION_ACTIVE) || defined(BH_FEEDBACK_ACTIVE)
@@ -1481,12 +1566,6 @@ double InitMetallicityinSolar;
   int DesLinkNgb;
   double ErrTolThetaSubfind;
 #endif /* #ifdef SUBFIND */
-
-#ifdef FIND_HALOS
-  double TimeOfFirstHaloFinding;
-  double NextTimeOfHaloFinding;
-  double TimeBetweenHaloFinding;
-#endif
 } All;
 
 /*****************************************************************************
@@ -1648,6 +1727,11 @@ extern struct sph_particle_data
   
   MySingle ActiveArea;
 
+#ifdef HALO_SEEDING
+  MyFloat HostHaloMass; /*!< FOF mass of the host halo, refreshed at each on-the-fly FOF pass (0 if not in a halo);
+                             can be used e.g. to select the mode of star formation by halo mass */
+#endif /* #ifdef HALO_SEEDING */
+
 #ifdef OUTPUT_SURFACE_AREA
   int CountFaces;
 #endif 
@@ -1763,13 +1847,13 @@ extern struct sph_particle_data
 /* Feedback */
 #ifdef STAR_FEEDBACK_ACTIVE
   MyDouble StarMassFeed;
-
+#if GRACKLE_CHEMISTRY >= 1
+  MyDouble StarChemFeed[GRACKLE_SPECIES_NUMBER];
+#endif
 #ifdef METALS
   MyDouble StarMetalsFeed;
 #endif
-
   MyDouble StarMomentumFeed[3];
-
   MyDouble StarEnergyFeed;
 #endif
 
@@ -2065,6 +2149,7 @@ enum iofields
   IO_NE,
   IO_NH,
   IO_SFR,
+  IO_HOSTHALOMASS,
 
   IO_POT,
   IO_ACCEL,
@@ -2132,6 +2217,12 @@ enum iofields
   IO_SIDM_NUMNGB,
   IO_SIDM_VELDISP,
   IO_SIDM_SCATTERCOUNT,
+#endif
+#if defined(HALO_SEEDING) && defined(BLACKHOLES)
+  IO_BH_FORMATION_TIME,
+  IO_BH_FORMATION_METALLICITY,
+  IO_BH_FORMATION_CHANNEL,
+  IO_BH_DONOR_VELOCITY,
 #endif
   IO_LASTENTRY /* This should be kept - it signals the end of the list */
 };

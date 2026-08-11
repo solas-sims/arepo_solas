@@ -90,3 +90,5 @@ Table of contents
   diagnosticfiles.md
   migration.md
   development.md
+  technical-reference.md
+  fof_halo_seeding.md
