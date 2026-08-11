@@ -211,6 +211,86 @@ static inline int ray_deposit(RayPacket *ray, int i, double length)
   return still_alive;
 }
 
+#define RAY_MAX_LOCATE 4096
+
+/* Returns 0 if the head now lies inside ray->cell (possibly on its boundary),
+   1 if the ray was handed to another rank and the caller must return. */
+static int voronoi_relocate(RayPacket *ray, RayExportBuffer *export_buf)
+{
+  for(int it = 0; it < RAY_MAX_LOCATE; it++)
+    {
+      int q_best = -1;
+      double v_best = 0.0;
+      double d_best[3] = {0.0, 0.0, 0.0};
+
+      const int i = ray->cell;
+
+      const double eps = RAY_TOL * get_cell_radius(i);
+
+      const double sx = P[i].Pos[0], sy = P[i].Pos[1], sz = P[i].Pos[2];
+      
+      const double px = ray->pos[0] + ray->t * ray->dir[0];
+      const double py = ray->pos[1] + ray->t * ray->dir[1];
+      const double pz = ray->pos[2] + ray->t * ray->dir[2];
+
+      int q = SphP[i].first_connection;
+      while(q >= 0)
+        {
+          int dp = DC[q].dp_index;
+
+          if(Mesh.DP[dp].index >= 0)
+            {
+              double dx = Mesh.DP[dp].x - sx;
+              double dy = Mesh.DP[dp].y - sy;
+              double dz = Mesh.DP[dp].z - sz;
+
+              double d2 = dx*dx + dy*dy + dz*dz;
+
+              /* v = 1/2 (|x-s_i|^2 - |x-s_j|^2); v/|d| is the signed distance
+                 to the bisector plane. v > 0 means s_j is the closer generator. */
+              double v = (px*dx + py*dy + pz*dz) - 0.5 * d2;
+
+              if(v > v_best && v > eps * sqrt(d2))
+                {
+                  v_best = v;
+                  q_best = q;
+                  
+                  d_best[0] = dx; 
+                  d_best[1] = dy; 
+                  d_best[2] = dz;
+                }
+            }
+
+          if(q == SphP[i].last_connection)
+            break;
+
+          q = DC[q].next;
+        }
+
+      if(q_best < 0)
+        {
+          ray->needs_locate = 0;
+          return 0;                  
+        }
+
+      ray->pos[0] -= d_best[0];
+      ray->pos[1] -= d_best[1];
+      ray->pos[2] -= d_best[2];
+
+      ray->cell = DC[q_best].index;
+
+      if(DC[q_best].task != ThisTask)
+        {
+          append_export(export_buf, ray, DC[q_best].task);
+          return 1;                   
+        }
+    }
+
+  terminate("RAYTRACE_VORONOI: locate walk did not converge for ray %d (star %llu)\n",
+            ray->ray_id, (unsigned long long)ray->star_id);
+  return 0;
+}
+
 /* ------------------------------------------------------------------ */
 /* Exit face search                                                    */
 /* ------------------------------------------------------------------ */
@@ -231,9 +311,12 @@ static inline int voronoi_exit_face(const RayPacket *ray, int i, double r_cell, 
 
   const double eps = RAY_TOL * r_cell;
 
-  const double px = ray->pos[0], py = ray->pos[1], pz = ray->pos[2];
   const double nx = ray->dir[0], ny = ray->dir[1], nz = ray->dir[2];
   const double sx = P[i].Pos[0], sy = P[i].Pos[1], sz = P[i].Pos[2];
+
+  const double px = ray->pos[0] + ray->t * nx;
+  const double py = ray->pos[1] + ray->t * ny;
+  const double pz = ray->pos[2] + ray->t * nz;
 
   int q = SphP[i].first_connection;
 
@@ -328,6 +411,12 @@ void raytrace_voronoi(RayPacket *ray, RayWorkStack *work, RayExportBuffer *expor
 
   while(1)
     {
+      if(ray->needs_locate)
+        {
+          if(voronoi_relocate(ray, export_buf))
+            return;
+        }
+
       int i = ray->cell;
 
       const double r_cell = get_cell_radius(i);
@@ -344,11 +433,15 @@ void raytrace_voronoi(RayPacket *ray, RayWorkStack *work, RayExportBuffer *expor
             {
               RayPacket children[4];
               split_ray(ray, children);
-
+              
               for(int k = 0; k < 4; k++)
-                append_ray(work, &children[k]);
-
-              /* Parent ray is consumed */
+                {
+                  if(voronoi_relocate(&children[k], export_buf))
+                    continue;           
+    
+                  append_ray(work, &children[k]);
+                }
+              
               return;
             }
         }
@@ -364,7 +457,10 @@ void raytrace_voronoi(RayPacket *ray, RayWorkStack *work, RayExportBuffer *expor
         }
 
       if(t_step < 0.0)
-        t_step = 0.0;
+        {
+          terminate("RAYTRACE_VORONOI: cell %d gives negative t along ray %d (star %llu) - stale DC list?\n", i, ray->ray_id,
+                   (unsigned long long)ray->star_id);
+        }
 
       int truncated = 0;
       if(ray->t + t_step >= ray->t_maximum)
@@ -385,9 +481,9 @@ void raytrace_voronoi(RayPacket *ray, RayWorkStack *work, RayExportBuffer *expor
        * x_new - s_j = (x_old - s_i) + t n - (s_j - s_i)
        * Exact, image-shift aware, and leaves the ray sitting precisely on
        * the shared bisector so the return face is excluded by sign alone. */
-      ray->pos[0] += t_step * ray->dir[0] - d[0];
-      ray->pos[1] += t_step * ray->dir[1] - d[1];
-      ray->pos[2] += t_step * ray->dir[2] - d[2];
+      ray->pos[0] -= d[0];
+      ray->pos[1] -= d[1];
+      ray->pos[2] -= d[2];
 
       int task = DC[q].task;
 

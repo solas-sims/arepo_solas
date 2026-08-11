@@ -410,6 +410,7 @@ void split_ray(const RayPacket *parent, RayPacket children[4])
 
       children[k].nside = new_nside;
       children[k].healpix_pixel = 4 * parent->healpix_pixel + k;
+      children[k].needs_locate = 1;
 
       healpix_dir(parent->rotation_seed, new_nside, children[k].healpix_pixel, children[k].dir);
 

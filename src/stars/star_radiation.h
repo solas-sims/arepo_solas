@@ -112,6 +112,7 @@ typedef struct RayPacket
   int nside; /* Current HEALPix nside level */
   int healpix_pixel; /* Current HEALPix pixel (NESTED) */
   unsigned long long rotation_seed; /* HEALPix basis rotation seed (per star) */
+  uint8_t needs_locate; /* Locate flag for split rays */
 
   /* Bitmask: bit w is SET while band w is still alive */
   /* Cleared when Radiated[w] < RAD_TRUNC_FRAC * Radiated_Init[w] */
