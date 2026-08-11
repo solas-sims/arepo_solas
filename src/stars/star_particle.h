@@ -9,6 +9,15 @@
 
 #define N_CDF_BINS 10000
 
+enum IMFType
+{
+    POPII = 0,
+#ifdef POPIII_SF
+    POPIII,
+#endif
+    N_IMF_TYPES  /* 2 #ifdef POPIII_SF, else 1 */
+};
+
 extern double cdf_masses[N_IMF_TYPES][N_CDF_BINS + 1];   
 extern double cdf_values[N_IMF_TYPES][N_CDF_BINS + 1];   
 

@@ -578,7 +578,7 @@ MPI_Bcast(StarMeanMassInBins, N_IMF_TYPES*NBINS, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
 #if defined(STAR_PARTICLES) && STAR_PARTICLES < 2
   for(i = 0; i < NumStars; i++)
-    sample_star_particle(PPS(i).Mass * All.cf_UnitMass_in_Msun, SP[i].NumOfStarsInBins);
+    sample_star_particle(SP[i].PopulationType, PPS(i).Mass * All.cf_UnitMass_in_Msun, SP[i].NumOfStarsInBins);
 #endif
 
 #endif

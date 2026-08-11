@@ -557,15 +557,6 @@ typedef unsigned long long peano1D;
 #endif
 #endif
 
-enum IMFType
-{
-    POPII = 0,
-#ifdef POPIII_SF
-    POPIII,
-#endif
-    N_IMF_TYPES  /* 2 #ifdef POPIII_SF, else 1 */
-};
-
 #ifndef FOF_PRIMARY_LINK_TYPES
 #define FOF_PRIMARY_LINK_TYPES 2
 #endif /* #ifndef FOF_PRIMARY_LINK_TYPES */
