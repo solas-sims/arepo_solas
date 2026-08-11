@@ -2,7 +2,7 @@
 #define STAR_PROTO_H
 
 
-/* star functions */
+/* Star functions */
 
 /* Memory allocation */
 void reallocate_memory_maxpartstars(void);
@@ -51,38 +51,52 @@ Star_Feedback units_for_feedback(Star_Feedback star);
 
 double IntegralTrapezoidal(double a, double b, int N, double (*f)(double));
 
+/* Wrap stars module */
+void star_in(void);
+void star_exit(void);
+
+/* Feedback setup */
+void feedback_init(struct Mechanical_Feedback_Events *MFEvents);
+void feedback_allocate(struct Mechanical_Feedback_Events *MFEvents, int MaxEvents);
+void feedback_reallocate(struct Mechanical_Feedback_Events *MFEvents, int NewMaxEvents);
+void feedback_free(struct Mechanical_Feedback_Events *MFEvents);
+
 /* Timesteps */
 integertime star_timestep(int p);
 void star_update_timesteps(void);
 void star_reconstruct_timebins(void);
 void star_update_list_of_active_particles(void);
 
-/* Density-Feedback loop */
-void star_density(void);
+/* Prep and density */
 void star_prep(void);
-#endif
-
-#if defined(WINDS) || defined(RADIATION_PRESSURE) || defined(SUPERNOVAE)
-void star_perform_end_of_step_physics(void);
-#endif
-
-#if defined(WINDS) || defined(SUPERNOVAE)
-void star_feedback(void);
-void feedback_init(struct Mechanical_Feedback_Pack *MFPack);
-void feedback_allocate(struct Mechanical_Feedback_Pack *MFPack, int MaxEvents);
-void feedback_reallocate(struct Mechanical_Feedback_Pack *MFPack, int NewMaxEvents);
+void star_density(void);
 #endif
 
 #ifdef STAR_RADIATION_ACTIVE
 /* Radiation */
 #include "../stars/star_radiation.h"
 
-void update_kappa(void);
-void init_healpix_rays(void);
+void update_dtau(void);
+double dtau_IR(int i, double length);
+
+void init_h2shield(void);
+double h2shield_dtau(double N_H2, double dN_H2);
+
 void append_ray(RayWorkStack *w, const RayPacket *ray);
-int split_ray(const RayPacket *parent, RayPacket children[4]);
+void split_ray(const RayPacket *parent, RayPacket children[4]);
+
+void append_export(RayExportBuffer *buf, const RayPacket *ray, int task);
+
 void star_radiation(void);
 void raytrace_treewalk(RayPacket *ray, RayWorkStack *work, RayExportBuffer *export_buf);
+#endif
+
+#if defined(WINDS) || defined(SUPERNOVAE)
+void star_feedback(void);
+#endif
+
+#ifdef STAR_FEEDBACK_ACTIVE
+void star_perform_end_of_step_physics(void);
 #endif
 
 #endif

@@ -4,118 +4,174 @@
 #include "../main/proto.h"
 
 
-static inline int ray_box_intersect(double *ray_pos, double *ray_dir, MyNgbTreeFloat *rmin, MyNgbTreeFloat *rmax, double *t_enter, double *t_exit)
+static inline int rt_node_inverted(int no)
 {
+  return RtNgb_Nodes[no].rt_range_min[0] >= RtNgb_Nodes[no].rt_range_max[0];
+}
+
+static inline int ray_box_intersect(const double *ray_pos, const double *ray_dir,
+                                    const MyNgbTreeFloat *rmin, const MyNgbTreeFloat *rmax,
+                                    double *t_enter, double *t_exit)
+{
+  double xtmp, ytmp, ztmp;
+
+  double center[3] = {0.5 * (rmin[0] + rmax[0]), 0.5 * (rmin[1] + rmax[1]), 0.5 * (rmin[2] + rmax[2])};
+
+  /* Minimum-image displacement of box centre relative to ray origin */
+  double d[3];
+
+  d[0] = NEAREST_X(center[0] - ray_pos[0]);
+  d[1] = NEAREST_Y(center[1] - ray_pos[1]);
+  d[2] = NEAREST_Z(center[2] - ray_pos[2]);
+
+  double halfextent[3] = {0.5 * (rmax[0] - rmin[0]), 0.5 * (rmax[1] - rmin[1]), 0.5 * (rmax[2] - rmin[2])};
+
+  double halfdomain[3] = {boxHalf_X, boxHalf_Y, boxHalf_Z};
+
   double tmin = -MAX_REAL_NUMBER, tmax = MAX_REAL_NUMBER;
 
   for(int i = 0; i < 3; i++)
     {
+      /* Box too wide along this axis for a single minimum-image shift to be trustworthy */
+      if(halfextent[i] >= halfdomain[i])
+        { 
+          /* Conservative hit */ 
+          *t_enter = 0.0;
+          *t_exit = MAX_REAL_NUMBER;
+          return 1;
+        }
+
+      double shifted_min = ray_pos[i] + d[i] - halfextent[i];
+      double shifted_max = ray_pos[i] + d[i] + halfextent[i];
+
       /* Ray parallel to this slab */
-      if(fabs(ray_dir[i]) < 1e-12) 
+      if(fabs(ray_dir[i]) < 1e-12)
         {
-          if(ray_pos[i] < rmin[i] || ray_pos[i] > rmax[i])
+          if(ray_pos[i] < shifted_min || ray_pos[i] > shifted_max)
             return 0;
         }
       else
         {
           double inv_dir = 1.0 / ray_dir[i];
-          double t1 = (rmin[i] - ray_pos[i]) * inv_dir;
-          double t2 = (rmax[i] - ray_pos[i]) * inv_dir;
+          double t1 = (shifted_min - ray_pos[i]) * inv_dir;
+          double t2 = (shifted_max - ray_pos[i]) * inv_dir;
 
-          if(t1 > t2) 
-            { 
-              double tmp = t1; 
-              t1 = t2; 
-              t2 = tmp; 
+          if(t1 > t2)
+            {
+              double tmp = t1;
+              t1 = t2;
+              t2 = tmp;
             }
 
           tmin = t1 > tmin ? t1 : tmin;
           tmax = t2 < tmax ? t2 : tmax;
 
-          if(tmin > tmax) 
+          if(tmin > tmax)
             return 0;
         }
     }
 
-    if(tmax < 0) 
-      return 0;
-
-    *t_enter = fmax(tmin, 0.0);
-    *t_exit  = tmax;
-
-    return 1;
-}
-
-static inline int ray_sphere_intersect(const double dx, const double dy, const double dz, const double *dir, const double r2, double *t_enter, double *t_exit)
-{
-  /* Check if ray origin is inside the sphere first */
-  double dist2 = dx * dx + dy * dy + dz * dz;
-  
-  if(dist2 < r2)
-    {
-      /* Origin is inside - find the single forward exit point */
-      /* Project centre onto ray, then offset by half-chord */
-      double t_closest = dx * dir[0] + dy * dir[1] + dz * dir[2];
-      double cx = dx - t_closest * dir[0];
-      double cy = dy - t_closest * dir[1];
-      double cz = dz - t_closest * dir[2];
-      double b2 = cx * cx + cy * cy + cz * cz;
-      double dt = sqrt(r2 - b2);
-      *t_enter = 0.0;         
-      *t_exit  = t_closest + dt;
-      return 1;
-    }
-
-  /* Sphere centre is outside and ahead */
-  double t_closest = dx * dir[0] + dy * dir[1] + dz * dir[2];
-  
-  if(t_closest <= 0) 
+  if(tmax < 0)
     return 0;
 
-  double cx = dx - t_closest * dir[0];
-  double cy = dy - t_closest * dir[1];
-  double cz = dz - t_closest * dir[2];
-  double b2 = cx * cx + cy * cy + cz * cz;
-  
-  if(b2 >= r2) 
-    return 0;
+  *t_enter = fmax(tmin, 0.0);
+  *t_exit  = tmax;
 
-  double dt = sqrt(r2 - b2);
-  *t_enter = t_closest - dt;
-  *t_exit  = t_closest + dt;
-  
   return 1;
 }
 
-static inline int ray_absorb(RayPacket *ray, double chord_length, double density_kappa[WAVEBANDS], WavebandData absorbed[WAVEBANDS], double *dtau_IR)
+static inline int ray_sphere_intersect(const double *ray_pos, const double *ray_dir, 
+                                       const double *center, const double r2,
+                                       double *t_enter, double *t_exit)
+{
+  double xtmp, ytmp, ztmp;
+
+  /* Minimum-image displacement of sphere centre relative to ray origin */
+  double d[3];
+
+  d[0] = NEAREST_X(center[0] - ray_pos[0]);
+  d[1] = NEAREST_Y(center[1] - ray_pos[1]);
+  d[2] = NEAREST_Z(center[2] - ray_pos[2]);
+
+  double dist2 = d[0] * d[0] + d[1] * d[1] + d[2] * d[2];
+  double t_closest = d[0] * ray_dir[0] + d[1] * ray_dir[1] + d[2] * ray_dir[2];
+  int origin_inside = (dist2 < r2);
+
+  /* Sphere is behind the ray, and ray starts outside it */
+  if(!origin_inside && t_closest <= 0.0)
+    return 0;
+
+  /* Squared impact parameter */
+  double b2 = dist2 - t_closest * t_closest;
+
+  /* Ray misses the sphere entirely */
+  if(!origin_inside && b2 >= r2)
+    return 0;
+
+  double dt = sqrt(r2 - b2);
+
+  *t_enter = origin_inside ? 0.0 : t_closest - dt;
+  *t_exit  = t_closest + dt;
+
+  return 1;
+}
+
+static inline int ray_absorb(RayPacket *ray, double Dtau_E[WAVEBANDS], double Dtau_N[WAVEBANDS], WavebandData absorbed[WAVEBANDS],
+                             double dN_H2, double *lw_line)
 {
   for(int w = 0; w < WAVEBANDS; w++)
     {
       absorbed[w].Energy = absorbed[w].Photons = 0.0;
 
+      /* Deactivate band if it has fallen below the dead-fraction threshold */
+      if(ray->Radiated[w].Energy < RAD_TRUNC_FRAC * ray->Radiated_Init[w].Energy && 
+        ray->Radiated[w].Photons < RAD_TRUNC_FRAC * ray->Radiated_Init[w].Photons)
+        ray->active_bands &= (uint8_t)(~(1u << w));
+
       if(!(ray->active_bands & (1u << w)))
         continue;
 
-      double dtau = density_kappa[w] * chord_length;
-      
-      double absorbed_energy = ray->Radiated[w].Energy * (1.0 - exp(-dtau));
-      double absorbed_photons = ray->Radiated[w].Photons * (1.0 - exp(-dtau));
+      /* Separate treatment of LW*/
+      if(w == LYMAN_WERNER)
+        continue;
+   
+      double absorbed_energy = ray->Radiated[w].Energy * (1.0 - exp(-Dtau_E[w]));
+      double absorbed_photons = ray->Radiated[w].Photons * (1.0 - exp(-Dtau_N[w]));
 
       absorbed[w].Energy += absorbed_energy;
       ray->Radiated[w].Energy -= absorbed_energy;
       
       absorbed[w].Photons += absorbed_photons;
       ray->Radiated[w].Photons -= absorbed_photons; 
-
-      /* Deactivate band if it has fallen below the dead-fraction threshold */
-      if(ray->Radiated[w].Energy < RAD_TRUNC_FRAC * ray->Radiated_Init[w].Energy && 
-      ray->Radiated[w].Photons < RAD_TRUNC_FRAC * ray->Radiated_Init[w].Photons)
-        ray->active_bands &= (uint8_t)(~(1u << w));
     }
-    
-    /* IR re-absorption tau */
-    *dtau_IR = density_kappa[INFRARED] * chord_length;
 
+  /* LW band: H2 line self shielding + dust absorption */
+  if(ray->active_bands & (1u << LYMAN_WERNER))
+    {
+      double Dtau_line = h2shield_dtau(ray->N_H2, dN_H2);
+      double Dtau_dust_E = Dtau_E[LYMAN_WERNER];
+      double Dtau_dust_N = Dtau_N[LYMAN_WERNER];
+
+      double tot_E = Dtau_line + Dtau_dust_E; 
+      double tot_N = Dtau_line + Dtau_dust_N;
+  
+      double absorbed_energy = ray->Radiated[LYMAN_WERNER].Energy * (1.0 - exp(-tot_E));
+      double absorbed_photons = ray->Radiated[LYMAN_WERNER].Photons * (1.0 - exp(-tot_N));
+
+      absorbed[LYMAN_WERNER].Energy += absorbed_energy;
+      ray->Radiated[LYMAN_WERNER].Energy -= absorbed_energy;
+      
+      absorbed[LYMAN_WERNER].Photons += absorbed_photons;
+      ray->Radiated[LYMAN_WERNER].Photons -= absorbed_photons;
+
+      if(tot_E > 0) 
+        lw_line[0] = Dtau_line / tot_E;
+      if(tot_N > 0) 
+        lw_line[1] = Dtau_line / tot_N;
+    } 
+  
+  ray->N_H2 += dN_H2;
+    
   return ray->active_bands != 0;
 }
 
@@ -165,61 +221,78 @@ void raytrace_treewalk(RayPacket *ray, RayWorkStack *work, RayExportBuffer *expo
           if(P[no].Type != 0 || P[no].Mass == 0 || P[no].ID == 0)
             continue;
 
-          double chord_length = cur.t_exit - cur.t_enter;
+          double length = cur.t_exit - cur.t_enter;
               
-          double density_kappa[WAVEBANDS];
+          double Dtau_E[WAVEBANDS];
           for(int w = 0; w < WAVEBANDS; w++)
-            density_kappa[w] = SphP[no].Density * SphP[no].Kappa[w];
+            Dtau_E[w] = SphP[no].DtauOverLength_E[w] * length;
+
+          double Dtau_N[WAVEBANDS];
+          for(int w = 0; w < WAVEBANDS; w++)
+            Dtau_N[w] = SphP[no].DtauOverLength_N[w] * length;
           
           WavebandData absorbed[WAVEBANDS];
-          double dtau_IR;
 
-          int still_alive = ray_absorb(ray, chord_length, density_kappa, absorbed, &dtau_IR);
+          /* Line Dissociation */
+          double dN_H2 = SphP[no].GrackleSpeciesConserved(GRACKLE_H2I) / SphP[no].Volume * length;
+          /* Percent LW absorption that goes into H2 line dissociation */
+          double lw_line[2] = {0.0, 0.0};
 
+          /* Proccess ray */
+          int still_alive = ray_absorb(ray, Dtau_E, Dtau_N, absorbed, dN_H2, lw_line);
+
+          /* Reradiation in the IR (Boosts momentum) */
+          double Dtau_IR = dtau_IR(no, length);
+          
           /* Deposit absorbed energy into cells, one band at a time */
-          /* What to do with Lyman-Werner? (TODO) */
-          /* Non Ionizing Energy */
-          double dp_rerad = 0.0;
+          double dK_total = 0.0;
           for(int w = 0; w < WAVEBANDS; w++)
             {
-              if(w = LYMAN_WERNER || w == IONIZING_HI || w == IONIZING_HeI || w == IONIZING_HeII)
-                continue;
-
-              SphP[no].Absorbed[w].Energy += absorbed[w].Energy;
-              dp_rerad += absorbed[w].Energy * (1 + dtau_IR * ReradiatedFraction[w]) / (CLIGHT / All.cf_UnitVelocity_in_cm_per_s) / All.cf_atime;
-            }
+              double dp;
+              
+              /* No IR reradiation */
+              if(w == IONIZING_HI || w == IONIZING_HeI || w == IONIZING_HeII)
+                dp = absorbed[w].Energy / (CLIGHT / All.cf_UnitVelocity_in_cm_per_s) / All.cf_atime;
+              /* IR reradiation (dust only) */
+              else if(w == LYMAN_WERNER)
+                dp = absorbed[w].Energy * (1.0 + (1.0 - lw_line[0]) * Dtau_IR * ReradiatedFraction[w]) / (CLIGHT / All.cf_UnitVelocity_in_cm_per_s) / All.cf_atime;
+              /* IR reradiation (full) */
+              else
+                dp = absorbed[w].Energy * (1.0 + Dtau_IR * ReradiatedFraction[w]) / (CLIGHT / All.cf_UnitVelocity_in_cm_per_s) / All.cf_atime;        
             
-          double dp = 0.0;
+              double dp_vec[3] = {dp * ray->dir[0], dp * ray->dir[1], dp * ray->dir[2]};
 
-          /* Dissociating Energy */
-          SphP[no].Absorbed[LYMAN_WERNER].Energy += absorbed[LYMAN_WERNER].Energy;
-          dp += absorbed[LYMAN_WERNER].Energy / (CLIGHT / All.cf_UnitVelocity_in_cm_per_s) / All.cf_atime;
+              /* Partially updated state */
+              double mj, pj[3];
 
-          /* Ionizing Energy */
-          SphP[no].Absorbed[IONIZING_HI].Energy += absorbed[IONIZING_HI].Energy;
-          dp += absorbed[IONIZING_HI].Energy / (CLIGHT / All.cf_UnitVelocity_in_cm_per_s) / All.cf_atime;
-          
-          SphP[no].Absorbed[IONIZING_HeI].Energy += absorbed[IONIZING_HeI].Energy;
-          dp += absorbed[IONIZING_HeI].Energy / (CLIGHT / All.cf_UnitVelocity_in_cm_per_s) / All.cf_atime;
-          
-          SphP[no].Absorbed[IONIZING_HeII].Energy += absorbed[IONIZING_HeII].Energy;
-          dp += absorbed[IONIZING_HeII].Energy / (CLIGHT / All.cf_UnitVelocity_in_cm_per_s) / All.cf_atime;
+              mj = P[no].Mass + SphP[no].StarMassFeed;
+              for(int k = 0; k < 3; k++)
+                pj[k] = SphP[no].Momentum[k] + SphP[no].StarMomentumFeed[k];
 
-          SphP[no].StarMomentumFeed[0] += (dp + dp_rerad) * ray->dir[0];
-          SphP[no].StarMomentumFeed[1] += (dp + dp_rerad) * ray->dir[1];
-          SphP[no].StarMomentumFeed[2] += (dp + dp_rerad) * ray->dir[2];
+              double sq_momentum = dp_vec[0]*dp_vec[0] + dp_vec[1]*dp_vec[1] + dp_vec[2]*dp_vec[2];
+
+              double cross = 2 * (pj[0] * dp_vec[0] + pj[1] * dp_vec[1] + pj[2] * dp_vec[2]);
+
+              double dK = (sq_momentum + cross) / (2 * mj);
+
+              SphP[no].StarMomentumFeed[0] += dp_vec[0];
+              SphP[no].StarMomentumFeed[1] += dp_vec[1];
+              SphP[no].StarMomentumFeed[2] += dp_vec[2];
+
+              if(w == LYMAN_WERNER)
+                SphP[no].Absorbed[w].Energy += (1.0 - lw_line[0]) * (absorbed[w].Energy - dK);
+              else
+                SphP[no].Absorbed[w].Energy += absorbed[w].Energy - dK;
+
+              dK_total += dK;
+            }
+
+          SphP[no].StarEnergyFeed += dK_total;
+          All.StarFeedbackLocal[2] += dK_total;
           
-          double sq_momentum = (dp + dp_rerad) * ray->dir[0]*(dp + dp_rerad) * ray->dir[0] 
-          + (dp + dp_rerad) * ray->dir[1]*(dp + dp_rerad) * ray->dir[1]
-          + (dp + dp_rerad) * ray->dir[2]*(dp + dp_rerad) * ray->dir[2];
-          double cross = (dp + dp_rerad) * ray->dir[0] * P[no].Vel[0]  
-          + (dp + dp_rerad) * ray->dir[1] * P[no].Vel[1] 
-          + (dp + dp_rerad) * ray->dir[2] * P[no].Vel[2];
-          SphP[no].StarEnergyFeed += sq_momentum / (2 * P[no].Mass) + 2 * cross / (2 * P[no].Mass);
-          All.StarFeedbackLocal[2] += sq_momentum / (2 * P[no].Mass) + 2 * cross / (2 * P[no].Mass);
-          
+          /* Deposit absorbed photons into cells, one band at a time */
           /* Dissociating Photons */
-          SphP[no].Absorbed[LYMAN_WERNER].Photons += absorbed[LYMAN_WERNER].Photons;
+           SphP[no].Absorbed[LYMAN_WERNER].Photons += lw_line[1] * absorbed[LYMAN_WERNER].Photons; 
 
           /* Ionizing Photons */
           SphP[no].Absorbed[IONIZING_HI].Photons += absorbed[IONIZING_HI].Photons;
@@ -228,7 +301,7 @@ void raytrace_treewalk(RayPacket *ray, RayWorkStack *work, RayExportBuffer *expo
          
           ray->t = cur.t_exit;
 
-          if(ray->t == ray->t_maximum) 
+          if(ray->t >= ray->t_maximum) 
             {
               ray->is_paused = 1; 
               return;
@@ -242,120 +315,138 @@ void raytrace_treewalk(RayPacket *ray, RayWorkStack *work, RayExportBuffer *expo
       else if(no < Ngb_MaxPart + Ngb_MaxNodes)
         {
           struct NgbNODE *nop = &Ngb_Nodes[no];
+          struct RtNgbNODE *rt_nop = &RtNgb_Nodes[no];
+
+          /* Node geometry */
+          /* Node center */
+          double cx = 0.5 * (rt_nop->rt_range_max[0] + rt_nop->rt_range_min[0]);
+          double cy = 0.5 * (rt_nop->rt_range_max[1] + rt_nop->rt_range_min[1]);
+          double cz = 0.5 * (rt_nop->rt_range_max[2] + rt_nop->rt_range_min[2]);
+                            
+          /* Node extent */ 
+          double dx = rt_nop->rt_range_max[0] - rt_nop->rt_range_min[0];
+          double dy = rt_nop->rt_range_max[1] - rt_nop->rt_range_min[1];
+          double dz = rt_nop->rt_range_max[2] - rt_nop->rt_range_min[2];
+
+          /* Node silhouette */
+          double ax = fabs(ray->dir[0]), ay = fabs(ray->dir[1]), az = fabs(ray->dir[2]);
+          double A_proj = dy*dz*ax + dx*dz*ay + dx*dy*az;   
+
+          /* Node center to ray origin distance */
+          double ddx = NEAREST_X(cx - ray->pos[0]);
+          double ddy = NEAREST_Y(cy - ray->pos[1]);
+          double ddz = NEAREST_Z(cz - ray->pos[2]);
+
+          double dist2 = ddx*ddx + ddy*ddy + ddz*ddz;
 
 #ifdef RAD_OPENING_ANGLE
+          /* -- Barnes-Hut opening criterion -- */
           /* This should only trigger for non-top level nodes */ 
-          if (no >= Ngb_FirstNonTopLevelNode)
-            {
-              /* -- Barnes-Hut opening criterion -- */
-              double cx = 0.5 * (nop->u.d.range_max[0] + nop->u.d.range_min[0]);
-              double cy = 0.5 * (nop->u.d.range_max[1] + nop->u.d.range_min[1]);
-              double cz = 0.5 * (nop->u.d.range_max[2] + nop->u.d.range_min[2]);
-
-              double ddx = cx - ray->pos[0];
-              double ddy = cy - ray->pos[1];
-              double ddz = cz - ray->pos[2];
-              double dist2 = ddx*ddx + ddy*ddy + ddz*ddz;
-
-              double dx = nop->u.d.range_max[0] - nop->u.d.range_min[0];
-              double dy = nop->u.d.range_max[1] - nop->u.d.range_min[1];
-              double dz = nop->u.d.range_max[2] - nop->u.d.range_min[2];
-              double len2 = dx*dx + dy*dy + dz*dz;
-          
+          if(no >= Ngb_FirstNonTopLevelNode)
+            {     
               /* Node is far enough - treat as single slab */
-              if(dist2 > 0 && len2 / dist2 < All.RadOpeningAngle * All.RadOpeningAngle)
+              if(dist2 > 0 && A_proj / dist2 < All.RadOpeningAngle * All.RadOpeningAngle)
                 {
-                  double chord_length = cur.t_exit - cur.t_enter;
-              
-                  double density_kappa[WAVEBANDS];
-                  for(int w = 0; w < WAVEBANDS; w++)
-                    /* Volume-weighted mean kappa * density */
-                    density_kappa[w] = RtNgb_Nodes[no].density_kappa[w];  
-
-                  WavebandData absorbed[WAVEBANDS];
-                  double dtau_IR;
-
-                  int still_alive = ray_absorb(ray, chord_length, density_kappa, absorbed, &dtau_IR);
-
-                  /* Accumulate for later distribution to children */
-                  for(int w = 0; w < WAVEBANDS; w++)
-                    {
-                      RtNgb_Nodes[no].Absorbed[w].Energy += absorbed[w].Energy;
-                      RtNgb_Nodes[no].Absorbed[w].Photons += absorbed[w].Photons;
-                    }
-
-                  ray->t = cur.t_exit;
-
-                  if(ray->t == ray->t_maximum) 
-                    {
-                      ray->is_paused = 1; 
-                      return;
-                    }
-
-                  if(!still_alive) 
-                    return;
+                  /* Node aspect */
+                  double lo = fmin(dx, fmin(dy, dz));
+                  double hi = fmax(dx, fmax(dy, dz));
+                  double aspect = (lo > 0.0) ? hi / lo : MAX_REAL_NUMBER;
                   
-                  /* Don't open this node */
-                  continue;  
-                }
-            }
-#endif      
-          /* Adaptive splitting criterion */
-          if(ray->nside < NSIDE_MAX)
-            {
-              double cx = 0.5 * (nop->u.d.range_max[0] + nop->u.d.range_min[0]);
-              double cy = 0.5 * (nop->u.d.range_max[1] + nop->u.d.range_min[1]);
-              double cz = 0.5 * (nop->u.d.range_max[2] + nop->u.d.range_min[2]);
-
-              double ddx = cx - ray->pos[0];
-              double ddy = cy - ray->pos[1];
-              double ddz = cz - ray->pos[2];
-              double dist2 = ddx*ddx + ddy*ddy + ddz*ddz;
-
-              double dx = nop->u.d.range_max[0] - nop->u.d.range_min[0];
-              double dy = nop->u.d.range_max[1] - nop->u.d.range_min[1];
-              double dz = nop->u.d.range_max[2] - nop->u.d.range_min[2];
-              double len2 = dx*dx + dy*dy + dz*dz;
-
-              /* Use number of actual children for adaptive f */
-             
-              /* At least 1 ray per child */
-              double f_eff = fmax(1.0, (double)RtNgb_Nodes[no].nchildren); 
+                  /* This should only trigger for not too elongated nodes */
+                  if(aspect < All.NodeAspectRatio)
+                    {
+                      double length = cur.t_exit - cur.t_enter;
               
-              /* Omega_ray = 4pi/(12*nside^2) */
-              double coeff = 3.0 * f_eff / M_PI; 
+                      double Dtau_E[WAVEBANDS];
+                      for(int w = 0; w < WAVEBANDS; w++)
+                        /* Volume-weighted mean kappa * density */
+                        Dtau_E[w] = RtNgb_Nodes[no].DtauOverLength_E[w] * length;
+                        
+                      double Dtau_N[WAVEBANDS];
+                      for(int w = 0; w < WAVEBANDS; w++)
+                        /* Volume-weighted mean kappa * density */
+                        Dtau_N[w] = RtNgb_Nodes[no].DtauOverLength_N[w] * length;
 
-              if(dist2 > 0.0 && len2 * coeff * (double)(ray->nside * ray->nside) > dist2)
+                      WavebandData absorbed[WAVEBANDS];
+
+                      double dN_H2 = RtNgb_Nodes[no].dN_H2_OverLength * length;
+                      double lw_line[2] = {0.0, 0.0};
+
+                      int still_alive = ray_absorb(ray, Dtau_E, Dtau_N, absorbed, dN_H2, lw_line);
+
+                      /* Accumulate for later distribution to children */
+                      for(int w = 0; w < WAVEBANDS; w++)
+                        {
+                          if(w == LYMAN_WERNER)
+                            {
+                              RtNgb_Nodes[no].Absorbed[w].Energy += (1.0 - lw_line[0]) * absorbed[w].Energy;
+                              RtNgb_Nodes[no].Absorbed[w].Photons += lw_line[1] * absorbed[w].Photons;
+                            }
+                          else
+                            {
+                              RtNgb_Nodes[no].Absorbed[w].Energy += absorbed[w].Energy;
+                              RtNgb_Nodes[no].Absorbed[w].Photons += absorbed[w].Photons;
+                            }
+                        }
+
+                      ray->t = cur.t_exit;
+
+                      if(ray->t >= ray->t_maximum) 
+                        {
+                          ray->is_paused = 1; 
+                          return;
+                        }
+
+                      if(!still_alive) 
+                        return;
+                  
+                      /* Don't open this node */
+                      continue;  
+                    } /* Else: Elongated node */
+                } /* Else: Node too big/close */
+            } /* Else: Top level node */
+#endif      
+          /* -- Adaptive splitting criterion -- */
+          /* This should not trigger for the root node */
+          if(no > Ngb_MaxPart)
+            {
+              /* This should not trigger for maximum resolution rays */
+              if(ray->nside < NSIDE_MAX)
                 {
+                  /* Use number of actual children for adaptive f */
+                  /* At least 1 ray per child */
+                  double f_eff = All.RaySplitFactor * (double)RtNgb_Nodes[no].Nchildren; 
+
                   /* Ray is too coarse - push split children to split_buf, consume parent */
-                  RayPacket children[4];
-                  if(split_ray(ray, children))
+                  /* Criterion: Omega_node = A_proj / dist2 < f * Omega_ray = f * 4pi/(12*nside^2) */
+                  if(dist2 > 0.0 && A_proj / dist2 < f_eff * 4.0 * M_PI / (12 * (double)(ray->nside * ray->nside)))
                     {
                       /* Pack pending */
-                      if(stack_top >= RAY_STACK_SIZE - 1) 
+                      if(stack_top > RAY_PENDING_SIZE)
                         terminate("Too many pending entries to split!");
-
+                      
                       ray->n_pending = stack_top;
                       memcpy(ray->pending, stack, stack_top * sizeof(StackEntry));
 
                       ray->t = cur.t_enter;
                       ray->t_exit = cur.t_exit;
+                  
                       /* Store for re-entry */
-                      ray->target_node = no;  
-
-                      for(int k = 0; k < 4; k++)
-                        {
-                          if(work->n >= work->capacity)
-                            terminate("Work stack overflow!");
-                          
-                          append_ray(work, &children[k]);
-                        }
+                      ray->target_node = no;
+                      
+                      RayPacket children[4];
+                      split_ray(ray, children);
+                    
+                      for(int k = 0; k < 4; k++)                      
+                        append_ray(work, &children[k]);
+                   
                       /* Parent ray is consumed */
                       return;   
-                    }
-                  /* Else: at NSIDE_MAX, fall through and open the node normally */
-                }
-            }
+                                  
+                    } /* Else: ray fine enough for node */
+                } /* Else: ray at max resolution, open node */
+            } /* Else: Root node */
+         
           /* Open node and enumerate children -> sort by t_enter, push */
           StackEntry children[8];
           int nchildren = 0;
@@ -368,34 +459,33 @@ void raytrace_treewalk(RayPacket *ray, RayWorkStack *work, RayExportBuffer *expo
 
               /* Cell */
               if(child < Ngb_MaxPart) 
-                {
-                  double px = NEAREST_X(P[child].Pos[0] - ray->pos[0]);
-                  double py = NEAREST_Y(P[child].Pos[1] - ray->pos[1]);
-                  double pz = NEAREST_Z(P[child].Pos[2] - ray->pos[2]);
-                  
-                  double r  = cbrt((3.0 * SphP[child].Volume) / (4.0 * M_PI));
+                {             
+                  double r = get_cell_radius(child);
                   double r2 = r * r;
                       
-                  hit = ray_sphere_intersect(px, py, pz, ray->dir, r2, &t_enter, &t_exit);              
+                  double cpos[3] = {P[child].Pos[0], P[child].Pos[1], P[child].Pos[2]};
+                  
+                  hit = ray_sphere_intersect(ray->pos, ray->dir, cpos, r2, &t_enter, &t_exit);            
                 }
               /* Internal node */  
               else if(child < Ngb_MaxPart + Ngb_MaxNodes) 
-                hit = ray_box_intersect(ray->pos, ray->dir, Ngb_Nodes[child].u.d.range_min, Ngb_Nodes[child].u.d.range_max, &t_enter, &t_exit);
+                {   
+                  if(!rt_node_inverted(child))
+                    hit = ray_box_intersect(ray->pos, ray->dir, RtNgb_Nodes[child].rt_range_min, RtNgb_Nodes[child].rt_range_max, &t_enter, &t_exit);
+                }
               /* Pseudo-particle: remote domain */
               else 
                 {
                   int pseudo_idx = child - (Ngb_MaxPart + Ngb_MaxNodes);
                   int top_node = Ngb_DomainNodeIndex[pseudo_idx];
 
-                  hit = ray_box_intersect(ray->pos, ray->dir, Ngb_Nodes[top_node].u.d.range_min, Ngb_Nodes[top_node].u.d.range_max, &t_enter, &t_exit);
+                  if(!rt_node_inverted(top_node))
+                    hit = ray_box_intersect(ray->pos, ray->dir, RtNgb_Nodes[top_node].rt_range_min, RtNgb_Nodes[top_node].rt_range_max, &t_enter, &t_exit);
                 }
 
               if(hit)
                 {
-                  if(t_enter > ray->t_maximum)
-                  /* Child is beyond max travel distance - skip entirely */
-                    continue;
-                  else
+                  if(t_enter < ray->t_maximum)
                     {
                       /* Limit traversal distance */
                       t_exit = fmin(t_exit, ray->t_maximum);  
@@ -446,7 +536,7 @@ void raytrace_treewalk(RayPacket *ray, RayWorkStack *work, RayExportBuffer *expo
           int remote_node = Ngb_DomainNodeIndex[no - (Ngb_MaxPart + Ngb_MaxNodes)];
 
           /* Pack pending */
-          if(stack_top >= RAY_STACK_SIZE - 1) 
+          if(stack_top > RAY_PENDING_SIZE) 
             terminate("Too many pending entries to export!");
 
           ray->n_pending = stack_top;
@@ -458,14 +548,7 @@ void raytrace_treewalk(RayPacket *ray, RayWorkStack *work, RayExportBuffer *expo
           ray->target_node = remote_node;  
 
           /* Add to export buffer */
-          if(export_buf->n < export_buf->capacity)
-            {
-              export_buf->rays[export_buf->n] = *ray;
-              export_buf->task[export_buf->n] = task;
-              export_buf->n++;
-            }
-          else
-            terminate("Export buffer full!");
+          append_export(export_buf, ray, task);
 
         /* This rank is done with this ray */
         return;

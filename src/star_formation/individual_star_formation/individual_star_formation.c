@@ -214,11 +214,15 @@ void individual_starbystar_formation(void)
   sf_starbystar();
   sf_massdrain();
 
-  /* apply drain and finalize heavy stars */
+  /* Apply drain and finalize heavy stars */
   for(i = 0; i < NumStars; i++)
     {
-      if(PPS(i).Mass == 0 && SP[i].MassOfStar > 0) /* heavy star */
-        PPS(i).Mass = SP[i].MassOfStar;
+      /* Heavy star */
+      if(PPS(i).Mass == 0 && SP[i].MassOfStar > 0) 
+        {
+          PPS(i).Mass = SP[i].MassOfStar;
+          SP[i].Metallicity /= PPS(i).Mass;
+        }
     }
       
   for(idx = 0; idx < TimeBinsHydro.NActiveParticles; idx++)
@@ -247,9 +251,9 @@ void individual_starbystar_formation(void)
               SphP[i].Momentum[1] *= factor;
               SphP[i].Momentum[2] *= factor;
 #ifdef MAXSCALARS
-              for(int s = 0; s < N_Scalar; s++) /* Note, the changes in MATERIALS, HIGHRESGASMASS, etc., are treated as part of the Scalars */
+              for(int s = 0; s < N_Scalar; s++)
               *(MyFloat *)(((char *)(&SphP[i])) + scalar_elements[s].offset_mass) *= factor;
-#endif /* #ifdef MAXSCALARS */
+#endif
             }
           SphP[i].StarMassDrain = 0;
         }
@@ -302,6 +306,7 @@ static void spawn_heavy(int igas, double birthtime, int istar, MyDouble mass_of_
 #ifdef STAR_FEEDBACK_ACTIVE
   /* Set timebin */
   SP[NumStars].Active = 0;
+  SP[NumStars].WithFeedback = 1;
   SP[NumStars].HostHydroBin = P[igas].TimeBinHydro;
   timebin_add_particle(&TimeBinsStar, NumStars, -1, 0, 1);
 #endif
@@ -362,9 +367,9 @@ static void spawn_light(int igas, double birthtime, int istar, MyDouble mass_of_
 //#endif /* #ifdef MHD */
 
 #ifdef MAXSCALARS
-  for(int s = 0; s < N_Scalar; s++) /* Note, the changes in MATERIALS, HIGHRESGASMASS, etc., are treated as part of the Scalars */
+  for(int s = 0; s < N_Scalar; s++) 
     *(MyFloat *)(((char *)(&SphP[igas])) + scalar_elements[s].offset_mass) *= fac;
-#endif /* #ifdef MAXSCALARS */
+#endif 
 
   /* Zero star struct */
   memset(&SP[NumStars], 0, sizeof(Star_Particle_Data));
@@ -373,7 +378,7 @@ static void spawn_light(int igas, double birthtime, int istar, MyDouble mass_of_
   SP[NumStars].PID = istar;
 
 #ifdef METALS 
-  SP[NumStars].Metallicity = SphP[igas].GasMetallicity;
+  SP[NumStars].Metallicity = SphP[igas].GasMetals / P[igas].Mass;
 #endif
 
 #ifdef POPIII_SF
@@ -388,6 +393,7 @@ static void spawn_light(int igas, double birthtime, int istar, MyDouble mass_of_
   
   /* Set timebin */
   SP[NumStars].Active = 0;
+  SP[NumStars].WithFeedback = 1;
   SP[NumStars].HostHydroBin = P[igas].TimeBinHydro;
   timebin_add_particle(&TimeBinsStar, NumStars, -1, 0, 1);
 

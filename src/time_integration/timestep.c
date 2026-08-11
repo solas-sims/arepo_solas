@@ -176,7 +176,7 @@ void find_timesteps_without_gravity(void)
 #ifdef STAR_FEEDBACK_ACTIVE
       if(P[i].Type == 4)
         {
-          double ti_star_step = star_timestep(P[i].SID);
+          integertime ti_star_step = star_timestep(P[i].SID);
           
           if(ti_star_step < ti_step)
             ti_step = ti_star_step;
@@ -186,7 +186,7 @@ void find_timesteps_without_gravity(void)
 #ifdef BH_ACTIVE
       if(P[i].Type == 5)
         {
-          double ti_bh_step = bh_timestep(P[i].BhID);
+          integertime ti_bh_step = bh_timestep(P[i].BhID);
           
           if(ti_bh_step < ti_step)
             ti_step = ti_bh_step;
@@ -468,6 +468,13 @@ integertime get_timestep_hydro(int p)
     dt = dt_powell;
 #endif /* #ifdef MHD_POWELL_LIMIT_TIMESTEP */
 
+#ifdef PHOTOIONIZATION
+  double dt_rad = SphP[p].RT_Timestep;
+  
+  if(dt_rad != 0 && dt_rad < dt) 
+    dt = dt_rad;
+#endif
+
   /* convert the physical timestep to dloga if needed. Note: If comoving integration has not been selected,
      All.cf_hubble_a=1.
    */
@@ -556,7 +563,7 @@ int test_if_grav_timestep_is_too_large(int p, int bin)
 #ifdef STAR_FEEDBACK_ACTIVE
   if(P[p].Type == 4)
     {
-      double ti_star_step = star_timestep(P[p].SID);
+      integertime ti_star_step = star_timestep(P[p].SID);
           
       if(ti_star_step < ti_step)
         ti_step = ti_star_step;
@@ -566,7 +573,7 @@ int test_if_grav_timestep_is_too_large(int p, int bin)
 #ifdef BH_ACTIVE
       if(P[p].Type == 5)
         {
-          double ti_bh_step = bh_timestep(P[p].BhID);
+          integertime ti_bh_step = bh_timestep(P[p].BhID);
           
           if(ti_bh_step < ti_step)
             ti_step = ti_bh_step;

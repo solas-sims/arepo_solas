@@ -352,7 +352,7 @@ void convert_cell_into_star(int i, double birthtime)
   P[i].SID = NumStars;
   SP[NumStars].PID = i;
 #ifdef METALS 
-  SP[NumStars].Metallicity = SphP[i].GasMetallicity;
+  SP[NumStars].Metallicity = SphP[i].GasMetals / P[i].Mass;
 #endif 
 
 #ifdef POPIII_SF
@@ -367,6 +367,7 @@ void convert_cell_into_star(int i, double birthtime)
   SP[NumStars].Hsml = get_cell_radius(i); 
   /* Set timebin */
   SP[NumStars].Active = 0;
+  SP[NumStars].WithFeedback = 1;
   SP[NumStars].HostHydroBin = P[i].TimeBinHydro; 
   timebin_add_particle(&TimeBinsStar, NumStars, -1, 0, 1);  
 #endif
@@ -438,9 +439,9 @@ void spawn_star_from_cell(int igas, double birthtime, int istar, MyDouble mass_o
 //#endif /* #ifdef MHD */
 
 #ifdef MAXSCALARS
-  for(int s = 0; s < N_Scalar; s++) /* Note, the changes in MATERIALS, HIGHRESGASMASS, etc., are treated as part of the Scalars */
+  for(int s = 0; s < N_Scalar; s++)
     *(MyFloat *)(((char *)(&SphP[igas])) + scalar_elements[s].offset_mass) *= fac;
-#endif /* #ifdef MAXSCALARS */
+#endif 
 
 #ifdef STARS
   /* Zero star struct */
@@ -449,7 +450,7 @@ void spawn_star_from_cell(int igas, double birthtime, int istar, MyDouble mass_o
   P[istar].SID = NumStars;
   SP[NumStars].PID = istar;
 #ifdef METALS 
-  SP[NumStars].Metallicity = SphP[igas].GasMetallicity;
+  SP[NumStars].Metallicity = SphP[igas].GasMetals / P[igas].Mass;
 #endif
 
 #ifdef POPIII_SF
@@ -464,6 +465,7 @@ void spawn_star_from_cell(int igas, double birthtime, int istar, MyDouble mass_o
   SP[NumStars].Hsml = get_cell_radius(igas);
   /* Set timebin */
   SP[NumStars].Active = 0;
+  SP[NumStars].WithFeedback = 1;
   SP[NumStars].HostHydroBin = P[igas].TimeBinHydro;
   timebin_add_particle(&TimeBinsStar, NumStars, -1, 0, 1); 
 

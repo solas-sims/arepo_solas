@@ -137,8 +137,16 @@ extern struct primexch
   short int TimeBinHydro;
 
 #if defined(WINDS) || defined(SUPERNOVAE)
+  MyDouble Mass;
+#ifdef METALS
+  MyDouble Metals;
+#endif
+  MyDouble Momentum[3];
+
   MyDouble MassFeed;
+#ifdef METALS
   MyDouble MetalsFeed;
+#endif
   MyDouble MomentumFeed[3];
 #endif
 } *PrimExch;

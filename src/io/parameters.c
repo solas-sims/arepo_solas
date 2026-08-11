@@ -614,25 +614,49 @@ void read_parameter_file(char *fname)
 #endif /* #ifdef POPIII_SF */
 #endif /* #ifdef STAR_PARTICLES */
 
+#if defined(TREE_BASED_TIMESTEPS) && defined(SUPERNOVAE)
+      strcpy(tag[nt], "SN_LeadTime");
+      addr[nt] = &All.SN_LeadTime;
+      id[nt++] = REAL;
+#endif
+
 #ifdef STAR_FEEDBACK_ACTIVE
       strcpy(tag[nt], "StarTablesFile");
-      addr[nt] = All.StarTablesFile;
+      addr[nt] = &All.StarTablesFile;
       id[nt++] = STRING;
 #endif
 
-#ifdef STAR_FEEDBACK_SPH
-      strcpy(tag[nt], "StarDesNgb");
-      addr[nt] = &All.StarDesNgb;
-      id[nt++] = REAL;
-      
-      strcpy(tag[nt], "StarDesDev");
-      addr[nt] = &All.StarDesDev;
+#ifdef SUPERNOVAE
+      strcpy(tag[nt], "SN_HostShellSweepFrac");
+      addr[nt] = &All.SN_HostShellSweepFrac;
       id[nt++] = REAL;
 #endif
+
+#ifdef STAR_RADIATION_ACTIVE
+      strcpy(tag[nt], "RaySplitFactor");
+      addr[nt] = &All.RaySplitFactor;
+      id[nt++] = REAL;
+#endif  
 
 #ifdef RAD_OPENING_ANGLE
       strcpy(tag[nt], "RadOpeningAngle");
       addr[nt] = &All.RadOpeningAngle;
+      id[nt++] = REAL;
+
+      strcpy(tag[nt], "NodeAspectRatio");
+      addr[nt] = &All.NodeAspectRatio;
+      id[nt++] = REAL;
+#endif  
+
+#ifdef PHOTOIONIZATION
+      strcpy(tag[nt], "RTIonizationTimestepFraction");
+      addr[nt] = &All.RTIonizationTimestepFraction;
+      id[nt++] = REAL;
+#endif  
+
+#ifdef RADIATION_PRESSURE
+      strcpy(tag[nt], "IRDtauMomentumBoostCoeff");
+      addr[nt] = &All.IRDtauMomentumBoostCoeff;
       id[nt++] = REAL;
 #endif  
 

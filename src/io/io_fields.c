@@ -734,7 +734,7 @@ void init_io_fields()
 #endif /* #ifdef MHD */
 
   /* Scalars */
-#ifdef PASSIVE_SCALARS
+#if PASSIVE_SCALARS > 0
   init_field(IO_PASS, "PASS", "PassiveScalars", MEM_MY_FLOAT, FILE_MY_IO_FLOAT, FILE_MY_IO_FLOAT, PASSIVE_SCALARS, A_SPHP,
              &SphP[0].PScalars[0], 0, GAS_ONLY);
   init_units(IO_PASS, 0., 0., 0., 0., 0., 0.0);

@@ -34,9 +34,10 @@
 #WINDS                  # Only winds
 
 #RADIATION              # Full radiation
-#PHOTOIONIZATION        # Only photoionization
-#PHOTOELECTRIC_HEATING  # Only photoelectric
 #RADIATION_PRESSURE     # Only radiation pressure
+#PHOTOELECTRIC_HEATING  # Only photoelectric
+#DISSOCIATION           # Only dissociation
+#PHOTOIONIZATION        # Only photoionization
 
 #SUPERNOVAE             # Only supernovae
 

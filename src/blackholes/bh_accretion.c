@@ -260,9 +260,9 @@ void bh_accretion(void)
  */
 static int bh_accretion_evaluate(int target, int mode, int threadid)
 {
-  int i, n, numnodes, *firstnode; 
-  double h, h2, r, r2, wk;
-  double dx, dy, dz, dvx, dvy, dvz; 
+  int i, n, numnodes, *firstnode;
+  MyDouble xtmp, ytmp, ztmp;   
+  MyDouble h, h2, dx, dy, dz, r, r2, wk;
   MyDouble *pos, *vel;
   
   data_in local, *target_data;
@@ -316,7 +316,7 @@ static int bh_accretion_evaluate(int target, int mode, int threadid)
 //  double rbh2 = rbh * rbh;
 //#endif
 
-  double hinv, hinv3, hinv4, u, dwk;
+  MyDouble hinv, hinv3, hinv4, u, dwk;
 
   h2 = h * h;
   hinv = 1.0 / h;
@@ -340,36 +340,17 @@ static int bh_accretion_evaluate(int target, int mode, int threadid)
       if(P[i].Type != 0 || P[i].Mass == 0 || P[i].ID == 0)
         continue;
 
-/* compute bh->cell position vectors: posBhP-posSphP */
-      dx = pos[0] - P[i].Pos[0];
-      dy = pos[1] - P[i].Pos[1];
-      dz = pos[2] - P[i].Pos[2];
+      /* Compute bh->cell position vector */
+      dx = NEAREST_X(P[i].Pos[0] - pos[0]);
+      dy = NEAREST_Y(P[i].Pos[1] - pos[1]);
+      dz = NEAREST_Z(P[i].Pos[2] - pos[2]);
 
-/* compute bh->cell velocity vectors: posBhP-posSphP */
-      dvx = vel[0] - P[i].Vel[0];
-      dvy = vel[1] - P[i].Vel[1];
-      dvz = vel[2] - P[i].Vel[2];
+      MyDouble dvx, dvy, dvz;  
 
-#ifndef REFLECTIVE_X
-      if(dx > boxHalf_X)
-        dx -= boxSize_X;
-      if(dx < -boxHalf_X)
-        dx += boxSize_X;
-#endif /* #ifndef REFLECTIVE_X */
-
-#ifndef REFLECTIVE_Y
-      if(dy > boxHalf_Y)
-        dy -= boxSize_Y;
-      if(dy < -boxHalf_Y)
-        dy += boxSize_Y;
-#endif /* #ifndef REFLECTIVE_Y */
-
-#ifndef REFLECTIVE_Z
-      if(dz > boxHalf_Z)
-        dz -= boxSize_Z;
-      if(dz < -boxHalf_Z)
-        dz += boxSize_Z;
-#endif /* #ifndef REFLECTIVE_Z */
+     /* Compute bh->cell velocity vector */
+      dvx = P[i].Vel[0] - vel[0]; 
+      dvy = P[i].Vel[1] - vel[1];
+      dvz = P[i].Vel[2] - vel[2];
 
       r2 = dx * dx + dy * dy + dz * dz;
 
@@ -384,12 +365,12 @@ static int bh_accretion_evaluate(int target, int mode, int threadid)
 
           bh_kernel(u, hinv3, hinv4, &wk, &dwk);
 
-          double v_cross[3];
+          MyDouble v_cross[3];
           v_cross[0] = dy * dvz - dz * dvy;
           v_cross[1] = dz * dvx - dx * dvz;
           v_cross[2] = dx * dvy - dy * dvx;
 
-          double rho = (SphP[i].Density > 0) ? SphP[i].Density : 1;
+          MyDouble rho = (SphP[i].Density > 0) ? SphP[i].Density : 1;
 
 #ifdef BONDI_ACCRETION
           /* Comute relative velocities, 

@@ -130,15 +130,15 @@ void create_mesh(void)
 
   short int *FeedbackTimeBin = mymalloc_movable(&FeedbackTimeBin, "FeedbackTimeBin", NumGas * sizeof(short int));
 
-  for(j = 0; j < NumPart; j++)
+  for(j = 0; j < NumGas; j++)
     {
-      if(P[j].Type == 0)
+      if(P[j].Type != 0 || P[j].Mass == 0 || P[j].ID == 0)
+        continue;
+      
+      if(SphP[j].Host)
         {
-          if(SphP[j].Host)
-            {
-              FeedbackTimeBin[j] = P[j].TimeBinHydro;
-              P[j].TimeBinHydro = 0;
-            }
+          FeedbackTimeBin[j] = P[j].TimeBinHydro;
+          P[j].TimeBinHydro = 0;
         }
     }
 
@@ -470,14 +470,14 @@ void create_mesh(void)
 #endif /* #if defined(CREATE_FULL_MESH) */
 
 #if !defined(CREATE_FULL_MESH) && (defined(WINDS) || defined(SUPERNOVAE))
-  for(j = 0; j < NumPart; j++)
+  for(j = 0; j < NumGas; j++)
     {
-      if(P[j].Type == 0)
+      if(P[j].Type != 0 || P[j].Mass == 0 || P[j].ID == 0)
+        continue;
+
+      if(SphP[j].Host)
         {
-          if(SphP[j].Host)
-            {
-              P[j].TimeBinHydro = FeedbackTimeBin[j];
-            }
+          P[j].TimeBinHydro = FeedbackTimeBin[j];
         }
     }
     

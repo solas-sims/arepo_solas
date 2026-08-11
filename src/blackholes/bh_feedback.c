@@ -146,8 +146,8 @@ void bh_feedback(void)
 static int bh_feedback_evaluate(int target, int mode, int threadid)
 {
   int i, n, numnodes, *firstnode; 
-  double h, h2, r, r2, wk;
-  double dx, dy, dz, dvx, dvy, dvz; 
+  MyDouble xtmp, ytmp, ztmp;   
+  MyDouble h, h2, dx, dy, dz, r, r2, wk; 
   MyDouble *pos, ngbsvolume, accretion, mass_feed, energy_feed, factor;
 
   data_in local, *target_data;
@@ -173,20 +173,19 @@ static int bh_feedback_evaluate(int target, int mode, int threadid)
   ngbsvolume = target_data->NgbsVolume;
   accretion = target_data->Accretion;
 
-  factor = 0;
   mass_feed = All.Mload * All.Epsilon_r * accretion; 
   energy_feed = All.Epsilon_f * (1.0 - All.Mload) * All.Epsilon_r  * accretion * (CLIGHT*CLIGHT / (All.cf_UnitVelocity_in_cm_per_s*All.cf_UnitVelocity_in_cm_per_s));
 
-  double hinv, hinv3, hinv4, u, dwk;
+  //MyDouble hinv, hinv3, hinv4, u, dwk;
 
-  h2   = h * h;
-  hinv = 1.0 / h;
-#ifndef TWODIMS
-  hinv3 = hinv * hinv * hinv;
-#else  /* #ifndef  TWODIMS */
-  hinv3 = hinv * hinv / boxSize_Z;
-#endif /* #ifndef  TWODIMS #else */
-  hinv4 = hinv3 * hinv;
+  //h2   = h * h;
+  //hinv = 1.0 / h;
+//#ifndef TWODIMS
+//  hinv3 = hinv * hinv * hinv;
+//#else  /* #ifndef  TWODIMS */
+//  hinv3 = hinv * hinv / boxSize_Z;
+//#endif /* #ifndef  TWODIMS #else */
+//  hinv4 = hinv3 * hinv;
 
 #ifdef BH_CONSTANT_RADIUS
   int nfound = ngb_treefind_variable_threads(pos, All.BhRadius, target, mode, threadid, numnodes, firstnode);
@@ -201,31 +200,10 @@ static int bh_feedback_evaluate(int target, int mode, int threadid)
       if(P[i].Type != 0 || P[i].Mass == 0 || P[i].ID == 0)
         continue;
 
-/* compute bh->cell position vectors: posBhP-posSphP */
-      dx = pos[0] - P[i].Pos[0];
-      dy = pos[1] - P[i].Pos[1];
-      dz = pos[2] - P[i].Pos[2];
-
-#ifndef REFLECTIVE_X
-      if(dx > boxHalf_X)
-        dx -= boxSize_X;
-      if(dx < -boxHalf_X)
-        dx += boxSize_X;
-#endif /* #ifndef REFLECTIVE_X */
-
-#ifndef REFLECTIVE_Y
-      if(dy > boxHalf_Y)
-        dy -= boxSize_Y;
-      if(dy < -boxHalf_Y)
-        dy += boxSize_Y;
-#endif /* #ifndef REFLECTIVE_Y */
-
-#ifndef REFLECTIVE_Z
-      if(dz > boxHalf_Z)
-        dz -= boxSize_Z;
-      if(dz < -boxHalf_Z)
-        dz += boxSize_Z;
-#endif /* #ifndef REFLECTIVE_Z */
+      /* Compute bh->cell position vector */
+      dx = NEAREST_X(P[i].Pos[0] - pos[0]);
+      dy = NEAREST_Y(P[i].Pos[1] - pos[1]);
+      dz = NEAREST_Z(P[i].Pos[2] - pos[2]);
 
       r2 = dx * dx + dy * dy + dz * dz;
 
@@ -238,7 +216,7 @@ static int bh_feedback_evaluate(int target, int mode, int threadid)
           r = sqrt(r2);
           u = r * hinv;
 
-          bh_kernel(u, hinv3, hinv4, &wk, &dwk);
+          //bh_kernel(u, hinv3, hinv4, &wk, &dwk);
 
           factor = SphP[i].Volume / ngbsvolume;
 

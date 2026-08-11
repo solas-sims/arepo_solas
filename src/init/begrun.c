@@ -155,10 +155,6 @@ void begrun1(void)
   timebins_init(&TimeBinsStar, "Star", &All.MaxPartStars);
 #endif 
 
-#if defined(WINDS) || defined(SUPERNOVAE) 
-  feedback_init(&MechanicalFeedbackEvents);
-#endif 
-
 #ifdef BH_ACTIVE
   timebins_init(&TimeBinsBh, "Bh", &All.MaxPartBhs);
 #endif 

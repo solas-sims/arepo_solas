@@ -46,7 +46,7 @@ void bh_kernel(double u, double hinv3, double hinv4, double *wk, double *dwk)
 
 integertime bh_timestep(int i)
 { 
-  /* Neighbours Minimum Bin */
+  /* Neighbours minimum bin */
   double dt_ngbmin = (BhP[i].NgbsMinBin ? (((integertime)1) << BhP[i].NgbsMinBin) : 0) * All.Timebase_interval;
   
   double dt;
@@ -136,6 +136,7 @@ void bh_update_list_of_active_particles(void)
 {
   int i, n;
   TimeBinsBh.NActiveParticles = 0;
+
   for(n = 0; n < TIMEBINS; n++)
     {
       if(TimeBinSynchronized[n]) 
@@ -149,12 +150,13 @@ void bh_update_list_of_active_particles(void)
     }
 
   mysort(TimeBinsBh.ActiveParticleList, TimeBinsBh.NActiveParticles, sizeof(int), int_compare);
+
+  sumup_large_ints(1, &TimeBinsBh.NActiveParticles, &TimeBinsBh.GlobalNActiveParticles);
 }
 
 void bh_perform_end_of_step_physics(void)
 {
   int idx, i;
-  long long bh_active = 0;
     
 #ifdef BH_ACCRETION_ACTIVE
   /* Accrete mass and angular momentum onto the bh */
@@ -185,6 +187,11 @@ void bh_perform_end_of_step_physics(void)
       SphP[i].Momentum[0] *= factor;
       SphP[i].Momentum[1] *= factor;
       SphP[i].Momentum[2] *= factor;
+
+#ifdef MAXSCALARS
+      for(int s = 0; s < N_Scalar; s++)
+        *(MyFloat *)(((char *)(&SphP[i])) + scalar_elements[s].offset_mass) *= factor;
+#endif
 
       SphP[i].BhMassDrain = 0;
     }
@@ -248,7 +255,7 @@ void bh_perform_end_of_step_physics(void)
 #ifdef JET_TRACER
           // Tracer field advected passively 
           SphP[i].PScalars[JET_INDEX] = 1;
-          SphP[i].PConservedScalars[JET_INDEX] = P[i].Mass;
+          sync_conserved_from_primitive(i, JET_INDEX);
 #endif
         }
     }
@@ -256,10 +263,9 @@ void bh_perform_end_of_step_physics(void)
       All.FeedbackFlag = -1;
 #endif
         
-    MPI_Allreduce(&TimeBinsBh.NActiveParticles, &bh_active, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
     MPI_Allreduce(&All.BhFeedbackLocal, &All.BhFeedbackGlobal, 2, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
   
-    mpi_printf("BLACKHOLES: Number of active blackholes = %lld \n", bh_active);
+    mpi_printf("BLACKHOLES: Number of active blackholes = %lld \n", TimeBinsBh.GlobalNActiveParticles);
     mpi_printf("BLACKHOLES: Energy given by BHs = %e, Energy taken up by gas particles = %e \n",
     All.BhFeedbackGlobal[0], All.BhFeedbackGlobal[1]);
 

@@ -49,36 +49,6 @@ struct scalar_elements scalar_elements[MAXSCALARS];
 struct scalar_index ScalarIndex;
 #endif /* #ifdef MAXSCALARS */
 
-/*! \brief Main routine to initialize passive scalar quantities.
- *
- *  \return void
- */
-void init_scalars()
-{
-#ifdef MAXSCALARS
-
-#if defined(REFINEMENT_HIGH_RES_GAS)
-  ScalarIndex.HighResMass = scalar_init(&SphP[0].HighResDensity, &SphP[0].HighResMass, SCALAR_TYPE_PASSIVE);
-  if(ScalarIndex.HighResMass == -1)
-    terminate("ScalarIndex.HighResMass initialized incorrectly\n");
-#endif /* #if defined(REFINEMENT_HIGH_RES_GAS) */
-
-#ifdef PASSIVE_SCALARS
-  for(int i = 0; i < PASSIVE_SCALARS; i++)
-    {
-#ifdef METALS
-      if(i == METALS_INDEX)
-        mpi_printf("Initializing passive scalar: Total Metallicity\n");
-#endif /* METALS */
-
-      scalar_init(&SphP[0].PScalars[i], &SphP[0].PConservedScalars[i], SCALAR_TYPE_PASSIVE);
-    }
-#endif /* #ifdef PASSIVE_SCALARS */
-
-  mpi_printf("INIT: %d/%d Scalars used.\n", N_Scalar, MAXSCALARS);
-#endif /* MAXSCALARS */
-}
-
 /*! \brief Initialize a specific scalar property.
  *
  *  \param[in] addr Pointer to (primitive) scalar in SphP[0] struct.
@@ -109,4 +79,80 @@ int scalar_init(MyFloat *addr, MyFloat *addr_mass, int type)
 #else  /* #ifdef MAXSCALARS */
   return -1;
 #endif /* #ifdef MAXSCALARS #else */
+}
+
+/*! \brief Main routine to initialize passive scalar quantities.
+ *
+ *  \return void
+ */
+void init_scalars(void)
+{
+#ifdef MAXSCALARS
+
+#if defined(REFINEMENT_HIGH_RES_GAS)
+  ScalarIndex.HighResMass = scalar_init(&SphP[0].HighResDensity, &SphP[0].HighResMass, SCALAR_TYPE_PASSIVE);
+  if(ScalarIndex.HighResMass == -1)
+    terminate("ScalarIndex.HighResMass initialized incorrectly\n");
+#endif /* #if defined(REFINEMENT_HIGH_RES_GAS) */
+
+#if PASSIVE_SCALARS > 0
+  for(int i = 0; i < PASSIVE_SCALARS; i++)
+    scalar_init(&SphP[0].PScalars[i], &SphP[0].PConservedScalars[i], SCALAR_TYPE_PASSIVE);
+#endif
+
+  mpi_printf("INIT: %d/%d Scalars used.\n", N_Scalar, MAXSCALARS);
+#endif /* MAXSCALARS */
+}
+
+void init_passive_scalars(void)
+{
+  int i;
+
+  for(i = 0; i < NumGas; i++)
+    {
+#ifdef METALS
+      SphP[i].GasMetallicity = All.InitMetallicityinSolar * SOLAR_METALLICITY;
+#endif /* #ifdef METALS */
+
+#ifdef USE_GRACKLE
+      /* Fully neutral initial conditions -> might want to set different ones */
+#if GRACKLE_CHEMISTRY >= 1
+      SphP[i].GrackleSpecies(GRACKLE_HI) = HYDROGEN_MASSFRAC;  /* all H is neutral */
+      SphP[i].GrackleSpecies(GRACKLE_HII) = GRACKLE_TINY;
+      SphP[i].GrackleSpecies(GRACKLE_HeI) = (1.0 - HYDROGEN_MASSFRAC);  /* all He is neutral */
+      SphP[i].GrackleSpecies(GRACKLE_HeII) = GRACKLE_TINY;
+      SphP[i].GrackleSpecies(GRACKLE_HeIII) = GRACKLE_TINY;
+#endif /* #if (GRACKLE_CHEMISTRY >= 1) */
+
+#if GRACKLE_CHEMISTRY >= 2
+      SphP[i].GrackleSpecies(GRACKLE_H2I) = GRACKLE_TINY;
+      SphP[i].GrackleSpecies(GRACKLE_H2II) = GRACKLE_TINY;
+      SphP[i].GrackleSpecies(GRACKLE_HM) = GRACKLE_TINY;
+#endif /* #if (GRACKLE_CHEMISTRY >= 2) */
+
+#if GRACKLE_CHEMISTRY >= 3
+      SphP[i].GrackleSpecies(GRACKLE_DI) = GRACKLE_TINY;
+      SphP[i].GrackleSpecies(GRACKLE_DII) = GRACKLE_TINY;
+      SphP[i].GrackleSpecies(GRACKLE_HDI) = GRACKLE_TINY;
+#endif /* #if (GRACKLE_CHEMISTRY >= 3) */
+#endif /* #ifdef USE_GRACKLE */
+
+#ifdef JET_TRACER
+      SphP[i].JetTracer = 0.0;
+#endif /* #ifdef JET_TRACER */
+
+      /* Convert every primitive passive scalar to its conserved form */
+      for(int j = 0; j < PASSIVE_SCALARS; j++)
+        sync_conserved_from_primitive(i, j);
+    }
+}
+
+void sync_conserved_from_primitive(int target, int idx)
+{
+  SphP[target].PConservedScalars[idx] = SphP[target].PScalars[idx] * P[target].Mass;
+}
+
+void sync_primitive_from_conserved(int target, int idx)
+{
+  SphP[target].PScalars[idx] = SphP[target].PConservedScalars[idx] / P[target].Mass;
 }

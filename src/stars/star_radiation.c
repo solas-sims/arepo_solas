@@ -4,91 +4,285 @@
 #include "../extern/chealpix.h"
 
 
-double HealpixDirs[MAX_NUM_RAYS][3];
-/* 12*NSIDE^2 */
-int NRays; 
-
-/* Reference opacity coefficients [cm^2/g of gas] at solar metallicity
- *
- * LYMAN_WERNER: FUV dust opacity (~912-2000 Ang), dust-to-gas = 0.01 at solar Z
- *               Ref: Draine (2003), Weingartner & Draine (2001)
- *
- * ULTRAVIOLET:  NUV dust opacity (~2000-4000 Ang)
- *               Ref: Draine (2003)
- *
- * OPTICAL:      Visual band (~4000-8000 Ang), close to standard V-band extinction
- *               Ref: Cardelli, Clayton & Mathis (1989)
- *
- * INFRARED:     Modified blackbody at T_DUST_REF = 20 K, beta = 2
- *               Ref: Semenov et al. (2003), Planck Collaboration XI (2014)
-                 
-                 Need to check references!
- */
-double Kappa[WAVEBANDS] = 
+/* Effective attenuation kappa_ext*(1 - a*<g>) [cm^2/g gas, solar Z]
+   Band-averaged over Draine 2003 (renorm. WD01) MW R_V=3.1 model,
+   kext_albedo_WD_MW_3.1_60_D03.all, energy and photon-weighted 4e4 K BB.
+   Gas mass per H = 2.311e-24 g (M_dust/H = 1.398e-26, M_gas/M_dust = 165.3) */
+double Kappa_E[WAVEBANDS] =
 {
-  [INFRARED] = 1.0e-1, /* INFRARED -> [cm^2/g] - IR dust at T_ref=20K, beta=2, solar Z */ 
-  [OPTICAL] = 1.0e1, /* OPTICAL -> [cm^2/g] - V-band dust at solar Z */
-  [ULTRAVIOLET] = 5.0e1, /* ULTRAVIOLET -> [cm^2/g] - NUV dust at solar Z */
-  [LYMAN_WERNER] = 1.0e2, /* LYMAN_WERNER -> [cm^2/g] - FUV dust at solar Z */
-  [IONIZING_HI] = 0.0, /* IONIZING_HI -> Computed directly from HI */
-  [IONIZING_HeI] = 0.0, /* IONIZING_HeI -> Computed directly from HeI */
-  [IONIZING_HeII] = 0.0, /* IONIZING_HeII -> Computed directly from HeII */
+  [INFRARED] = 34.9, 
+  [OPTICAL] = 278.3, 
+  [ULTRAVIOLET] = 417.7,  
+  [LYMAN_WERNER] = 736.6, /* Dust component */
+  [IONIZING_HI] = 1.0,
+  [IONIZING_HeI] = 1.0,
+  [IONIZING_HeII] = 1.0,
+};
+
+double Kappa_N[WAVEBANDS] =
+{
+  [INFRARED] = 30.0, 
+  [OPTICAL] = 242.3, 
+  [ULTRAVIOLET] = 406.9,  
+  [LYMAN_WERNER] = 731.4, /* Dust component */
+  [IONIZING_HI] = 1.0,
+  [IONIZING_HeI] = 1.0,
+  [IONIZING_HeII] = 1.0,
+};
+
+/* Fraction of kappa_eff-attenuated energy that is truly absorbed (heats grains):
+   f_abs = kappa_abs/kappa_eff = (1-a)/(1-a<g>), D03 MW dust, band-averaged.
+   Remainder is non-forward-scattered light: removed from the ray and it does
+   deliver momentum (kappa_eff is exactly the momentum-transfer opacity), but
+   it must NOT contribute to heating. */
+double TrueAbsorbedFraction[WAVEBANDS] =
+{
+  [INFRARED] = 0.54,
+  [OPTICAL] = 0.62,
+  [ULTRAVIOLET] = 0.81,
+  [LYMAN_WERNER] = 0.88, /* Dust share only; H2 line share is pure absorption */
+  [IONIZING_HI] = 1.0,
+  [IONIZING_HeI] = 1.0,
+  [IONIZING_HeII] = 1.0,
 };
 
 double ReradiatedFraction[WAVEBANDS] = 
 {
-  [INFRARED] = 1.0,
-  [OPTICAL] = 1.0,
-  [ULTRAVIOLET] = 0.95, /* 5% goes to pe heating */
-  [LYMAN_WERNER] = 0.0, /* No reradiation->dissociation instead */
-  [IONIZING_HI] = 0.0, /* No reradiation->photoionization instead */
-  [IONIZING_HeI] = 0.0, /* No reradiation->photoionization instead */
-  [IONIZING_HeII] = 0.0, /* No reradiation->photoionization instead */
+  [INFRARED] = 0.54,
+  [OPTICAL] = 0.62,
+  [ULTRAVIOLET] = 0.77, /* 5% goes to pe heating */
+  [LYMAN_WERNER] = 0.84, /* 5% goes to pe heating */
+  [IONIZING_HI] = 0.0, /* No reradiation */
+  [IONIZING_HeI] = 0.0, /* No reradiation */
+  [IONIZING_HeII] = 0.0, /* No reradiation */
 };
 
-void update_kappa(void)
+void update_dtau(void)
 {
   for(int i = 0; i < NumGas; i++)
     {
       if(P[i].Type != 0 || P[i].Mass == 0 || P[i].ID == 0)
         continue;
+
+      double Units = All.cf_UnitLength_in_cm * All.cf_UnitLength_in_cm / All.cf_UnitMass_in_g;
       
-      /* At Lyman limit */  
-      double sigma_H = 6.3e-18; 
 #ifdef METALS
-      double Z = SphP[i].GasMetallicity / SOLAR_METALLICITY;
+      double Zsol = ((SphP[i].GasMetals + SphP[i].StarMetalsFeed) / (P[i].Mass + SphP[i].StarMassFeed)) / SOLAR_METALLICITY;
 #else
-      double Z = 0;
+      double Zsol = 0;
 #endif
-      double units = All.cf_UnitLength_in_cm * All.cf_UnitLength_in_cm / All.cf_UnitMass_in_g;
+
+      double Density = (P[i].Mass + SphP[i].StarMassFeed) / SphP[i].Volume;
+
+      double sigma_HI, sigma_HeI, sigma_HeII;
+
+      SphP[i].DtauOverLength_E[INFRARED] = (Kappa_E[INFRARED] / Units) * Zsol * Density;
+      SphP[i].DtauOverLength_E[OPTICAL] = (Kappa_E[OPTICAL] / Units) * Zsol * Density;
+      SphP[i].DtauOverLength_E[ULTRAVIOLET] = (Kappa_E[ULTRAVIOLET] / Units) * Zsol * Density;      
+
+      /* Dust only */
+      SphP[i].DtauOverLength_E[LYMAN_WERNER] = (Kappa_E[LYMAN_WERNER] / Units) * Zsol * Density;
       
-      SphP[i].Kappa[INFRARED] = (Kappa[INFRARED] / units) * Z;
-      SphP[i].Kappa[OPTICAL] = (Kappa[OPTICAL] / units) * Z;
-      SphP[i].Kappa[ULTRAVIOLET] = (Kappa[ULTRAVIOLET] / units) * Z;
-      SphP[i].Kappa[LYMAN_WERNER] = (Kappa[LYMAN_WERNER] / units) * Z;       
-      SphP[i].Kappa[IONIZING_HI] = (sigma_H / PROTONMASS / units) * SphP[i].GrackleSpecies(GRACKLE_HI);
-      SphP[i].Kappa[IONIZING_HeI] = (sigma_H / PROTONMASS / units) * SphP[i].GrackleSpecies(GRACKLE_HeI); 
-      SphP[i].Kappa[IONIZING_HeII] = (sigma_H / PROTONMASS / units) * SphP[i].GrackleSpecies(GRACKLE_HeII);    
+      /* Band averaged sigma0*(v/v0)^(-3), in cm^2 */
+      sigma_HI = 3.25e-18;
+      sigma_HeI = 5.04e-18;
+      sigma_HeII = 1.30e-18; 
+      SphP[i].DtauOverLength_E[IONIZING_HI] = (sigma_HI / (PROTONMASS) / Units) * SphP[i].GrackleSpeciesConserved(GRACKLE_HI) / SphP[i].Volume;
+      SphP[i].DtauOverLength_E[IONIZING_HeI] = (sigma_HeI / (4.0 * PROTONMASS) / Units) * SphP[i].GrackleSpeciesConserved(GRACKLE_HeI) / SphP[i].Volume;
+      SphP[i].DtauOverLength_E[IONIZING_HeII] = (sigma_HeII / (4.0 * PROTONMASS) / Units) * SphP[i].GrackleSpeciesConserved(GRACKLE_HeII) / SphP[i].Volume;  
+      
+
+      SphP[i].DtauOverLength_N[INFRARED] = (Kappa_N[INFRARED] / Units) * Zsol * Density;
+      SphP[i].DtauOverLength_N[OPTICAL] = (Kappa_N[OPTICAL] / Units) * Zsol * Density;
+      SphP[i].DtauOverLength_N[ULTRAVIOLET] = (Kappa_N[ULTRAVIOLET] / Units) * Zsol * Density;      
+
+      /* Dust only */
+      SphP[i].DtauOverLength_N[LYMAN_WERNER] = (Kappa_N[LYMAN_WERNER] / Units) * Zsol * Density;
+      
+      /* Band averaged sigma0*(v/v0)^(-3), in cm^2 */
+      sigma_HI = 3.48e-18; 
+      sigma_HeI = 5.27e-18;
+      sigma_HeII = 1.31e-18; 
+      SphP[i].DtauOverLength_N[IONIZING_HI] = (sigma_HI / (PROTONMASS) / Units) * SphP[i].GrackleSpeciesConserved(GRACKLE_HI) / SphP[i].Volume;
+      SphP[i].DtauOverLength_N[IONIZING_HeI] = (sigma_HeI / (4.0 * PROTONMASS) / Units) * SphP[i].GrackleSpeciesConserved(GRACKLE_HeI) / SphP[i].Volume;
+      SphP[i].DtauOverLength_N[IONIZING_HeII] = (sigma_HeII / (4.0 * PROTONMASS) / Units) * SphP[i].GrackleSpeciesConserved(GRACKLE_HeII) / SphP[i].Volume;  
     }
 }
 
-void init_healpix_rays(void) 
+#ifdef RADIATION_PRESSURE
+double dtau_IR(int i, double length)
 {
-  int nside = NSIDE_MIN;
-  NRays = 12 * nside * nside;
+  double Units = All.cf_UnitLength_in_cm * All.cf_UnitLength_in_cm / All.cf_UnitMass_in_g;
+      
+#ifdef METALS
+  double Zsol = ((SphP[i].GasMetals + SphP[i].StarMetalsFeed) / (P[i].Mass + SphP[i].StarMassFeed)) / SOLAR_METALLICITY;
+#else
+  double Zsol = 0;
+#endif
 
-  for(int ipix = 0; ipix < NRays; ipix++)
+ double Density = (P[i].Mass + SphP[i].StarMassFeed) / SphP[i].Volume;
+
+  double Dtau_IR = All.IRDtauMomentumBoostCoeff * (1.0 / Units) * Zsol * Density * length;
+
+  return Dtau_IR;
+}
+#endif
+
+static double H2Tab_A[H2TAB_N]; /* A at table nodes */
+static double H2Tab_dlogN; /* log10 spacing */
+static double H2Tab_A_thinmin; /* A(NMIN) = SIGMA_PUMP * NMIN */
+ 
+/* Wolcott-Green et al. (2011) self-shielding function */
+static inline double f_selfshield_H2(double N_H2)
+{
+  double x = N_H2 / 5.0e14;
+  double sq = sqrt(1.0 + x);
+  return 0.965 / pow(1.0 + x / H2_SHIELD_B5, 1.1)
+       + 0.035 / sq * exp(-8.5e-4 * sq);
+}
+ 
+/* Build A(N) once at startup (trapezoid, log-spaced with linear-N areas,
+   16 sub-steps per interval so table error << fit error) */
+void init_h2shield(void)
+{
+  H2Tab_dlogN = (H2TAB_LOGNMAX - H2TAB_LOGNMIN) / (H2TAB_N - 1);
+  H2Tab_A_thinmin = SIGMA_PUMP * pow(10.0, H2TAB_LOGNMIN);
+ 
+  /* Thin part below NMIN: f_sh=1 */
+  double A = H2Tab_A_thinmin;          
+  H2Tab_A[0] = A;
+ 
+  for(int i = 1; i < H2TAB_N; i++)
     {
-      pix2vec_nest(nside, ipix, HealpixDirs[ipix]);
+      double N0 = pow(10.0, H2TAB_LOGNMIN + (i - 1) * H2Tab_dlogN);
+      double N1 = pow(10.0, H2TAB_LOGNMIN + i * H2Tab_dlogN);
+ 
+      const int nsub = 16;
+      double dN = (N1 - N0) / nsub;
+      for(int k = 0; k < nsub; k++)
+        {
+          double Na = N0 + k * dN;
+          A += 0.5 * (f_selfshield_H2(Na) + f_selfshield_H2(Na + dN)) * dN * SIGMA_PUMP;
+        }
+      
+      H2Tab_A[i] = A;
     }
+}
+ 
+/* A(N): thin analytic below NMIN, clamp above NMAX, linear-in-logN inside */
+static inline double h2shield_A(double N_H2)
+{
+  if(N_H2 <= 0.0)
+    return 0.0;
+ 
+  double logN = log10(N_H2);
+ 
+  /* f_sh = 1 exactly */
+  if(logN <= H2TAB_LOGNMIN)
+    return SIGMA_PUMP * N_H2; 
+ 
+  /* Lines exhausted */
+  if(logN >= H2TAB_LOGNMAX)
+    return H2Tab_A[H2TAB_N - 1];     
+ 
+  double u = (logN - H2TAB_LOGNMIN) / H2Tab_dlogN;
+  int    j = (int)u;
+  double f = u - j;
+ 
+  return H2Tab_A[j] * (1.0 - f) + H2Tab_A[j + 1] * f;
+}
+ 
+/* Exact per-cell line optical depth for a cell adding dN_H2 to a ray
+   that has already accumulated N_H2 */
+double h2shield_dtau(double N_H2, double dN_H2)
+{
+  double N_H2_cgs = N_H2 * (All.cf_UnitMass_in_g / (All.cf_UnitLength_in_cm * All.cf_UnitLength_in_cm)) / (2.0 * PROTONMASS);
+  double dN_H2_cgs = dN_H2 * (All.cf_UnitMass_in_g / (All.cf_UnitLength_in_cm * All.cf_UnitLength_in_cm)) / (2.0 * PROTONMASS);
+
+  double dtau = h2shield_A(N_H2_cgs + dN_H2_cgs) - h2shield_A(N_H2_cgs);
+  return dtau > 0.0 ? dtau : 0.0;
+}
+
+/* Helpers for rotation */
+static inline unsigned long long splitmix64(unsigned long long *s)
+{
+  unsigned long long z = (*s += 0x9E3779B97F4A7C15ull);
+  z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ull;
+  z = (z ^ (z >> 27)) * 0x94D049BB133111EBull;
+  return z ^ (z >> 31);
+}
+
+static inline double splitmix_uniform(unsigned long long *s)
+{
+  return (splitmix64(s) >> 11) * (1.0 / 9007199254740992.0); /* [0,1) */
+}
+
+/* Shoemake (1992): uniform random quaternion -> rotation matrix */
+static void get_ray_rotation(unsigned long long seed, double R[3][3])
+{
+  unsigned long long s = seed * 0x2545F4914F6CDD1Dull + 0x9E3779B97F4A7C15ull;
+
+  double u1 = splitmix_uniform(&s);
+  double u2 = splitmix_uniform(&s);
+  double u3 = splitmix_uniform(&s);
+
+  double r1 = sqrt(1.0 - u1), r2 = sqrt(u1);
+  double t1 = 2.0 * M_PI * u2, t2 = 2.0 * M_PI * u3;
+
+  double x = r1 * sin(t1), y = r1 * cos(t1);
+  double z = r2 * sin(t2), w = r2 * cos(t2);
+
+  R[0][0] = 1.0 - 2.0 * (y*y + z*z);
+  R[0][1] = 2.0 * (x*y - z*w);
+  R[0][2] = 2.0 * (x*z + y*w);
+
+  R[1][0] = 2.0 * (x*y + z*w);
+  R[1][1] = 1.0 - 2.0 * (x*x + z*z);
+  R[1][2] = 2.0 * (y*z - x*w);
+
+  R[2][0] = 2.0 * (x*z - y*w);
+  R[2][1] = 2.0 * (y*z + x*w);
+  R[2][2] = 1.0 - 2.0 * (x*x + y*y);
+}
+
+/* Seed from the star's global ID: stable under domain decomposition and
+   identical on every rank, so a ray splitting on an imported domain
+   reproduces the same children as its home rank would have */
+static inline unsigned long long seed_rotation(MyIDType id)
+{
+  unsigned long long seed = (unsigned long long)id;
+  seed = seed * 0x9E3779B97F4A7C15ull + (unsigned long long)All.Ti_Current;
+  return seed;
+}
+
+/* Rotated HEALPix direction */
+static inline void healpix_dir(unsigned long long seed, int nside, int ipix, double *dir)
+{
+  static unsigned long long cached_seed = 0;
+  static int cached_valid = 0;
+  static double R[3][3];
+
+  if(!cached_valid || seed != cached_seed)
+    {
+      get_ray_rotation(seed, R);
+      cached_seed  = seed;
+      cached_valid = 1;
+    }
+
+  double v[3];
+  pix2vec_nest(nside, ipix, v);
+
+  for(int k = 0; k < 3; k++)
+    dir[k] = R[k][0] * v[0] + R[k][1] * v[1] + R[k][2] * v[2];
 }
 
 static RayWorkStack *init_work_stack(long long capacity)
 {
-  RayWorkStack *w = mymalloc_movable(&w, "RayWorkStack", sizeof(RayWorkStack));
-  w->rays = mymalloc_movable(&w->rays, "WorkRays", capacity * sizeof(RayPacket));
+  RayWorkStack *w = malloc(sizeof(RayWorkStack));
+
   w->n = 0;
   w->capacity = capacity;
+  w->rays = malloc(capacity * sizeof(RayPacket));
   return w;
 }
 
@@ -97,29 +291,29 @@ void append_ray(RayWorkStack *w, const RayPacket *ray)
   if(w->n >= w->capacity)
     {
       w->capacity *= 2;
-      w->rays = myrealloc_movable(w->rays, w->capacity * sizeof(RayPacket));
+      w->rays = realloc(w->rays, w->capacity * sizeof(RayPacket));
     }
   w->rays[w->n++] = *ray;
 }
 
 static void free_work_stack(RayWorkStack *w)
 {
-  myfree_movable(w->rays);
-  myfree_movable(w);
+  free(w->rays); free(w);
 }
 
-static void init_rays_from_stars(RayWorkStack *work)
+static void init_rays(RayWorkStack *work)
 {
   double SQRT3 = sqrt(3);
     
   int ray_idx = 0;
-    
-  /* Loop over all stars */
-  for(int idx = 0; idx < TimeBinsStar.NActiveParticles; idx++)
+     
+  /* Act on host cells */
+  for(int ev = 0; ev < MechanicalFeedbackEvents.NumEvents; ev++)
     {
-      int i = TimeBinsStar.ActiveParticleList[idx];
+      Mechanical_Feedback_Data *MechanicalFeedbackData = &MechanicalFeedbackEvents.MechanicalFeedbackData[ev];
+      Mechanical_Feedback *MechanicalFeedback = &MechanicalFeedbackData->MechanicalFeedback;
 
-      double dt_rad = (SP[i].TimeBinStar ? (((integertime)1) << SP[i].TimeBinStar) : 0) * All.Timebase_interval;
+      unsigned long long rotation_seed = seed_rotation(MechanicalFeedbackData->StarID);
         
       /* Loop over rays for this star */
       for(int iray = 0; iray < NRays; iray++)
@@ -127,25 +321,31 @@ static void init_rays_from_stars(RayWorkStack *work)
           /* Initialize ray from star i */
           RayPacket ray = {0};
 
-          ray.pos[0] = PPS(i).Pos[0];      
-          ray.pos[1] = PPS(i).Pos[1]; 
-          ray.pos[2] = PPS(i).Pos[2]; 
-          ray.dir[0] = HealpixDirs[iray][0];        
-          ray.dir[1] = HealpixDirs[iray][1];
-          ray.dir[2] = HealpixDirs[iray][2];
+          ray.star_id = MechanicalFeedbackData->StarID;
+
+          ray.pos[0] = MechanicalFeedback->StarPosition[0];      
+          ray.pos[1] = MechanicalFeedback->StarPosition[1]; 
+          ray.pos[2] = MechanicalFeedback->StarPosition[2]; 
+
+          ray.rotation_seed = rotation_seed;
+          healpix_dir(rotation_seed, NSIDE_MIN, iray, ray.dir);
+
           ray.t = 0.0;
           ray.t_exit = MAX_REAL_NUMBER;
-          ray.t_maximum = fmin(CLIGHT/All.cf_UnitVelocity_in_cm_per_s * dt_rad/All.cf_hubble_a, SQRT3 * All.BoxSize);
+          ray.t_maximum = SQRT3 * All.BoxSize;
+
+          ray.nside = NSIDE_MIN;        
+          ray.healpix_pixel = iray;    
 
           ray.active_bands = NO_IR_ACTIVE;
 
           for(int w = 0; w < WAVEBANDS; w++)
             { 
-              ray.Radiated[w].Energy = SP[i].Radiated[w].Energy / NRays;
-              ray.Radiated[w].Photons = SP[i].Radiated[w].Photons / NRays;
+              ray.Radiated[w].Energy = MechanicalFeedback->Radiated[w].Energy / NRays;
+              ray.Radiated[w].Photons = MechanicalFeedback->Radiated[w].Photons / NRays;
 
-              ray.Radiated_Init[w].Energy = SP[i].Radiated[w].Energy / NRays;
-              ray.Radiated_Init[w].Photons = SP[i].Radiated[w].Photons / NRays;
+              ray.Radiated_Init[w].Energy = MechanicalFeedback->Radiated[w].Energy / NRays;
+              ray.Radiated_Init[w].Photons = MechanicalFeedback->Radiated[w].Photons / NRays;
 
               if(ray.Radiated[w].Energy <= 0.0 && ray.Radiated[w].Photons <= 0.0)
                 ray.active_bands &= (uint8_t)(~(1u << w));
@@ -153,15 +353,12 @@ static void init_rays_from_stars(RayWorkStack *work)
           
           ray.ray_id = ray_idx;
           ray.home_task = ThisTask;
+
+          ray.target_node = -1;
+          ray.is_paused = 0;  
           
           ray.n_pending = 0;
-          ray.target_node = -1;
-
-          ray.is_paused = 0;
-
-          ray.nside = NSIDE_MIN;        
-          ray.healpix_pixel = iray;            
-            
+        
           ray_idx++;
 
           append_ray(work, &ray);
@@ -169,12 +366,9 @@ static void init_rays_from_stars(RayWorkStack *work)
     }
 }
 
-/* Returns 4 child rays by value - returns 0 if at NSIDE_MAX */
-int split_ray(const RayPacket *parent, RayPacket children[4])
+/* Splits to 4 child rays */
+void split_ray(const RayPacket *parent, RayPacket children[4])
 {
-  if(parent->nside >= NSIDE_MAX)
-    return 0;
-
   int new_nside = parent->nside * 2;
 
   for(int k = 0; k < 4; k++)
@@ -185,7 +379,7 @@ int split_ray(const RayPacket *parent, RayPacket children[4])
       children[k].nside = new_nside;
       children[k].healpix_pixel = 4 * parent->healpix_pixel + k;
 
-      pix2vec_nest(new_nside, children[k].healpix_pixel, children[k].dir);
+      healpix_dir(parent->rotation_seed, new_nside, children[k].healpix_pixel, children[k].dir);
 
       for(int w = 0; w < WAVEBANDS; w++)
         {
@@ -196,80 +390,94 @@ int split_ray(const RayPacket *parent, RayPacket children[4])
           children[k].Radiated_Init[w].Photons = parent->Radiated_Init[w].Photons * 0.25;
         }
     }
-  return 1;
 }
 
-static RayExportBuffer *init_export_buffer(int capacity)
+static RayExportBuffer *init_export_buffer(long long capacity)
 {
   RayExportBuffer *buf = malloc(sizeof(RayExportBuffer));
-  buf->rays = malloc(capacity * sizeof(RayPacket));
-  buf->task = malloc(capacity * sizeof(int));
+ 
   buf->n = 0;
   buf->capacity = capacity;
+  buf->task = malloc(capacity * sizeof(int));
+  buf->rays = malloc(capacity * sizeof(RayPacket));
+
   return buf;
+}
+
+void append_export(RayExportBuffer *buf, const RayPacket *ray, int task)
+{
+  if(buf->n >= buf->capacity)
+    {
+      buf->capacity *= 2;
+      buf->task = realloc(buf->task, buf->capacity * sizeof(int));
+      buf->rays = realloc(buf->rays, buf->capacity * sizeof(RayPacket));
+    }
+
+  buf->task[buf->n] = task;
+  buf->rays[buf->n] = *ray;
+  buf->n++;
 }
 
 static void free_export_buffer(RayExportBuffer *buf)
 {
-  free(buf->task);
-  free(buf->rays);
-  free(buf);
+  free(buf->rays); free(buf->task); free(buf);
 }
 
 static void sort_by_task(RayExportBuffer *buf)
 {
-  /* Build index array */
-  int *idx = malloc(buf->n * sizeof(int));
-  RayPacket *sorted_rays = malloc(buf->n * sizeof(RayPacket));
+  int *count = calloc(NTask, sizeof(int));
+  int *cursor = malloc(NTask * sizeof(int));
+
+  for(long long i = 0; i < buf->n; i++)
+    count[buf->task[i]]++;
+
+  cursor[0] = 0;
+  for(int t = 1; t < NTask; t++)
+    cursor[t] = cursor[t-1] + count[t-1];
+
   int *sorted_task = malloc(buf->n * sizeof(int));
-  
-  for(int i = 0; i < buf->n; i++)
-    idx[i] = i;
-
-  /* Insertion sort on idx by task */
-  for(int i = 1; i < buf->n; i++)
+  RayPacket *sorted_rays = malloc(buf->n * sizeof(RayPacket));
+ 
+  for(long long i = 0; i < buf->n; i++)
     {
-      int key = idx[i];
-      int j = i - 1;
-      while(j >= 0 && buf->task[idx[j]] > buf->task[key])
-        {
-          idx[j+1] = idx[j];
-          j--;
-        }
-      idx[j+1] = key;
+      int t = buf->task[i];
+      long long pos = cursor[t]++;
+      sorted_task[pos] = t;
+      sorted_rays[pos] = buf->rays[i]; 
     }
 
-  /* Apply permutation to both arrays */
-  for(int i = 0; i < buf->n; i++)
-    {
-      sorted_rays[i] = buf->rays[idx[i]];
-      sorted_task[i] = buf->task[idx[i]];
-    }
-
-  memcpy(buf->rays, sorted_rays, buf->n * sizeof(RayPacket));
   memcpy(buf->task, sorted_task, buf->n * sizeof(int));
+  memcpy(buf->rays, sorted_rays, buf->n * sizeof(RayPacket));
 
+  free(sorted_rays); 
   free(sorted_task); 
-  free(sorted_rays);
-  free(idx);
+  free(cursor); 
+  free(count); 
 }
 
 static void exchange_rays(RayExportBuffer *send, RayWorkStack *work)
 {
-  int send_count[NTask], recv_count[NTask];
-  int send_offset[NTask], recv_offset[NTask];
+  static MPI_Datatype MPI_RAYPACKET = MPI_DATATYPE_NULL;
+  if(MPI_RAYPACKET == MPI_DATATYPE_NULL)
+    {
+      MPI_Type_contiguous(sizeof(RayPacket), MPI_BYTE, &MPI_RAYPACKET);
+      MPI_Type_commit(&MPI_RAYPACKET);
+    }
 
-  /* Count how many rays go to each task */
+  /* Heap, not VLA: int send_count[NTask] blows the C stack for large NTask */
+  int *send_count = malloc(NTask * sizeof(int));
+  int *recv_count = malloc(NTask * sizeof(int));
+  int *send_offset = malloc(NTask * sizeof(int));
+  int *recv_offset = malloc(NTask * sizeof(int));
+
   memset(send_count, 0, NTask * sizeof(int));
-  for(int i = 0; i < send->n; i++)
+  for(long long i = 0; i < send->n; i++)
     send_count[send->task[i]]++;
 
   MPI_Alltoall(send_count, 1, MPI_INT, recv_count, 1, MPI_INT, MPI_COMM_WORLD);
 
-  /* Compute offsets */
   send_offset[0] = recv_offset[0] = 0;
-  int total_recv = recv_count[0];
-    
+  long long total_recv = recv_count[0];
   for(int i = 1; i < NTask; i++)
     {
       send_offset[i] = send_offset[i-1] + send_count[i-1];
@@ -277,31 +485,29 @@ static void exchange_rays(RayExportBuffer *send, RayWorkStack *work)
       total_recv += recv_count[i];
     }
 
-  /* Grow work array to fit incoming rays */
   while(work->n + total_recv > work->capacity)
     {
       work->capacity *= 2;
-      work->rays = myrealloc_movable(work->rays, work->capacity * sizeof(RayPacket));
+      work->rays = realloc(work->rays, work->capacity * sizeof(RayPacket));
     }
 
-  for(int i = 0; i < NTask; i++) 
-    {
-      send_count[i] *= sizeof(RayPacket);
-      recv_count[i] *= sizeof(RayPacket);
-      send_offset[i] *= sizeof(RayPacket);
-      recv_offset[i] *= sizeof(RayPacket);
-    }
+  /* In ray Units */
+  sort_by_task(send);   
 
-  /* Sort send buffer by task */
-  sort_by_task(send);
-
-  /* Exchange ray data */
-  MPI_Alltoallv(send->rays, send_count, send_offset, MPI_BYTE, work->rays + work->n, recv_count, recv_offset, MPI_BYTE, MPI_COMM_WORLD);
+  MPI_Alltoallv(send->rays, send_count, send_offset, MPI_RAYPACKET,
+  work->rays + work->n, recv_count, recv_offset, MPI_RAYPACKET,
+  MPI_COMM_WORLD);
 
   work->n += total_recv;
+
+  free(recv_offset); 
+  free(send_offset); 
+  free(recv_count); 
+  free(send_count);
 }
 
 #ifdef TREEPOINTS
+/* Not operational yet -Ngb tree does not use Tree_Points */
 struct rad_resultsactiveimported_data *Rad_ResultsActiveImported;
 
 static void send_results_home(void)
@@ -314,7 +520,7 @@ static void send_results_home(void)
 
   /* Count gas cells among imported particles */
   for(i = 0, ncount = 0; i < Tree_NumPartImported; i++)
-    if(Tree_Points[i].Type == 0)
+    if(Ngb_Tree_Points[i].Type == 0)
       ncount++;
 
   Rad_ResultsActiveImported = malloc(ncount * sizeof(struct rad_resultsactiveimported_data));
@@ -325,19 +531,19 @@ static void send_results_home(void)
 
   for(i = 0, n = 0, k = 0; i < NTask; i++)
     for(j = 0; j < Force_Recv_count[i]; j++, n++)
-      if(Tree_Points[n].Type == 0)
+      if(Ngb_Tree_Points[n].Type == 0)
         {
-          Rad_ResultsActiveImported[k].StarMomentumFeed[0] = Tree_Points[n].StarMomentumFeed[0];
-          Rad_ResultsActiveImported[k].StarMomentumFeed[1] = Tree_Points[n].StarMomentumFeed[1];
-          Rad_ResultsActiveImported[k].StarMomentumFeed[2] = Tree_Points[n].StarMomentumFeed[2];
+          Rad_ResultsActiveImported[k].StarMomentumFeed[0] = Ngb_Tree_Points[n].StarMomentumFeed[0];
+          Rad_ResultsActiveImported[k].StarMomentumFeed[1] = Ngb_Tree_Points[n].StarMomentumFeed[1];
+          Rad_ResultsActiveImported[k].StarMomentumFeed[2] = Ngb_Tree_Points[n].StarMomentumFeed[2];
 
           for(int w = 0; w < WAVEBANDS; w++)
             {
-              Rad_ResultsActiveImported[k].Absorbed[w].Energy = Tree_Points[n].Absorbed[w].Energy;
-              Rad_ResultsActiveImported[k].Absorbed[w].Photons = Tree_Points[n].Absorbed[w].Photons;
+              Rad_ResultsActiveImported[k].Absorbed[w].Energy = Ngb_Tree_Points[n].Absorbed[w].Energy;
+              Rad_ResultsActiveImported[k].Absorbed[w].Photons = Ngb_Tree_Points[n].Absorbed[w].Photons;
             }
 
-          Rad_ResultsActiveImported[k].index = Tree_Points[n].index;
+          Rad_ResultsActiveImported[k].index = Ngb_Tree_Points[n].index;
           Recv_count[i]++;
           k++;
         }
@@ -401,7 +607,7 @@ static void distribute_node_rad(int no)
   int has_rad = 0;
         
   for(int w = 0; w < WAVEBANDS; w++)
-    if(RtNgb_Nodes[no].Absorbed[w].Energy || RtNgb_Nodes[no].Absorbed[w].Photons > 0) 
+    if(RtNgb_Nodes[no].Absorbed[w].Energy > 0 || RtNgb_Nodes[no].Absorbed[w].Photons > 0) 
       { 
         has_rad = 1; 
         break; 
@@ -410,9 +616,21 @@ static void distribute_node_rad(int no)
   if(!has_rad) 
     return;
   
-  double node_tau[WAVEBANDS];
+  double node_dtau_E[WAVEBANDS], node_dtau_N[WAVEBANDS];
+
   for(int w = 0; w < WAVEBANDS; w++)
-    node_tau[w] = RtNgb_Nodes[no].volume * RtNgb_Nodes[no].density_kappa[w];
+    {
+      if(w == LYMAN_WERNER)
+        {
+          node_dtau_E[w] = RtNgb_Nodes[no].Volume * RtNgb_Nodes[no].DtauOverLength_E[w];
+          node_dtau_N[w] = RtNgb_Nodes[no].Volume * RtNgb_Nodes[no].dN_H2_OverLength;
+        }
+      else
+        {
+          node_dtau_E[w] = RtNgb_Nodes[no].Volume * RtNgb_Nodes[no].DtauOverLength_E[w];
+          node_dtau_N[w] = RtNgb_Nodes[no].Volume * RtNgb_Nodes[no].DtauOverLength_N[w];
+        }
+    }
 
   int child = Ngb_Nodes[no].u.d.nextnode;
   while(child != Ngb_Nodes[no].u.d.sibling && child >= 0)
@@ -421,19 +639,48 @@ static void distribute_node_rad(int no)
       if(child < Ngb_MaxPart)
         {
           if(P[child].Type != 0 || P[child].Mass == 0 || P[child].ID == 0)
-            continue;
+            {
+              child = Ngb_Nextnode[child];
+              continue;
+            }
           
           for(int w = 0; w < WAVEBANDS; w++)
             {
-              if(node_tau[w] > 0)
+              if(node_dtau_E[w] > 0)
                 {
-                  double child_tau = SphP[child].Volume * SphP[child].Density * SphP[child].Kappa[w];
-                  double frac = child_tau / node_tau[w];
+                  double child_dtau_E;
+                  if(w == LYMAN_WERNER)
+                    {
+                       child_dtau_E = SphP[child].Volume * SphP[child].DtauOverLength_E[w];
+                    }
+                  else
+                    {
+                       child_dtau_E = SphP[child].Volume * SphP[child].DtauOverLength_E[w];
+                    }
                   
-                  SphP[child].Absorbed[w].Energy += frac * RtNgb_Nodes[no].Absorbed[w].Energy;
-                  SphP[child].Absorbed[w].Photons += frac * RtNgb_Nodes[no].Absorbed[w].Photons;
+                  double frac_E = child_dtau_E / node_dtau_E[w];
+                  
+                  SphP[child].Absorbed[w].Energy += frac_E * RtNgb_Nodes[no].Absorbed[w].Energy;
+                }
+              
+              if(node_dtau_N[w] > 0)
+                {
+                  double child_dtau_N;
+                  if(w == LYMAN_WERNER)
+                    {
+                      child_dtau_N = SphP[child].Volume * SphP[child].GrackleSpeciesConserved(GRACKLE_H2I) / SphP[child].Volume;
+                    }
+                  else
+                    {
+                      child_dtau_N = SphP[child].Volume * SphP[child].DtauOverLength_N[w];
+                    }
+
+                  double frac_N = child_dtau_N / node_dtau_N[w];
+                  
+                  SphP[child].Absorbed[w].Photons += frac_N * RtNgb_Nodes[no].Absorbed[w].Photons;
                 }
             }
+
           child = Ngb_Nextnode[child];
         }
       /* Internal node - pass fraction down recursively */
@@ -441,15 +688,41 @@ static void distribute_node_rad(int no)
         {
           for(int w = 0; w < WAVEBANDS; w++)
             {
-              if(node_tau[w] > 0)
+              if(node_dtau_E[w] > 0)
                 {
-                  double child_tau = RtNgb_Nodes[child].volume * RtNgb_Nodes[child].density_kappa[w];
-                  double frac = child_tau / node_tau[w];
+                  double child_dtau_E;
+                  if(w == LYMAN_WERNER)
+                    {
+                      child_dtau_E = RtNgb_Nodes[child].Volume * RtNgb_Nodes[child].DtauOverLength_E[w];
+                    }
+                  else
+                    {
+                      child_dtau_E = RtNgb_Nodes[child].Volume * RtNgb_Nodes[child].DtauOverLength_E[w];
+                    }
                   
-                  RtNgb_Nodes[child].Absorbed[w].Energy += frac * RtNgb_Nodes[no].Absorbed[w].Energy;
-                  RtNgb_Nodes[child].Absorbed[w].Photons += frac * RtNgb_Nodes[no].Absorbed[w].Photons;
+                  double frac_E = child_dtau_E / node_dtau_E[w];
+                  
+                  RtNgb_Nodes[child].Absorbed[w].Energy += frac_E * RtNgb_Nodes[no].Absorbed[w].Energy;
+                }
+              
+              if(node_dtau_N[w] > 0)
+                {
+                  double child_dtau_N;
+                  if(w == LYMAN_WERNER)
+                    {
+                      child_dtau_N = RtNgb_Nodes[child].Volume * RtNgb_Nodes[child].dN_H2_OverLength;
+                    }
+                  else
+                    {
+                      child_dtau_N = RtNgb_Nodes[child].Volume * RtNgb_Nodes[child].DtauOverLength_N[w];
+                    }
+                  
+                  double frac_N = child_dtau_N / node_dtau_N[w];
+                  
+                  RtNgb_Nodes[child].Absorbed[w].Photons += frac_N * RtNgb_Nodes[no].Absorbed[w].Photons;
                 }
             }
+
           distribute_node_rad(child);
           child = Ngb_Nodes[child].u.d.sibling;
         }
@@ -474,61 +747,84 @@ static void radiation_feedback(void)
     {
       if(P[i].Type != 0 || P[i].Mass == 0 || P[i].ID == 0)
         continue;
-
-      double volume = SphP[i].Volume;
-      double dt = (P[i].TimeBinHydro ? (((integertime)1) << P[i].TimeBinHydro) : 0) * All.Timebase_interval; //do we want the particle dt?
+      
+      /* Volume, timestep */
+      double V = SphP[i].Volume;
+      double dt = (P[i].TimeBinHydro ? (((integertime)1) << P[i].TimeBinHydro) : 0) * All.Timebase_interval; 
 
       /* In cgs */
-      double V_cgs = volume * (All.cf_UnitLength_in_cm * All.cf_UnitLength_in_cm * All.cf_UnitLength_in_cm);
+      double V_cgs = V * (All.cf_UnitLength_in_cm * All.cf_UnitLength_in_cm * All.cf_UnitLength_in_cm);
       double dt_cgs = dt * All.cf_UnitTime_in_s;
 
 #ifdef PHOTOELECTRIC_HEATING
+      /* Photoelectric heating */
       double epsilon_pe = 0.05;
 
-      double E_pe = SphP[i].Absorbed[ULTRAVIOLET].Energy * epsilon_pe * All.cf_UnitEnergy_in_cgs; 
+      double E_pe = (SphP[i].Absorbed[ULTRAVIOLET].Energy  * TrueAbsorbedFraction[ULTRAVIOLET]
+                     + SphP[i].Absorbed[LYMAN_WERNER].Energy * TrueAbsorbedFraction[LYMAN_WERNER])
+                     * epsilon_pe * All.cf_UnitEnergy_in_cgs;
       
-      /* Volumetric_heating_rate: docs say erg/(s cm^3), straight CGS, no conversion */
+      /* Volumetric_heating_rate: grackle docs say erg/(s cm^3), straight CGS, no conversion */
       SphP[i].PE_VolHeatingRate +=  E_pe / dt_cgs / V_cgs;
 #endif
 
-#ifdef PHOTOIONIZATION
+#ifdef DISSOCIATION
       /* H2 Dissociation */
+      /* Number density */
+      double n_H2 = SphP[i].GrackleSpeciesConserved(GRACKLE_H2I) / V / (2 * PROTONMASS / All.cf_UnitMass_in_g);
+
       double N_abs_H2 = SphP[i].Absorbed[LYMAN_WERNER].Photons;
-      
-      double n_H2 = SphP[i].GrackleSpecies(GRACKLE_H2I) * SphP[i].Density / (PROTONMASS / All.cf_UnitMass_in_g);
-      SphP[i].H2_DissociationRate += n_H2 > 0 ? (N_abs_H2 / dt/All.cf_hubble_a/All.HubbleParam / volume) / n_H2: 0.0;
-      
+
+      SphP[i].H2_DissociationRate += n_H2 > 0 ? (F_DISS * N_abs_H2 / (dt/All.cf_hubble_a/All.HubbleParam) / V) / n_H2 : 0.0;
+#endif
+
+#ifdef PHOTOIONIZATION
+      /* Photoionization */     
+      /* Number densities */
+      double n_HI = SphP[i].GrackleSpeciesConserved(GRACKLE_HI) / V / (PROTONMASS / All.cf_UnitMass_in_g);
+      double n_HeI = SphP[i].GrackleSpeciesConserved(GRACKLE_HeI) / V / (4 * PROTONMASS / All.cf_UnitMass_in_g);
+      double n_HeII = SphP[i].GrackleSpeciesConserved(GRACKLE_HeII) / V / (4 * PROTONMASS / All.cf_UnitMass_in_g);
+
+      /* In cgs */
+      double n_HI_cgs = n_HI / (All.cf_UnitLength_in_cm * All.cf_UnitLength_in_cm * All.cf_UnitLength_in_cm);
+      double n_HeI_cgs = n_HeI / (All.cf_UnitLength_in_cm * All.cf_UnitLength_in_cm * All.cf_UnitLength_in_cm);
+      double n_HeII_cgs = n_HeII / (All.cf_UnitLength_in_cm * All.cf_UnitLength_in_cm * All.cf_UnitLength_in_cm);
+     
+      /* Threshold energies */ 
       double energy_thresh_HI = 13.6 * ELECTRONVOLT_IN_ERGS;
       double energy_thresh_HeI = 24.6 * ELECTRONVOLT_IN_ERGS;
       double energy_thresh_HeII = 54.4 * ELECTRONVOLT_IN_ERGS;
 
+      double E_abs_HI = SphP[i].Absorbed[IONIZING_HI].Energy * All.cf_UnitEnergy_in_cgs;
+      double E_abs_HeI = SphP[i].Absorbed[IONIZING_HeI].Energy * All.cf_UnitEnergy_in_cgs;
+      double E_abs_HeII = SphP[i].Absorbed[IONIZING_HeII].Energy * All.cf_UnitEnergy_in_cgs;      
+
       double N_abs_HI = SphP[i].Absorbed[IONIZING_HI].Photons;
       double N_abs_HeI = SphP[i].Absorbed[IONIZING_HeI].Photons;
       double N_abs_HeII = SphP[i].Absorbed[IONIZING_HeII].Photons;
-      
-      double E_abs_HI = SphP[i].Absorbed[IONIZING_HI].Energy * All.cf_UnitEnergy_in_cgs;
-      double E_abs_HeI = SphP[i].Absorbed[IONIZING_HeI].Energy * All.cf_UnitEnergy_in_cgs;
-      double E_abs_HeII = SphP[i].Absorbed[IONIZING_HeII].Energy * All.cf_UnitEnergy_in_cgs;
-      
-      /* RT_ionization_rate:  1 / (time units) */
-      double n_HI = SphP[i].GrackleSpecies(GRACKLE_HI) * SphP[i].Density / (PROTONMASS / All.cf_UnitMass_in_g);
-      SphP[i].HI_IonizationRate += n_HI > 0 ? (N_abs_HI / dt/All.cf_hubble_a/All.HubbleParam / volume) / n_HI: 0.0;
-            
-      double n_HeI = SphP[i].GrackleSpecies(GRACKLE_HeI) * SphP[i].Density / (PROTONMASS / All.cf_UnitMass_in_g);
-      SphP[i].HeI_IonizationRate += n_HeI > 0 ? (N_abs_HeI / dt/All.cf_hubble_a/All.HubbleParam / volume) / n_HeI: 0.0;
 
-      double n_HeII = SphP[i].GrackleSpecies(GRACKLE_HeII) * SphP[i].Density / (PROTONMASS / All.cf_UnitMass_in_g);
-      SphP[i].HeII_IonizationRate += n_HeII > 0 ? (N_abs_HeII / dt/All.cf_hubble_a/All.HubbleParam / volume) / n_HeII: 0.0;
-
-      /* RT_heating_rate: docs say erg/(s cm^3), straight CGS, no conversion */
+      /* RT_heating_rate: grackle docs say erg/(s cm^3) / n, straight CGS, no conversion */
       double E_threshold_HI = N_abs_HI * energy_thresh_HI; 
-      SphP[i].PI_VolHeatingRate += (E_abs_HI - E_threshold_HI) > 0 ? (E_abs_HI - E_threshold_HI) / dt_cgs / V_cgs : 0.0;
-
-      double E_threshold_HeI = N_abs_HeI * energy_thresh_HeI; 
-      SphP[i].PI_VolHeatingRate += (E_abs_HeI - E_threshold_HeI) > 0 ? (E_abs_HeI - E_threshold_HeI) / dt_cgs / V_cgs : 0.0;
       
-      double E_threshold_HeII = N_abs_HeII * energy_thresh_HeII; 
-      SphP[i].PI_VolHeatingRate += (E_abs_HeII - E_threshold_HeII) > 0 ? (E_abs_HeII - E_threshold_HeII) / dt_cgs / V_cgs : 0.0;
+      if(n_HI_cgs)
+        SphP[i].HI_HeatingRate += (E_abs_HI - E_threshold_HI) > 0 ? ((E_abs_HI - E_threshold_HI) / dt_cgs / V_cgs) / n_HI_cgs : 0.0;
+      
+      double E_threshold_HeI = N_abs_HeI * energy_thresh_HeI;
+      
+      if(n_HeI_cgs) 
+        SphP[i].HeI_HeatingRate += (E_abs_HeI - E_threshold_HeI) > 0 ? ((E_abs_HeI - E_threshold_HeI) / dt_cgs / V_cgs) / n_HeI_cgs : 0.0;
+      
+      double E_threshold_HeII = N_abs_HeII * energy_thresh_HeII;
+      
+      if(n_HeII_cgs)
+        SphP[i].HeII_HeatingRate += (E_abs_HeII - E_threshold_HeII) > 0 ? ((E_abs_HeII - E_threshold_HeII) / dt_cgs / V_cgs) / n_HeII_cgs : 0.0;
+
+      /* RT_ionization_rate: 1 / (time Units) */
+      SphP[i].HI_IonizationRate += n_HI > 0 ? (N_abs_HI / (dt/All.cf_hubble_a/All.HubbleParam) / V) / n_HI : 0.0;     
+      
+      SphP[i].HeI_IonizationRate += n_HeI > 0 ? (N_abs_HeI / (dt/All.cf_hubble_a/All.HubbleParam) / V) / n_HeI : 0.0;
+
+      SphP[i].HeII_IonizationRate += n_HeII > 0 ? (N_abs_HeII / (dt/All.cf_hubble_a/All.HubbleParam) / V) / n_HeII : 0.0;
 #endif
 
       for(w = 0; w < WAVEBANDS; w++)
@@ -536,14 +832,55 @@ static void radiation_feedback(void)
     }
 }
 
+#ifdef PHOTOIONIZATION
+static void rt_timestep(void)
+{
+  int idx, i;
+  double eps_ion = All.RTIonizationTimestepFraction;
+  
+  for(idx = 0; idx < TimeBinsHydro.NActiveParticles; idx++)
+    {
+      i = TimeBinsHydro.ActiveParticleList[idx];
+      if(i < 0)
+        continue;
+
+      /* Normalize ionization rate by total hydrogen (was normalized by neutral for grackle) */
+      double m_HI = SphP[i].GrackleSpeciesConserved(GRACKLE_HI);
+
+      double m_H = SphP[i].GrackleSpeciesConserved(GRACKLE_HI) + SphP[i].GrackleSpeciesConserved(GRACKLE_HII);
+
+#if GRACKLE_CHEMISTRY >= 2
+      m_H += SphP[i].GrackleSpeciesConserved(GRACKLE_H2I) + SphP[i].GrackleSpeciesConserved(GRACKLE_H2II) 
+          + SphP[i].GrackleSpeciesConserved(GRACKLE_HM);
+#endif
+
+#if GRACKLE_CHEMISTRY >= 3
+      m_H += SphP[i].GrackleSpeciesConserved(GRACKLE_DI) + SphP[i].GrackleSpeciesConserved(GRACKLE_DII) 
+          + SphP[i].GrackleSpeciesConserved(GRACKLE_HDI);
+#endif
+    
+      double rate = 0.0;
+      if(m_H > 0)
+        {
+          double x_HI = m_HI / m_H;
+          rate = SphP[i].HI_IonizationRate * x_HI;
+        }
+
+      SphP[i].RT_Timestep = (rate > 0.0) ? eps_ion / rate : All.MaxSizeTimestep / All.cf_hubble_a;
+    }
+}
+#endif
+
 void star_radiation(void)
 {
   TIMER_START(CPU_STARS_RADIATION);
 
   double t0, t1;
 
+  update_dtau();
+
 #ifdef RAD_OPENING_ANGLE
-  /* Zero RAD accumulator on all nodes before treewalk - important for top nodes! */
+  /* Zero accumulator on all nodes before treewalk - important for top nodes! */
   for(int no = Ngb_MaxPart; no < Ngb_MaxPart + Ngb_NumNodes; no++)
     {
       for(int w = 0; w < WAVEBANDS; w++)
@@ -553,30 +890,31 @@ void star_radiation(void)
     }
 #endif
 
-  /* Zero RAD accumulator on all leaves before treewalk */
+  /* Zero accumulator on all leaves before treewalk */
   for(int i = 0; i < NumGas; i++)
     {
-      if(P[i].Type != 0 || P[i].Mass == 0 || P[i].ID == 0)
-        continue;
-
       for(int w = 0; w < WAVEBANDS; w++)
         {
           SphP[i].Absorbed[w].Energy = SphP[i].Absorbed[w].Photons = 0.0;
         }
     }
  
-  int n_stars = TimeBinsStar.NActiveParticles;
-  int n_rays_local = n_stars * NRays;
+  int n_stars = MechanicalFeedbackEvents.NumEvents;
+  long long n_rays_local = (long long)n_stars * NRays;
+
   long long n_rays_global;
+  sumup_longs(1, &n_rays_local, &n_rays_global);
 
-  sumup_large_ints(1, &n_rays_local, &n_rays_global);
+  mpi_printf("STAR_RADIATION: Initializing radiation with %12lld rays\n", n_rays_global);
 
-  mpi_printf("STAR_RADIATION: Initialize with %d rays\n", n_rays_global);
+  /* Floor so ranks with no local stars still have a buffer to receive imports */
+  long long work_capacity = n_rays_local > 0 ? 4 * n_rays_local : 1024;
+  long long export_capacity = n_rays_local > 0 ? n_rays_local : 1024;
 
-  RayWorkStack *work = init_work_stack(16 * n_rays_global);
-  RayExportBuffer *export_buf = init_export_buffer(5000 * n_rays_global);
+  RayWorkStack *work = init_work_stack(work_capacity);
+  RayExportBuffer *export_buf = init_export_buffer(export_capacity);
   
-  init_rays_from_stars(work);
+  init_rays(work);
 
   long long n_global;
   int iter = 0;
@@ -597,7 +935,7 @@ void star_radiation(void)
       export_buf->n = 0;
 
       /* Check if anyone still has rays in flight */
-      sumup_large_ints(1, &work->n, &n_global);
+      sumup_longs(1, &work->n, &n_global);
 
       t1 = second();
 
@@ -606,6 +944,9 @@ void star_radiation(void)
       if(n_global > 0 && iter > 0)
         mpi_printf("STAR_RADIATION: Rad iteration %3d: need to repeat for %12lld rays. (took %g sec)\n", iter, n_global,
         timediff(t0, t1));
+      
+      if(iter > MAXITER)
+        terminate("STAR_RADIATION: %lld rays still in flight after %d iterations\n", n_global, iter);
       
     } while(n_global > 0);
     
@@ -616,6 +957,10 @@ void star_radiation(void)
 #endif
 
   radiation_feedback();
+
+#ifdef PHOTOIONIZATION
+  rt_timestep();
+#endif
 
   free_export_buffer(export_buf);
   free_work_stack(work);

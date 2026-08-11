@@ -726,11 +726,11 @@ int force_treebuild_construct(int npart, int optimized_domain_mapping, int inser
               if(P[i].Type == 0)
                 {
                   export_Tree_Points[n].Kappa[w] = SphP[i].Kappa[w];
-                  export_Tree_Points[n].RAD[w] = 0;
+                  export_Tree_Points[n].Absorbed[w] = 0;
                 }
 
               if(P[i].Type == 4)
-                export_Tree_Points[n].LUM[w] = SPP(i).LUM[w];
+                export_Tree_Points[n].Radiated[w] = SPP(i).Radiated[w];
             }
 #endif
 
@@ -1288,6 +1288,7 @@ void force_update_node_recursive(int no, int sib, int father, int *last)
       for(int w = 0; w < WAVEBANDS; w++)
         {
           kappa[w] = 0;
+
           luminosity[w] = 0;
           l[w][0] = 0;
           l[w][1] = 0;
@@ -1341,10 +1342,10 @@ void force_update_node_recursive(int no, int sib, int father, int *last)
 
                       if(P[p].Type == 4)
                         {
-                          luminosity[w] += SPP(p).LUM[w];
-                          l[w][0] += SPP(p).LUM[w] * pos[0];
-                          l[w][1] += SPP(p).LUM[w] * pos[1];
-                          l[w][2] += SPP(p).LUM[w] * pos[2];
+                          luminosity[w] += SPP(p).Radiated[w];
+                          l[w][0] += SPP(p).Radiated[w] * pos[0];
+                          l[w][1] += SPP(p).Radiated[w] * pos[1];
+                          l[w][2] += SPP(p).Radiated[w] * pos[2];
                         }
                     }
 #endif
@@ -1379,6 +1380,7 @@ void force_update_node_recursive(int no, int sib, int father, int *last)
                   for(int w = 0; w < WAVEBANDS; w++)
                     {
                       kappa[w] += Nodes[p].u.d.mass * Nodes[p].u.d.kappa[w];
+                      
                       luminosity[w] += Nodes[p].u.d.luminosity[w]; 
                       l[w][0] += Nodes[p].u.d.luminosity[w] * Nodes[p].u.d.l[w][0];
                       l[w][1] += Nodes[p].u.d.luminosity[w] * Nodes[p].u.d.l[w][1];
@@ -1430,10 +1432,10 @@ void force_update_node_recursive(int no, int sib, int father, int *last)
 
                       if(Tree_Points[n].Type == 4)
                         {
-                          luminosity[w] += Tree_Points[n].LUM[w];
-                          l[w][0] += Tree_Points[n].LUM[w] * Tree_Points[n].Pos[0];
-                          l[w][1] += Tree_Points[n].LUM[w] * Tree_Points[n].Pos[1];
-                          l[w][2] += Tree_Points[n].LUM[w] * Tree_Points[n].Pos[2];
+                          luminosity[w] += Tree_Points[n].Radiated[w];
+                          l[w][0] += Tree_Points[n].Radiated[w] * Tree_Points[n].Pos[0];
+                          l[w][1] += Tree_Points[n].Radiated[w] * Tree_Points[n].Pos[1];
+                          l[w][2] += Tree_Points[n].Radiated[w] * Tree_Points[n].Pos[2];
                         }
                     }
 #endif
@@ -1508,6 +1510,7 @@ void force_update_node_recursive(int no, int sib, int father, int *last)
       for(int w = 0; w < WAVEBANDS; w++)
         {
           Nodes[no].u.d.kappa[w] = kappa[w];
+
           Nodes[no].u.d.luminosity[w] = luminosity[w];
           Nodes[no].u.d.l[w][0] = l[w][0];
           Nodes[no].u.d.l[w][1] = l[w][1];
@@ -1630,6 +1633,7 @@ void force_exchange_topleafdata(void)
           for(int w = 0; w < WAVEBANDS; w++) 
             {
               loc_DomainMoment[idx].kappa[w] = Nodes[no].u.d.kappa[w];
+              
               loc_DomainMoment[idx].luminosity[w] = Nodes[no].u.d.luminosity[w];
               loc_DomainMoment[idx].l[w][0] = Nodes[no].u.d.l[w][0];
               loc_DomainMoment[idx].l[w][1] = Nodes[no].u.d.l[w][1];
@@ -1674,6 +1678,7 @@ void force_exchange_topleafdata(void)
           for(int w = 0; w < WAVEBANDS; w++) 
             {
               Nodes[no].u.d.kappa[w] = DomainMoment[idx].kappa[w];
+              
               Nodes[no].u.d.luminosity[w] = DomainMoment[idx].luminosity[w];
               Nodes[no].u.d.l[w][0] = DomainMoment[idx].l[w][0];
               Nodes[no].u.d.l[w][1] = DomainMoment[idx].l[w][1];
@@ -1759,6 +1764,7 @@ void force_treeupdate_toplevel(int no, int topnode, int bits, int x, int y, int 
       for(int w = 0; w < WAVEBANDS; w++)
         {
           kappa[w] = 0;
+          
           luminosity[w] = 0;
           l[w][0] = 0;
           l[w][1] = 0;
@@ -1793,6 +1799,7 @@ void force_treeupdate_toplevel(int no, int topnode, int bits, int x, int y, int 
               for(int w = 0; w < WAVEBANDS; w++)
                 {
                   kappa[w] += Nodes[p].u.d.mass * Nodes[p].u.d.kappa[w];
+                  
                   luminosity[w] += Nodes[p].u.d.luminosity[w];
                   l[w][0] += Nodes[p].u.d.luminosity[w] * Nodes[p].u.d.l[w][0];
                   l[w][1] += Nodes[p].u.d.luminosity[w] * Nodes[p].u.d.l[w][1];
@@ -1867,6 +1874,7 @@ void force_treeupdate_toplevel(int no, int topnode, int bits, int x, int y, int 
       for(int w = 0; w < WAVEBANDS; w++)
         {
           Nodes[no].u.d.kappa[w] = kappa[w];
+          
           Nodes[no].u.d.luminosity[w] = luminosity[w];
           Nodes[no].u.d.l[w][0] = l[w][0];
           Nodes[no].u.d.l[w][1] = l[w][1];

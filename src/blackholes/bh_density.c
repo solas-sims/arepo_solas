@@ -184,8 +184,6 @@ void bh_density(void)
   long long ntot;
   double t0, t1;
 
-  //mpi_printf("BH_DENSITY: Start density and neighbour search for %d black holes.\n", NumBhs);
-
   BhNgbs = (MyFloat *)mymalloc("BhNgbs", NumBhs * sizeof(MyFloat));
 
 #ifdef BH_CONSTANT_RADIUS
@@ -200,22 +198,14 @@ void bh_density(void)
     {
       Left[i] = Right[i] = 0;
       BhP[i].DensityFlag = 1;
+       
+      if(BhP[i].Hsml <= 0)
+        BhP[i].Hsml = All.SofteningTable[PPB(i).SofteningType];
     }
 
   generic_set_MaxNexport();
 
-  for(idx = 0; idx < TimeBinsBh.NActiveParticles; idx++)
-    {
-      i = TimeBinsBh.ActiveParticleList[idx];
-      if(BhP[i].Hsml <= 0)
-        {
-          //mpi_printf("BH_ACCRETION: WARNING! BH %d has invalid Hsml=%g, ... reinitializing\n", i, BhP[i].Hsml);
-          // Use softening as fallback
-          BhP[i].Hsml = All.SofteningTable[PPB(i).SofteningType];
-        }
-    }
- 
-  /* we will repeat the whole thing for those particles where we didn't find enough neighbours */
+  /* We will repeat the whole thing for those particles where we didn't find enough neighbours */
   do
     {
       t0 = second();
@@ -230,28 +220,38 @@ void bh_density(void)
             {
               if(BhNgbs[i] == 0)
                 terminate("BH_DENSITY: BH %d has zero neighbours at maximum Hsml=%g\n", i, BhP[i].Hsml);
-
-              BhP[i].DensityFlag = -1; /* Mark as inactive */
+              
+              /* Mark as inactive */
+              BhP[i].DensityFlag = -1; 
               continue;
             }
 
+#ifdef REFINEMENT
           if(BhP[i].NgbsMass < (All.BhDesNgb - All.BhDesDev) * All.TargetGasMass || BhP[i].NgbsMass > (All.BhDesNgb + All.BhDesDev) * All.TargetGasMass)
+#else
+          if(BhNgbs[i] < (All.BhDesNgb - All.BhDesDev) || BhNgbs[i] > (All.BhDesNgb + All.BhDesDev)) 
+#endif
             {
-              /* need to redo this particle */
+              /* Need to redo this particle */
               npleft++;
 
               if(Left[i] > 0 && Right[i] > 0)
                 {
                   if((Right[i] - Left[i]) < 1.0e-3 * Left[i])
                     {
-                      /* this one should be ok */
+                      /* This one should be ok */
                       npleft--;
-                      BhP[i].DensityFlag = -1; /* Mark as inactive */
+                      /* Mark as inactive */
+                      BhP[i].DensityFlag = -1; 
                       continue;
                     }
                 } 
 
+#ifdef REFINEMENT
               if(BhP[i].NgbsMass < (All.BhDesNgb - All.BhDesDev) * All.TargetGasMass)
+#else
+              if(BhNgbs[i] < (All.BhDesNgb - All.BhDesDev))
+#endif
                 Left[i] = dmax(BhP[i].Hsml, Left[i]);
               else
                 {
@@ -283,7 +283,8 @@ void bh_density(void)
                 }
             }
           else
-            BhP[i].DensityFlag = -1; /* Mark as inactive */ 
+            /* Mark as inactive */ 
+            BhP[i].DensityFlag = -1;
       
           /* Limit smoothing length */
           double hmax = All.HMaxFactor * All.SofteningTable[PPB(i).SofteningType]; 
@@ -316,7 +317,7 @@ void bh_density(void)
   myfree(Right);
   myfree(Left);
 
-  /* mark as active again */
+  /* Mark as active again */
   for(i = 0; i < NumBhs; i++)
     BhP[i].DensityFlag = 1;
 #endif
@@ -341,10 +342,10 @@ void bh_density(void)
 static int bh_density_evaluate(int target, int mode, int threadid)
 {
   int i, n, numnodes, *firstnode; 
-  int ngbs, ngbsminbin = TIMEBINS; 
-  double h, h2, r, r2, wk;
-  double dx, dy, dz, dvx, dvy, dvz; 
-  MyDouble *pos, *vel, ngbsmass, ngbsvolume;
+  int ngbs = 0, ngbsminbin = TIMEBINS; 
+  MyDouble xtmp, ytmp, ztmp;   
+  MyDouble h, h2, dx, dy, dz, r, r2, wk; 
+  MyDouble *pos, *vel, ngbsmass = 0, ngbsvolume = 0;
 
   data_in local, *target_data;
   data_out out = {0};
@@ -368,24 +369,22 @@ static int bh_density_evaluate(int target, int mode, int threadid)
   vel = target_data->Vel;
   h = target_data->Hsml;
 
-  ngbs = ngbsmass = ngbsvolume = 0;
-
 #ifdef TORQUE_ACCRETION
   MyDouble gas_angular_momentum[3];
   for(int j = 0; j < 3; j++)
     gas_angular_momentum[j] = 0;
 #endif 
 
-  double hinv, hinv3, hinv4, u, dwk;
+  //MyDouble hinv, hinv3, hinv4, u, dwk;
 
-  h2   = h * h;
-  hinv = 1.0 / h;
-#ifndef TWODIMS
-  hinv3 = hinv * hinv * hinv;
-#else  /* #ifndef  TWODIMS */
-  hinv3 = hinv * hinv / boxSize_Z;
-#endif /* #ifndef  TWODIMS #else */
-  hinv4 = hinv3 * hinv;
+  //h2   = h * h;
+  //hinv = 1.0 / h;
+//#ifndef TWODIMS
+//  hinv3 = hinv * hinv * hinv;
+//#else  /* #ifndef  TWODIMS */
+//  hinv3 = hinv * hinv / boxSize_Z;
+//#endif /* #ifndef  TWODIMS #else */
+//  hinv4 = hinv3 * hinv;
 
 #ifdef BH_CONSTANT_RADIUS
   int nfound = ngb_treefind_variable_threads(pos, All.BhRadius, target, mode, threadid, numnodes, firstnode);
@@ -400,36 +399,17 @@ static int bh_density_evaluate(int target, int mode, int threadid)
       if(P[i].Type != 0 || P[i].Mass == 0 || P[i].ID == 0)
         continue;
 
-/* compute bh->cell position vectors: posBhP-posSphP */
-      dx = pos[0] - P[i].Pos[0];
-      dy = pos[1] - P[i].Pos[1];
-      dz = pos[2] - P[i].Pos[2];
+      /* Compute bh->cell position vector */
+      dx = NEAREST_X(P[i].Pos[0] - pos[0]);
+      dy = NEAREST_Y(P[i].Pos[1] - pos[1]);
+      dz = NEAREST_Z(P[i].Pos[2] - pos[2]);
 
-/* compute bh->cell velocity vectors: posBhP-posSphP */
-      dvx = vel[0] - P[i].Vel[0];
-      dvy = vel[1] - P[i].Vel[1];
-      dvz = vel[2] - P[i].Vel[2];
+      MyDouble dvx, dvy, dvz;  
 
-#ifndef REFLECTIVE_X
-      if(dx > boxHalf_X)
-        dx -= boxSize_X;
-      if(dx < -boxHalf_X)
-        dx += boxSize_X;
-#endif /* #ifndef REFLECTIVE_X */
-
-#ifndef REFLECTIVE_Y
-      if(dy > boxHalf_Y)
-        dy -= boxSize_Y;
-      if(dy < -boxHalf_Y)
-        dy += boxSize_Y;
-#endif /* #ifndef REFLECTIVE_Y */
-
-#ifndef REFLECTIVE_Z
-      if(dz > boxHalf_Z)
-        dz -= boxSize_Z;
-      if(dz < -boxHalf_Z)
-        dz += boxSize_Z;
-#endif /* #ifndef REFLECTIVE_Z */
+     /* Compute bh->cell velocity vector */
+      dvx = P[i].Vel[0] - vel[0]; 
+      dvy = P[i].Vel[1] - vel[1];
+      dvz = P[i].Vel[2] - vel[2];
 
       r2 = dx * dx + dy * dy + dz * dz;
 
@@ -442,7 +422,7 @@ static int bh_density_evaluate(int target, int mode, int threadid)
           r = sqrt(r2);
           u = r * hinv;
 
-          bh_kernel(u, hinv3, hinv4, &wk, &dwk);
+          //bh_kernel(u, hinv3, hinv4, &wk, &dwk);
           
           ngbs++;
           

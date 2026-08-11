@@ -1156,7 +1156,7 @@ int blockpresent(enum iofields blocknr, int write)
 
   if(!write)
     {
-#ifdef PASSIVE_SCALARS
+#if PASSIVE_SCALARS > 0
       if(RestartFlag == 0 && blocknr == IO_PASS)
         return 1;
 #endif /* #ifdef PASSIVE_SCALARS */

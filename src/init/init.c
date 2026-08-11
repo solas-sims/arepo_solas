@@ -437,7 +437,8 @@ int init(void)
       write_voronoi_mesh(&Mesh, tess_name, 0, NTask - 1);
       return 0;
     }
-
+  
+  /* Set up gas properties */  
   for(i = 0, mass = 0; i < NumGas; i++)
     {
       if(RestartFlag == 0)
@@ -479,29 +480,15 @@ int init(void)
       mass += P[i].Mass;
     }
 
-/* NOTE: The metals have to be initialised before the PASSIVE_SCALARS.
- * The value in the PScalars are set to zero during reading ICs.
- * */
-#ifdef METALS
-  for(i = 0; i < NumGas; i++)
-      SphP[i].GasMetallicity = All.InitMetallicityinSolar * SOLAR_METALLICITY;
-#endif /* ifdef METALS */
-
-#ifdef PASSIVE_SCALARS
-  for(i = 0; i < NumGas; i++)
-      for(j = 0; j < PASSIVE_SCALARS; j++)
-        SphP[i].PConservedScalars[j] = SphP[i].PScalars[j] * P[i].Mass;
-#endif /* #ifdef PASSIVE_SCALARS */
+#if PASSIVE_SCALARS > 0
+  init_passive_scalars();
+#endif
 
 #ifdef METALS
 #ifdef STARS
   for(i = 0; i < NumStars; i++)
-      SP[i].Metallicity = All.InitMetallicityinSolar * SOLAR_METALLICITY;
+    SP[i].Metallicity = All.InitMetallicityinSolar * SOLAR_METALLICITY;
 #endif
-#endif
-
-#ifdef USE_GRACKLE 
-  init_state();
 #endif
 
   if(RestartFlag == 17)
@@ -580,29 +567,34 @@ MPI_Bcast(StarMeanMassInBins, N_IMF_TYPES*NBINS, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 #endif
 
 #if STAR_PARTICLES == 0
-MPI_Bcast(bin_imf, N_IMF_TYPES*NBINS, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+  MPI_Bcast(&norm, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+  MPI_Bcast(bin_imf, N_IMF_TYPES*NBINS, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
 #include <gsl/gsl_rng.h>
 
-rng = gsl_rng_alloc(gsl_rng_mt19937);
-gsl_rng_set(rng, ThisTask + 1);
+  rng = gsl_rng_alloc(gsl_rng_mt19937);
+  gsl_rng_set(rng, ThisTask + 1);
+#endif
+
+#if defined(STAR_PARTICLES) && STAR_PARTICLES < 2
+  for(i = 0; i < NumStars; i++)
+    sample_star_particle(PPS(i).Mass * All.cf_UnitMass_in_Msun, SP[i].NumOfStarsInBins);
 #endif
 
 #endif
 
 #ifdef STAR_FEEDBACK_ACTIVE  
-  for(i=0; i < 6; i++)
-    All.StarFeedbackLocal[i] = 0;
-  
-  double *sfg = All.StarFeedbackGlobal;
-  sfg = malloc(6 * sizeof(double));
-
   mpi_printf("Loading star evolution tables\n");
   load_star_tables(All.StarTablesFile);
+
+  feedback_init(&MechanicalFeedbackEvents);
+
+  for(i = 0; i < NumStars; i++)
+    SP[i].WithFeedback = 1;
 #endif
 
 #ifdef STAR_RADIATION_ACTIVE
-  init_healpix_rays();
+  init_h2shield();
 #endif
 
 #ifdef BH_ACCRETION_ACTIVE 

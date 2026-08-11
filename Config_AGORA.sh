@@ -1,12 +1,11 @@
 #--------------------------------------- SOLAS additions
 
 #--------------------------------------- Metal parameters
-PASSIVE_SCALARS=1      # Number of passive scalar fields advected with fluid (default: 0)
 METALS                 # Advect all metals, ie metal mass fraction, as a PASSIVE_SCALARS
 
 #--------------------------------------- Cooling parameters
 USE_GRACKLE
-GRACKLE_CHEMISTRY=2    # Curretly only grackle mode=0 (lookup tables) with no chemistry network is supported
+GRACKLE_CHEMISTRY=3    
 
 #--------------------------------------- Star Formation options
 AGORA_SF               # Agora based SF
@@ -18,7 +17,7 @@ STAR_PARTICLES=1       # Star particles model flag: set to 0, 1 for massive star
 
 #STAR_FEEDBACK          # Include full star feedback (winds + full radiation + supernovae)
 WINDS                  # Only winds
-RADIATION              # Full radiation
+#RADIATION              # Full radiation
 SUPERNOVAE             # Only supernovae
 
 #STAR_HOST_REFINEMENT
@@ -59,7 +58,7 @@ TREE_BASED_TIMESTEPS          # non-local timestep criterion (take 'signal speed
 
 #--------------------------------------- Single/Double Precision
 DOUBLEPRECISION=1             # Mode of double precision: not defined: single; 1: full double precision 2: mixed, 3: mixed, fewer single precisions; unless short of memory, use 1.
-#NGB_TREE_DOUBLEPRECISION      # if this is enabled, double precision is used for the neighbor node extension
+NGB_TREE_DOUBLEPRECISION      # if this is enabled, double precision is used for the neighbor node extension
 
 #--------------------------------------- output options
 PROCESS_TIMES_OF_OUTPUTLIST   # goes through times of output list prior to starting the simulaiton to ensure that outputs are written as close to the desired time as possible (as opposed to at next possible time if this flag is not active)

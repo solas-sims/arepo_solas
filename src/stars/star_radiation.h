@@ -5,23 +5,54 @@
 
 
 #define TAG_RAD 18
+
 #define RAD_TRUNC_FRAC 0.01 
-#define MAX_NUM_RAYS 12288 
-#define RAY_STACK_SIZE 64
 
+#define RAY_STACK_SIZE 512
+#define RAY_PENDING_SIZE 64 
+
+/* Healpix: Multiples of 2! */
 #define NSIDE_MIN 1
-#define NSIDE_MAX 32      
+#define NSIDE_MAX 128  
 
-/* Change at init_rays_from_stars */
+/* Starting number of rays */
+#define NRays (12 * NSIDE_MIN * NSIDE_MIN)
+
+/* Dissociation of H2 */
+#define SIGMA_DISS 2.47e-18 /* cm^2, dissociation-weighted eff. cross 
+                               section (DB96, Baczynski+15) */
+
+#define F_DISS 0.15 /* dissociation branching per absorption */
+#define SIGMA_PUMP (SIGMA_DISS / F_DISS) /* total line absorption */
+ 
+#define H2_SHIELD_B5 3.0 /* Doppler b / (km/s); fixed */
+ 
+/* Shielding log table parameters */
+#define H2TAB_N 1024
+#define H2TAB_LOGNMIN 11.0 /* log10 N_H2 [cm^-2]: f_sh = 1 below */
+#define H2TAB_LOGNMAX 24.0 /* f_sh negligible above */
+
+/* Change at init_rays */
 #define ALL_BANDS_ACTIVE ((uint8_t)((1u << WAVEBANDS) - 1u))
 #define NO_IR_ACTIVE ((uint8_t)(ALL_BANDS_ACTIVE & ~(1u << INFRARED)))
-#define NO_IONIZING_ACTIVE ((uint8_t)(ALL_BANDS_ACTIVE & ~(1u << IONIZING_HI) & ~(1u << IONIZING_HeI) & ~(1u << IONIZING_HeI)))
+#define NO_IONIZING_ACTIVE ((uint8_t)(ALL_BANDS_ACTIVE & ~(1u << IONIZING_HI) & ~(1u << IONIZING_HeI) & ~(1u << IONIZING_HeII)))
 #define ONLY_IONIZING_ACTIVE ((uint8_t)(ALL_BANDS_ACTIVE & ((1u << IONIZING_HI) | (1u << IONIZING_HeI) | (1u << IONIZING_HeII))))
 
-
-extern double HealpixDirs[MAX_NUM_RAYS][3];
-/* 12*NSIDE^2 */
-extern int NRays;
+/* 
+ * INFRARED: inf A - 12398.4 A (0 eV - 1 eV)
+ *  
+ * OPTICAL: 12398.4 A - 2066.4 A (1 eV - 6 eV)
+ *
+ * ULTRAVIOLET: 2066.4 A - 1107.0 A (6 eV - 11.2 eV) 
+ *
+ * LYMAN_WERNER: 1107.0 A - 911.6 A (11.2 eV - 13.6 eV) 
+ *
+ * IONIZING_HI: 911.6 A - 504.0 A (13.6 eV - 24.6 eV)
+ *
+ * IONIZING_HeI: 504.0 A - 227.9 A (24.6 eV - 54.4 eV)
+ *
+ * IONIZING_HeII: 227.9 A - 0 A (54.4 eV - inf eV)              
+ */ 
 
 typedef enum
 { INFRARED = 0,
@@ -37,14 +68,15 @@ typedef enum
 #if WAVEBANDS > 8
 #error "Active_bands is uint8_t but WAVEBANDS > 8 - use uint16_t instead"
 #endif
-
+ 
 typedef struct WavebandData
 {
   double Photons;
   double Energy;
 } WavebandData;
 
-extern double Kappa[WAVEBANDS];
+extern double Kappa_E[WAVEBANDS];
+extern double Kappa_N[WAVEBANDS];
 
 extern double ReradiatedFraction[WAVEBANDS];
 
@@ -57,53 +89,62 @@ typedef struct StackEntry
 
 typedef struct RayPacket
 {
+  MyIDType star_id;
+
   double pos[3];
   double dir[3];
+
   double t;
   double t_exit;
   double t_maximum;
 
+  int nside; /* Current HEALPix nside level */
+  int healpix_pixel; /* HEALPix basis rotation seed (per star) */
+  unsigned long long rotation_seed; /* HEALPix basis rotation seed (per star) */
+
   /* Bitmask: bit w is SET while band w is still alive */
-  /* Cleared when RAD[w] < RAD_TRUNC_FRAC * RAD_Initial[w] */
+  /* Cleared when Radiated[w] < RAD_TRUNC_FRAC * Radiated_Init[w] */
   /* When active_bands == 0 the ray is fully absorbed - return immediately */
   uint8_t  active_bands;
 
+  /* Ray energy and photons */
   WavebandData Radiated[WAVEBANDS];
   WavebandData Radiated_Init[WAVEBANDS];
 
+  /* Accumulated H2 column since source */
+  double N_H2; 
+
+  /* Ray bookkeeping */
   int ray_id;
   int home_task;
   
-  /* Pending top-level nodes still to traverse after current domain */
-  StackEntry pending[RAY_STACK_SIZE];
-  int n_pending;
   int target_node;
   int is_paused;
-  
-  int nside; /* Current HEALPix nside level */
-  int healpix_pixel; /* Pixel index in nested scheme */
+    
+  int n_pending;
+  StackEntry pending[RAY_PENDING_SIZE];
 } RayPacket;
 
 typedef struct RayWorkStack
 {
+  long long n; /* Number of rays on this stack */
+  long long capacity; /* Allocated capacity */
   RayPacket *rays;
-  int n;
-  long long capacity;
 } RayWorkStack;
 
 typedef struct RayExportBuffer
 {
-  int n; /* Number of rays to export */
-  RayPacket *rays; /* Ray information */
-  int *task; /* Which task to send each ray to */
-  int capacity; /* Allocated capacity */
+  long long n; /* Number of rays to export */
+  long long capacity; /* Allocated capacity */
+  int *task; /* Where to send each ray */
+  RayPacket *rays; 
 } RayExportBuffer;
 
 extern struct rad_resultsactiveimported_data
 {
+  int index; /* Local SphP index on home task */
   WavebandData Radiated[WAVEBANDS];
   double StarMomentumFeed[3];
-  int index; /* Local SphP index on home task */
 } *Rad_ResultsActiveImported;
 
 #endif

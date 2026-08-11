@@ -53,19 +53,27 @@ extern struct ExtNgbNODE
 #ifdef STAR_RADIATION_ACTIVE
 extern struct RtNgbNODE
 {
-    /* geometric cell bounds — opening angle + intersection */
+    /* geometric cell bounds - opening angle + intersection */
     //float center[3];
     //float len;
     
     /* number of children */
-    int nchildren;
+    int Nchildren;
 
+    /* AABB of cell *spheres*, not points */
+    MyNgbTreeFloat rt_range_min[3];   
+    MyNgbTreeFloat rt_range_max[3];
+
+#ifdef RAD_OPENING_ANGLE
     /* RT quantities - volume-weighted, accumulated during tree build */
-    float volume;
-    float density_kappa[WAVEBANDS];
-    
-    /* RT quantities - accumulated during tree walk */
+    MyNgbTreeFloat Volume;
+    MyNgbTreeFloat dN_H2_OverLength;
+      
+    MyNgbTreeFloat DtauOverLength_E[WAVEBANDS];
+    MyNgbTreeFloat DtauOverLength_N[WAVEBANDS];
+
     WavebandData Absorbed[WAVEBANDS];
+#endif
 } * RtNgb_Nodes;
 #endif
 

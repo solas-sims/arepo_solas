@@ -51,9 +51,9 @@ static int sf_criteria(int i)
   double mu = 4 / (8 - 5 * (1 - HYDROGEN_MASSFRAC));
 #endif
 
-  double number_dens = SphP[i].Density * All.cf_UnitDensity_in_cgs / mu / PROTONMASS;
-  double u_to_temp_fac = mu * PROTONMASS / BOLTZMANN * GAMMA_MINUS1;
-  double temp = SphP[i].Utherm * All.cf_UnitVelocity_in_cm_per_s * All.cf_UnitVelocity_in_cm_per_s * u_to_temp_fac;
+  double number_dens = (SphP[i].Density * All.cf_UnitDensity_in_cgs) / mu / PROTONMASS;
+  double temp = (SphP[i].Utherm * All.cf_UnitVelocity_in_cm_per_s * All.cf_UnitVelocity_in_cm_per_s) 
+  * mu * PROTONMASS * GAMMA_MINUS1 / BOLTZMANN;
 
   if(number_dens < All.NumberDensThreshold)
     return 0;

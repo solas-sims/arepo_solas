@@ -256,7 +256,11 @@ void run(void)
                                                                                            */
 #else /* #if defined(VORONOI_STATIC_MESH) && !defined(VORONOI_STATIC_MESH_DO_DOMAIN_DECOMPOSITION) */
 
+#ifdef STAR_RADIATION_ACTIVE
+      if(1)
+#else
       if(All.HighestActiveTimeBin >= All.SmallestTimeBinWithDomainDecomposition) /* only do this for sufficiently large steps */
+#endif
         {
 #ifdef VORONOI_STATIC_MESH
           free_mesh();
@@ -409,16 +413,14 @@ void calculate_non_standard_physics_prior_mesh_construction(void)
 #endif
 
 #ifdef STAR_FEEDBACK_ACTIVE
+      star_in();
+
       star_update_timesteps();
       
       star_prep();
 
       star_density();
 #endif 
-
-#ifdef STAR_RADIATION_ACTIVE
-      star_radiation();
-#endif
 
 #ifdef BH_ACTIVE
       bh_update_timesteps();
@@ -452,7 +454,11 @@ void calculate_non_standard_physics_end_of_step(void)
 {
   if(All.Time > 0)
     { 
-#if defined(WINDS) || defined(RADIATION_PRESSURE) || defined(SUPERNOVAE)
+#ifdef STAR_RADIATION_ACTIVE
+      star_radiation();
+#endif
+
+#ifdef STAR_FEEDBACK_ACTIVE
       star_perform_end_of_step_physics();
 #endif
 
@@ -468,8 +474,8 @@ void calculate_non_standard_physics_end_of_step(void)
 #endif /* #ifdef USE_SFR #else */
 #endif /* #ifdef COOLING */
 
-#ifdef STAR_RADIATION_ACTIVE
-      update_kappa();
+#ifdef STAR_FEEDBACK_ACTIVE
+      star_exit();
 #endif
     }
 }
