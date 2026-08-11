@@ -35,8 +35,6 @@ homepage. Worth a one-line fix alongside this.
 
 ## `EEOS_SF` (public AREPO's default Springel & Hernquist 2003 model — not a SOLAS addition, included for completeness since it's what both shipped examples actually use)
 
-*(`CritPhysDensity` moved to the general Star Formation table above — it's shared across `EEOS_SF`/`AGORA_SF`/`JEANS_SF`, not `EEOS_SF`-specific.)*
-
 | Parameter | Type | Units | Recommended | Notes |
 |---|---|---|---|---|
 | `MaxSfrTimescale` | REAL | ✅ internal time units (per in-repo comment) | `2.27` | |
