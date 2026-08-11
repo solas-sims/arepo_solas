@@ -52,17 +52,12 @@ homepage. Worth a one-line fix alongside this.
 | `TemperatureThreshold` | REAL | ✅ Kelvin — compared directly against a temperature computed in K | SF disabled above this temperature. |
 | `StarFormationEfficiency` | REAL | ✅ dimensionless — `SFR = efficiency × Mass / t_freefall` | Same tag reused by `JEANS_SF` and `INDIVIDUAL_STAR_BY_STAR_FORMATION`. |
 
-## `SF_THRESHOLD_HALO_MASS_DEPENDENT` (found in source — not mentioned on any current wiki page)
-
-Multiplies `NumberDensThreshold` by a halo-mass-dependent factor (`sf_threshold_halo_mass_factor()`)
-— this is presumably the mechanism behind the `sf_threshold_halo_mass.md` doc referenced from
-`Home.md`'s FOF-seeding section, but that doc lives on the (now-merged) `merge-fof-into-star-feedback`
-branch and I haven't read it. Worth linking once someone confirms the current path.
+## `SF_THRESHOLD_HALO_MASS_DEPENDENT` ([./sf_threshold_halo_mass.md](./sf_threshold_halo_mass.md))
 
 | Parameter | Type | Units | Notes |
 |---|---|---|---|
-| `MinHaloMassForNormalSF` | REAL | ❓ presumably code mass units, unconfirmed | |
-| `LowMassHaloThresholdFactor` | REAL | ❓ presumably dimensionless multiplier | |
+| `MinHaloMassForNormalSF` | REAL | ✅ halo mass (code units) above which the ordinary threshold applies unchanged. | |
+| `LowMassHaloThresholdFactor` | REAL | ✅ dimensionless multiplier making star formation harder to trigger for gas cells whose host halo mass is below MinHaloMassForNormalSF (and above 0). Gas not currently in any FOF group (HostHaloMass <= 0) always uses the ordinary threshold — this is deliberately an in-halo effect (self-shielding/collapse-threshold physics inside a halo), not something meant to apply to general diffuse gas. | |
 
 ## `JEANS_SF`
 
