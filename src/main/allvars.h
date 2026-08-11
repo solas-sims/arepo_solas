@@ -977,6 +977,21 @@ extern FILE *FdInfo, /*!< file handle for info.txt log-file. */
 extern FILE *FdDetailed;
 #endif /* #ifdef DETAILEDTIMINGS */
 
+#ifdef SIDM_LOG_COLLISIONS
+extern FILE *FdSidmCollisions; /**< per-task file handle for sidm_collisions_<task>.txt diagnostic log
+                                 *   (SIDM item-4 diagnostic mode, see sidm_scatter.c). */
+#endif                         /* #ifdef SIDM_LOG_COLLISIONS */
+
+#ifdef SIDM
+extern long long SidmTimestepChecks;  /**< cumulative (per-task) count of Type==1 particles for which the SIDM
+                                        *   term in get_timestep_gravity() (timestep.c) was evaluated. */
+extern long long SidmTimestepBinding; /**< cumulative (per-task) subset of the above where the SIDM term was
+                                        *   actually the smallest, i.e. bound the particle's timestep. Reduced
+                                        *   and printed alongside the SIDM_SCATTER diagnostic (sidm_scatter.c)
+                                        *   to answer "does the SIDM timestep criterion ever actually bind in
+                                        *   a real run" (SIDM.md TODO). */
+#endif /* #ifdef SIDM */
+
 #ifdef OUTPUT_CPU_CSV
 extern FILE *FdCPUCSV; /**< file handle for cpu.csv log-file. Used if the cpu log is printed in csv format as well. */
 #endif                 /* #ifdef OUTPUT_CPU_CSV */
@@ -1477,13 +1492,19 @@ double InitMetallicityinSolar;
 #ifdef STAR_FEEDBACK_ACTIVE
   double StarFeedbackLocal[6];
   double StarFeedbackGlobal[6];
-  
+
   char StarTablesFile[MAXLEN_PATH];
-#endif 
+#endif
 
 #ifdef SUPERNOVAE
   double SN_HostShellSweepFrac;
 #endif
+
+#ifdef SIDM
+  double SidmDesNumNgb;
+  double SidmDesNumNgbDev;
+  double SidmCrossSection; /*!< sigma/m, constant elastic cross section for v1, in code units (length^2/mass) */
+#endif /* #ifdef SIDM */
 
 #ifdef STAR_RADIATION_ACTIVE
   double RaySplitFactor;
@@ -1620,6 +1641,16 @@ extern struct particle_data
 #ifdef BLACKHOLES
   MyIDType BhID;
 #endif
+
+#ifdef SIDM
+  /* Forward reference into the DMSP[] side array (src/sidm/sidm.h),
+   * mirroring how SID above indexes into SP[] for stars. Only
+   * meaningful for Type==1 particles. The six fields that used to live
+   * directly here (SidmDensity, SidmHsml, SidmVelDisp, SidmNumNgb,
+   * SidmLastScatterTime, SidmScatterFlag) have moved to DM_Particle_Data
+   * -- see sidm.h for the struct and the PDMS/DMPS access macros. */
+  MyIDType SIDMID;
+#endif /* #ifdef SIDM */
 } * P,              /*!< holds particle data on local processor */
     *DomainPartBuf; /*!< buffer for particle data used in domain decomposition */
 
@@ -1700,7 +1731,6 @@ extern struct sph_particle_data
   MyFloat HostHaloMass; /*!< FOF mass of the host halo, refreshed at each on-the-fly FOF pass (0 if not in a halo);
                              can be used e.g. to select the mode of star formation by halo mass */
 #endif /* #ifdef HALO_SEEDING */
-
 
 #ifdef OUTPUT_SURFACE_AREA
   int CountFaces;
@@ -2181,6 +2211,13 @@ enum iofields
 #ifdef OUTPUT_TIMEBIN_BH
   IO_TIMEBIN_BH,
 #endif
+#ifdef SIDM
+  IO_SIDM_DENSITY,
+  IO_SIDM_HSML,
+  IO_SIDM_NUMNGB,
+  IO_SIDM_VELDISP,
+  IO_SIDM_SCATTERCOUNT,
+#endif
 #if defined(HALO_SEEDING) && defined(BLACKHOLES)
   IO_BH_FORMATION_TIME,
   IO_BH_FORMATION_METALLICITY,
@@ -2200,6 +2237,9 @@ enum arrays
 #endif
 #ifdef BLACKHOLES
   A_BH,
+#endif
+#ifdef SIDM
+  A_DMSP,
 #endif
   A_PS
 };
@@ -2229,6 +2269,7 @@ enum types_in_memory
 enum e_typelist
 {
   GAS_ONLY                      = 1,
+  DM_ONLY                       = 2,
   STARS_ONLY                    = 16,
   GAS_AND_STARS                 = 17,
   BHS_ONLY                      = 32,

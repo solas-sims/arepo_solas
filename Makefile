@@ -634,6 +634,13 @@ INCL    += blackholes/bh_proto.h
 SUBDIRS += blackholes
 endif
 
+# SIDM
+ifeq (SIDM,$(findstring SIDM,$(CONFIGVARS)))
+OBJS += sidm/sidm_density.o sidm/sidm_tree.o sidm/sidm_scatter.o
+INCL += sidm/sidm.h sidm/sidm_tree.h
+SUBDIRS += sidm
+endif
+
 ##########################
 #combine compiler options#
 ##########################

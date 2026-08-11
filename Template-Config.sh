@@ -7,6 +7,13 @@
 #--------------------------------------- SOLAS additions
 #TODO                   # Placeholder, not a real compile-time option; not referenced by the code
 
+#---------------------------------------- Dark Matter parameters
+#SIDM                   # Self-interacting Dark Matter - allows for particle scattering following Vogelsberger et al. 2019
+#SIDM_H
+#SIDM_TREE_H
+#SIDM_KICK_POSITION_CORRECTION   # SIDM: post-kick position correction + neighbour wake-up (see sidm_scatter.c); off by default
+#SIDM_LOG_COLLISIONS             # SIDM: diagnostic mode, logs detected collisions without applying them (see sidm_scatter.c); off by default
+
 #---------------------------------------- Metal parameters
 #PASSIVE_SCALARS=1      # Number of passive scalar fields advected with fluid (default: 0)
 #PASSIVE_SCALARS_EXTRA  # Extra passive scalar slots on top of those auto-counted for METALS/GRACKLE/jet tracer (default: 0)

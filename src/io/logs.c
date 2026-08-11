@@ -87,6 +87,20 @@ void open_logfiles(void)
     terminate("error in opening file '%s'\n", buf);
 #endif /* #ifdef DETAILEDTIMINGS */
 
+#ifdef SIDM_LOG_COLLISIONS
+  /* Per-task, like FdDetailed above -- SIDM collisions are detected on
+   * whichever task owns the initiating particle, so a root-only file
+   * (like most of the log-files below) would need an extra MPI-gather
+   * step this diagnostic-only path has no reason to pay for. */
+  sprintf(buf, "%ssidm_collisions_%d.txt", All.OutputDir, ThisTask);
+  if(!(FdSidmCollisions = fopen(buf, mode)))
+    terminate("error in opening file '%s'\n", buf);
+  if(RestartFlag == 0)
+    fprintf(FdSidmCollisions,
+            "# time timebin dt_i initiator_ID init_pos_x init_pos_y init_pos_z partner_pos_x partner_pos_y "
+            "partner_pos_z r is_remote p_ij\n");
+#endif /* #ifdef SIDM_LOG_COLLISIONS */
+
   if(ThisTask != 0) /* only the root processors writes to the log files */
     return;
 
@@ -221,6 +235,16 @@ void open_logfiles(void)
  */
 void close_logfiles(void)
 {
+#ifdef SIDM_LOG_COLLISIONS
+  /* Per-task, like the open in open_logfiles() -- closed (and thus
+   * flushed) unconditionally, unlike FdDetailed above which this
+   * pre-existing function never closes on any task; the collision log
+   * is the actual deliverable of the SIDM item-4 diagnostic run, so an
+   * unflushed buffer losing the tail of a run would silently corrupt
+   * the validation comparison. */
+  fclose(FdSidmCollisions);
+#endif /* #ifdef SIDM_LOG_COLLISIONS */
+
   if(ThisTask != 0) /* only the root processors writes to the log files */
     return;
 

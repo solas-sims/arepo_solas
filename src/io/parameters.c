@@ -770,8 +770,21 @@ void read_parameter_file(char *fname)
       id[nt++] = STRING;
 #endif /* #ifdef BH_MERGER */
 
-
-      if((fd = fopen(fname, "r")))
+#ifdef SIDM
+        strcpy(tag[nt], "SidmDesNumNgb");
+        addr[nt] = &All.SidmDesNumNgb;
+        id[nt++] = REAL;
+        
+        strcpy(tag[nt], "SidmDesNumNgbDev");
+        addr[nt] = &All.SidmDesNumNgbDev;
+        id[nt++] = REAL;
+        
+        strcpy(tag[nt], "SidmCrossSection");
+        addr[nt] = &All.SidmCrossSection;
+        id[nt++] = REAL;
+#endif
+      
+        if((fd = fopen(fname, "r")))
         {
           sprintf(buf, "%s%s", fname, "-usedvalues");
           if(!(fdout = fopen(buf, "w")))

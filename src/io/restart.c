@@ -72,6 +72,9 @@
 #include <unistd.h>
 
 #include "../main/allvars.h"
+#ifdef SIDM
+#include "../sidm/sidm.h"
+#endif /* #ifdef SIDM */
 #include "../main/proto.h"
 
 #include "../debug_md5/Md5.h"
@@ -1273,6 +1276,16 @@ static void contents_restart_file(int modus)
   byten(TimeBinsStar.FirstInTimeBin, TIMEBINS * sizeof(int), modus);
   byten(TimeBinsStar.LastInTimeBin, TIMEBINS * sizeof(int), modus);
 #endif
+
+#ifdef SIDM
+  in(&NumDM, modus);
+
+    if(NumDM > 0)
+    {
+      /* SIDM DM-Particle side-array data */
+      byten(&DMSP[0], NumDM * sizeof(DM_Particle_Data), modus);
+    }
+#endif /* #ifdef SIDM */
 
 #ifdef BLACKHOLES
   in(&NumBhs, modus);
