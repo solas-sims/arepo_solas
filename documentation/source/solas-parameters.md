@@ -57,7 +57,7 @@ homepage. Worth a one-line fix alongside this.
 | Parameter | Type | Units | Notes |
 |---|---|---|---|
 | `MinHaloMassForNormalSF` | REAL | ✅ halo mass (code units) above which the ordinary threshold applies unchanged. | |
-| `LowMassHaloThresholdFactor` | REAL | ✅ dimensionless multiplier making star formation harder to trigger for gas cells whose host halo mass is below MinHaloMassForNormalSF (and above 0). Gas not currently in any FOF group (HostHaloMass <= 0) always uses the ordinary threshold — this is deliberately an in-halo effect (self-shielding/collapse-threshold physics inside a halo), not something meant to apply to general diffuse gas. | |
+| `LowMassHaloThresholdFactor` | REAL | ✅ dimensionless multiplier making star formation harder to trigger for gas cells whose host halo mass is below MinHaloMassForNormalSF (and above 0). | Gas not currently in any FOF group (HostHaloMass <= 0) always uses the ordinary threshold — this is deliberately an in-halo effect (self-shielding/collapse-threshold physics inside a halo), not something meant to apply to general diffuse gas. |
 
 ## `JEANS_SF`
 
