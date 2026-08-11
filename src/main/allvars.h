@@ -538,7 +538,7 @@ enum IMFType
 #ifdef POPIII_SF
     POPIII,
 #endif
-    N_IMF_TYPES  /* 2 #ifdef POPIII_SF, else 1 */-
+    N_IMF_TYPES  /* 2 #ifdef POPIII_SF, else 1 */
 };
 
 #ifndef FOF_PRIMARY_LINK_TYPES
