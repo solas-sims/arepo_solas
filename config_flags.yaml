@@ -1,0 +1,45 @@
+# Single source of truth for arepo_solas Config.sh flags that are NOT
+# primary, independently user-settable options.
+#
+# Every flag on this repo's Config.sh / Template-Config.sh falls into one
+# of three tiers:
+#
+#   1. Primary options  - set directly by the user (e.g. BONDI_ACCRETION,
+#      WINDS, BLACKHOLES). Not listed here; Template-Config.sh is their
+#      source of truth.
+#
+#   2. master_switches   - user-settable convenience flags that expand to a
+#      set of primary (or other master-switch) flags when enabled. Each
+#      expanded flag also remains independently settable on its own.
+#
+#   3. derived_flags     - NEVER user-settable. Computed as "true iff any of
+#      the listed trigger flags is active". These exist purely to gate code
+#      that is shared across several specific models (e.g. any BH accretion
+#      or feedback model needs the same particle-array / domain / I/O
+#      infrastructure). A derived flag's triggers may themselves be other
+#      derived flags.
+#
+# Enforcement: scripts/validate_config_flags.py checks that
+#   (a) no name under derived_flags ever appears as a standalone `#FLAG`
+#       entry in Template-Config.sh or template_config*.yaml, and
+#   (b) the Makefile's hand-written CONFIGVARS derivation blocks agree with
+#       this file, so the two can't silently drift apart.
+#
+# Consumers:
+#   - Makefile               (hand-written derivation blocks, cross-checked
+#                              against this file by the validator)
+#   - cmake/parse_yaml.py     (computes the same flags for CMake/YAML builds)
+#
+# See documentation/source/config-options.md for the full explanation.
+
+master_switches:
+  STAR_FEEDBACK: [WINDS, RADIATION, SUPERNOVAE]
+  RADIATION: [RADIATION_PRESSURE, PHOTOELECTRIC_HEATING, DISSOCIATION, PHOTOIONIZATION]
+  BH_FEEDBACK: [BH_THERMAL_FEEDBACK, BH_JET_FEEDBACK]
+
+derived_flags:
+  BH_ACCRETION_ACTIVE: [BONDI_ACCRETION, TORQUE_ACCRETION, ADP_ACCRETION]
+  BH_FEEDBACK_ACTIVE: [BH_THERMAL_FEEDBACK, BH_JET_FEEDBACK]
+  BH_ACTIVE: [BH_ACCRETION_ACTIVE, BH_FEEDBACK_ACTIVE]
+  STAR_FEEDBACK_ACTIVE: [WINDS, RADIATION_PRESSURE, PHOTOELECTRIC_HEATING, DISSOCIATION, PHOTOIONIZATION, SUPERNOVAE]
+  STAR_RADIATION_ACTIVE: [RADIATION_PRESSURE, PHOTOELECTRIC_HEATING, DISSOCIATION, PHOTOIONIZATION]
