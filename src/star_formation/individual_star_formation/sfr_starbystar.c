@@ -37,10 +37,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "../main/allvars.h"
-#include "../main/proto.h"
+#include "../../main/allvars.h"
+#include "../../main/proto.h"
 
-#include "../gravity/forcetree.h"
+#include "../../gravity/forcetree.h"
 
 /* Function that checks whether a cell i satisfies star formation criteria*/
 static int sf_criteria(int i)
