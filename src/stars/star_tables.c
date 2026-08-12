@@ -3,6 +3,7 @@
 #include "../main/allvars.h"
 #include "../main/proto.h"
 
+#ifdef STAR_FEEDBACK_ACTIVE
 
 // Main Sequence
 int Z_COUNT = 0;
@@ -573,3 +574,5 @@ void load_star_tables(const char *filename)
           }
     }
 }
+
+#endif /* #ifdef STAR_FEEDBACK_ACTIVE */

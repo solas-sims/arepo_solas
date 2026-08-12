@@ -1,5 +1,6 @@
 #include "../main/allvars.h"
 
+#ifdef STARS
 
 int NumStars;
 
@@ -12,3 +13,5 @@ Mechanical_Feedback_Events MechanicalFeedbackEvents;
 #endif
 
 Star_Particle_Data *SP;
+
+#endif /* #ifdef STARS */

@@ -8,6 +8,7 @@
 
 #include "../domain/domain.h"
 
+#ifdef STAR_FEEDBACK_ACTIVE
 
 /* Pass counter: 1 = find host cell, 2 = gather feedback properties */
 static int pass;
@@ -194,7 +195,6 @@ static void out2particle(data_out *out, int i, int mode)
         }
     }
 }
-
 
 #include "../utils/generic_comm_helpers2.h"
 
@@ -609,3 +609,5 @@ int star_density_isactive(int n)
 
   return 1;
 }
+
+#endif /* #ifdef STAR_FEEDBACK_ACTIVE */

@@ -8,6 +8,7 @@
 
 #include "../domain/domain.h"
 
+#ifdef BH_FEEDBACK_ACTIVE
 
 static int bh_feedback_evaluate(int target, int mode, int threadid);
 
@@ -75,7 +76,6 @@ static void out2particle(data_out *out, int i, int mode)
     {
     }
 }
-
 
 #include "../utils/generic_comm_helpers2.h"
 
@@ -236,3 +236,5 @@ static int bh_feedback_evaluate(int target, int mode, int threadid)
 
   return 0;
 }
+
+#endif /* #ifdef BH_FEEDBACK_ACTIVE */

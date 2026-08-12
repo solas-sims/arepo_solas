@@ -3,6 +3,7 @@
 
 #include "../extern/chealpix.h"
 
+#ifdef STAR_RADIATION_ACTIVE
 
 double HealpixDirs[MAX_NUM_RAYS][3];
 
@@ -897,3 +898,5 @@ void star_radiation(void)
 
   TIMER_STOP(CPU_STARS_RADIATION);
 }
+
+#endif /* #ifdef STAR_RADIATION_ACTIVE */

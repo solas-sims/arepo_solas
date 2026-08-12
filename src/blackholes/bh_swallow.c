@@ -8,6 +8,7 @@
 
 #include "../domain/domain.h"
 
+#ifdef BH_ACCRETION_ACTIVE
 
 static int bh_swallow_evaluate(int target, int mode, int threadid);
 
@@ -83,7 +84,6 @@ static void out2particle(data_out *out, int i, int mode)
       BhP[i].MassToDrain += out->MassToDrain;
     }
 }
-
 
 #include "../utils/generic_comm_helpers2.h"
 
@@ -291,3 +291,5 @@ static int bh_swallow_evaluate(int target, int mode, int threadid)
 
   return 0;
 }
+
+#endif /* #ifdef BH_ACCRETION_ACTIVE */

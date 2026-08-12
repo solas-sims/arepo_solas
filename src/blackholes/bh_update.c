@@ -5,6 +5,7 @@
 #include "../main/allvars.h"
 #include "../main/proto.h"
 
+#ifdef BH_ACTIVE
 
 static int int_compare(const void *a, const void *b)
 {
@@ -323,3 +324,5 @@ void bh_perform_end_of_step_physics(void)
 
 #endif
 } // perform_end_of_step_physics(void)
+
+#endif /* #ifdef BH_ACTIVE */

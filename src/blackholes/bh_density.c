@@ -8,6 +8,7 @@
 
 #include "../domain/domain.h"
 
+#ifdef BH_ACTIVE
 
 static int bh_density_evaluate(int target, int mode, int threadid);
 static int bh_density_isactive(int n);
@@ -105,7 +106,6 @@ static void out2particle(data_out *out, int i, int mode)
 #endif
     }
 }
-
 
 #include "../utils/generic_comm_helpers2.h"
 
@@ -506,3 +506,5 @@ int bh_density_isactive(int n)
 
   return 1;
 }
+
+#endif /* #ifdef BH_ACTIVE */

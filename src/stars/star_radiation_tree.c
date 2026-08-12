@@ -3,6 +3,7 @@
 #include "../main/allvars.h"
 #include "../main/proto.h"
 
+#ifdef STAR_RADIATION_ACTIVE
 
 static inline int ray_box_intersect(const double *ray_pos, const double *ray_dir,
                                     const MyNgbTreeFloat *rmin, const MyNgbTreeFloat *rmax,
@@ -570,3 +571,5 @@ void raytrace_treewalk(RayPacket *ray, RayWorkStack *work, RayExportBuffer *expo
           }
     }
 }
+
+#endif /* #ifdef STAR_RADIATION_ACTIVE */
