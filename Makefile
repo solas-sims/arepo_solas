@@ -658,6 +658,7 @@ OBJS    += blackholes/bh_seed.o
 INCL    += blackholes/bh_proto.h
 SUBDIRS += blackholes
 endif
+endif # FOF
 
 # SIDM
 ifeq (SIDM,$(findstring SIDM,$(CONFIGVARS)))
