@@ -47,8 +47,14 @@
 /* Function that checks whether a cell i satisfies star formation criteria*/
 static int sf_criteria(int i)
 {
+#ifdef USE_GRACKLE
   double mu = compute_mu(i);
-  
+#else /* #ifdef USE_GRACKLE */
+  /* assume full ionization -- same fallback as sfr_AGORA.c/sfr_eEOS.c use when
+   * Grackle isn't tracking species abundances to compute an actual mu */
+  double mu = 4 / (8 - 5 * (1 - HYDROGEN_MASSFRAC));
+#endif /* #ifdef USE_GRACKLE #else */
+
   double number_dens = (SphP[i].Density * All.cf_UnitDensity_in_cgs) / mu / PROTONMASS;
   double temp = (SphP[i].Utherm * All.cf_UnitVelocity_in_cm_per_s * All.cf_UnitVelocity_in_cm_per_s) 
   * mu * PROTONMASS * GAMMA_MINUS1 / BOLTZMANN;
