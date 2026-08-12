@@ -224,16 +224,3 @@ void reallocate_memory_maxpartbhs(void)
 #endif
 }
 #endif
-
-#ifdef BLACKHOLES
-void reallocate_memory_maxpartbhs(void)
-{
-  mpi_printf("ALLOCATE: Changing to MaxPartBhs= %d\n", All.MaxPartBhs);
-
-  BhP = (struct Bh_Particle_Data *)myrealloc_movable(BhP, All.MaxPartBhs * sizeof(struct Bh_Particle_Data));
-
-#ifdef BH_ACTIVE
-  timebins_reallocate(&TimeBinsBh);
-#endif
-}
-#endif
