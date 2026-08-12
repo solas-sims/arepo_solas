@@ -5,7 +5,7 @@ CONFIG = Config.sh
 BUILD_DIR = build
 SRC_DIR = src
 
-SYSTYPE ?= "LINUX"
+SYSTYPE ?= LINUX
 
 MAKEFILES = Makefile config-makefile
 ifeq ($(wildcard Makefile.systype), Makefile.systype)
@@ -358,14 +358,34 @@ INCL += cooling/cooling_vars.h \
 SUBDIRS += cooling
 endif
 
+ifneq (,$(filter USE_GRACKLE,$(CONFIGVARS)))
+ifeq (,$(filter COOLING,$(CONFIGVARS)))
+$(error USE_GRACKLE requires COOLING)
+endif
+endif
+
+ifneq (,$(filter GRACKLE_CHEMISTRY,$(CONFIGVARS)))
+ifeq (,$(filter USE_GRACKLE,$(CONFIGVARS)))
+$(error GRACKLE_CHEMISTRY requires USE_GRACKLE)
+endif
+endif
+
 ifeq (USE_GRACKLE,$(findstring USE_GRACKLE,$(CONFIGVARS)))
 OBJS += cooling/grackle.o
 endif
 
-#SFR
+# Enforce at least one SF model at a time
 ifneq (,$(filter USE_SFR,$(CONFIGVARS)))
-OBJS += star_formation/starformation.o 
-SUBDIRS += star_formation 
+ifeq (,$(filter EEOS_SF AGORA_SF JEANS_SF,$(CONFIGVARS)))
+$(error USE_SFR requires one of EEOS_SF, AGORA_SF, or JEANS_SF)
+endif
+endif
+
+# Enforce at most one SF model at a time
+SF_MODELS := $(filter EEOS_SF AGORA_SF JEANS_SF,$(CONFIGVARS))
+ifneq ($(word 2,$(SF_MODELS)),)
+$(error Only one SF model may be active at a time. Currently enabled: $(SF_MODELS))
+endif
 
 ifneq (,$(filter EEOS_SF AGORA_SF JEANS_SF,$(CONFIGVARS)))
 ifeq (,$(filter USE_SFR,$(CONFIGVARS)))
@@ -373,17 +393,16 @@ $(error EEOS_SF, AGORA_SF, and JEANS_SF all require USE_SFR)
 endif
 endif
 
-# Enforce only one SF model at a time
-SF_MODELS := $(filter EEOS_SF AGORA_SF JEANS_SF,$(CONFIGVARS))
-ifneq ($(word 2,$(SF_MODELS)),)
-$(error Only one SF model may be active at a time. Currently enabled: $(SF_MODELS))
-endif
-
 ifneq (,$(filter SF_THRESHOLD_HALO_MASS_DEPENDENT,$(CONFIGVARS)))
 ifeq (,$(filter USE_SFR,$(CONFIGVARS)))
 $(error SF_THRESHOLD_HALO_MASS_DEPENDENT requires USE_SFR (and one of EEOS_SF/AGORA_SF/JEANS_SF))
 endif
 endif
+
+#SFR
+ifneq (,$(filter USE_SFR,$(CONFIGVARS)))
+OBJS += star_formation/starformation.o 
+SUBDIRS += star_formation 
 
 ifneq (,$(filter EEOS_SF,$(CONFIGVARS)))
 OBJS  += star_formation/sfr_eEOS.o
@@ -546,6 +565,12 @@ CONFIGVARS += BH_ACTIVE
 $(shell $(call add_define,BH_ACTIVE))
 endif
 
+ifneq (,$(filter BH_FEEDBACK_ACTIVE,$(CONFIGVARS)))
+ifeq (,$(filter BH_ACCRETION_ACTIVE,$(CONFIGVARS)))
+$(error BH_FEEDBACK_ACTIVE requires BH_ACCRETION_ACTIVE)
+endif
+endif
+
 ifneq (,$(filter BH_ACTIVE,$(CONFIGVARS)))
 ifeq (,$(filter BLACKHOLES,$(CONFIGVARS)))
 $(error BH_ACTIVE requires BLACKHOLES)
@@ -598,11 +623,11 @@ OBJS += fof/fof.o \
         fof/fof_vars.o
 INCL += fof/fof.h
 SUBDIRS += fof
+
 ifeq (HALO_SEEDING,$(findstring HALO_SEEDING,$(CONFIGVARS)))
 OBJS    += fof/fof_seeding.o \
 		   fof/fof_seeding_registry.o
 INCL    += fof/fof_seeding.h
-endif
 endif
 
 ifeq (SUBFIND,$(findstring SUBFIND,$(CONFIGVARS)))

@@ -55,7 +55,7 @@ static int sf_criteria(int i)
 
 #ifdef USE_GRACKLE
   double mu = compute_mu(i);
-#else
+#else // To be replaced 
   double mu = 4 / (8 - 5 * (1 - HYDROGEN_MASSFRAC));
 #endif
 

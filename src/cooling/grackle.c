@@ -223,9 +223,9 @@ double CallGrackle(double u_old, double rho, double dt, int target, int mode)
           // check make_consistent_g in solve_rate_cool_g.F
           gr_float HHemassfrac = 1.0 - Metallicity;  // X_H+Y_He
           // For H: X/(X+Y) divided value used in grackle 0.76
-          gr_float fh_correct = (X_H / HHemassfrac) / 0.76;
+          gr_float fh_correct = (X_H / HHemassfrac) / HYDROGEN_MASSFRAC;
           // For He: Y/(X+Y) divided value in grackle 0.24
-          gr_float fhe_correct = (Y_He / HHemassfrac) / 0.24;
+          gr_float fhe_correct = (Y_He / HHemassfrac) / (1 - HYDROGEN_MASSFRAC);
 
           /* if non-eq chemistry assign abundances back */
 #if (GRACKLE_CHEMISTRY >= 1)
@@ -451,8 +451,10 @@ void InitGrackle(void)
   /* The ratio of specific heats for an ideal gas. A direct calculation for the molecular component is used if primordial_chemistry
    * > 1. Default: 5/3. */
   my_grackle_data->Gamma = GAMMA; /* our eos set in Config.sh */
-  /* Flag to control which primordial chemistry network is used (set by Config.sh) */
 
+  my_grackle_data->HydrogenFractionByMass = HYDROGEN_MASSFRAC;    
+
+  /* Flag to control which primordial chemistry network is used (set by Config.sh) */
 #ifndef GRACKLE_CHEMISTRY
   my_grackle_data->primordial_chemistry = 0; /* if nothing is set assume fully tabulated cooling */
 #else
@@ -560,6 +562,13 @@ void InitGrackle(void)
 
 double compute_mu(int i)
 {
+/* Metals, approximated as 16 m_H */
+#ifdef METALS
+  double Z = SphP[i].GasMetals / P[i].Mass;
+#else
+  double Z = 0; 
+#endif
+
   /* Level 1: atomic H and He */
 #if GRACKLE_CHEMISTRY >= 1
   double XHI = SphP[i].GrackleSpeciesConserved(GRACKLE_HI) / P[i].Mass;
@@ -568,10 +577,11 @@ double compute_mu(int i)
   double XHeII = SphP[i].GrackleSpeciesConserved(GRACKLE_HeII) / P[i].Mass;
   double XHeIII = SphP[i].GrackleSpeciesConserved(GRACKLE_HeIII) / P[i].Mass;
 #else
+
   /* Fall back to fully neutral cosmic abundances */
-  double XHI = HYDROGEN_MASSFRAC;
+  double XHI = (1.0 - Z) * HYDROGEN_MASSFRAC;
   double XHII = 0.0;
-  double XHeI = 1.0 - HYDROGEN_MASSFRAC;
+  double XHeI = (1.0 - Z) * (1.0 - HYDROGEN_MASSFRAC);
   double XHeII = 0.0;
   double XHeIII = 0.0;
 #endif
@@ -606,13 +616,6 @@ double compute_mu(int i)
   double XD = XDI + XDII; /* 2 m_H */
   double XHD = XHDI; /* 3 m_H */
   double XHe = XHeI + XHeII + XHeIII; /* 4 m_H */
-
-/* Metals, approximated as 16 m_H */
-#ifdef METALS
-  double Z = SphP[i].GasMetals / P[i].Mass;
-#else
-  double Z = 0; 
-#endif
 
   /* mu = 1 / sum_s (X_s / A_s), where A_s is the atomic mass in units of m_H */
   return 1.0 / (Xe + XH + XH2 / 2.0 + XD / 2.0 + XHD / 3.0 + XHe / 4.0 + Z / 16.0);

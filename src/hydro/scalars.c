@@ -115,11 +115,18 @@ void init_passive_scalars(void)
 #endif /* #ifdef METALS */
 
 #ifdef USE_GRACKLE
-      /* Fully neutral initial conditions -> might want to set different ones */
+      /* Fully neutral initial conditions */
+
+#ifdef METALS
+      const double Z0 = SphP[i].GasMetallicity;
+#else
+      const double Z0 = 0.0;
+#endif
+
 #if GRACKLE_CHEMISTRY >= 1
-      SphP[i].GrackleSpecies(GRACKLE_HI) = HYDROGEN_MASSFRAC;  /* all H is neutral */
+      SphP[i].GrackleSpecies(GRACKLE_HI) = (1.0 - Z0) * HYDROGEN_MASSFRAC;  /* all H is neutral */
       SphP[i].GrackleSpecies(GRACKLE_HII) = GRACKLE_TINY;
-      SphP[i].GrackleSpecies(GRACKLE_HeI) = (1.0 - HYDROGEN_MASSFRAC);  /* all He is neutral */
+      SphP[i].GrackleSpecies(GRACKLE_HeI) = (1.0 - Z0) * (1.0 - HYDROGEN_MASSFRAC);  /* all He is neutral */
       SphP[i].GrackleSpecies(GRACKLE_HeII) = GRACKLE_TINY;
       SphP[i].GrackleSpecies(GRACKLE_HeIII) = GRACKLE_TINY;
 #endif /* #if (GRACKLE_CHEMISTRY >= 1) */
