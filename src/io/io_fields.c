@@ -71,6 +71,9 @@
 #include <unistd.h>
 
 #include "../main/allvars.h"
+#ifdef SIDM
+#include "../sidm/sidm.h"
+#endif /* #ifdef SIDM */
 #include "../main/proto.h"
 
 #ifdef OUTPUT_TASK
@@ -835,5 +838,62 @@ void init_io_fields()
   init_field(IO_TIMEBIN_BH, "TBB", "TimebinBh", MEM_INT, FILE_INT, FILE_NONE, 1, A_BH, &BhP[0].TimeBinBh, 0, BHS_ONLY);
   init_units(IO_TIMEBIN_BH, 0., 0., 0., 0., 0., 0.0);
   init_snapshot_type(IO_TIMEBIN_BH, SN_MINI);
-#endif 
+#endif
+
+#ifdef SIDM
+  /* Now pointing at DMSP[0] with A_DMSP, following the DMSP[] side-array
+   * migration. A_DMSP mirrors A_S's dispatch exactly -- see the offset
+   * computation in io.c's init_field(), the write-path block in
+   * fill_write_buffer() (io.c), and the read-path case in
+   * empty_read_buffer() (read_ic.c). DM_ONLY still restricts output to
+   * Type==1 particles for the underlying particle-type filtering. */
+  init_field(IO_SIDM_DENSITY, "SIDE", "SidmDensity", MEM_MY_FLOAT, FILE_MY_IO_FLOAT, FILE_MY_IO_FLOAT, 1, A_DMSP,
+             &DMSP[0].SidmDensity, 0, DM_ONLY);
+  init_units(IO_SIDM_DENSITY, -3., 2., -3., 1., 0., All.UnitDensity_in_cgs);
+  init_snapshot_type(IO_SIDM_DENSITY, SN_MINI);
+
+  init_field(IO_SIDM_HSML, "SIHS", "SidmHsml", MEM_MY_FLOAT, FILE_MY_IO_FLOAT, FILE_MY_IO_FLOAT, 1, A_DMSP,
+             &DMSP[0].SidmHsml, 0, DM_ONLY);
+  init_units(IO_SIDM_HSML, 1., -1., 1., 0., 0., All.UnitLength_in_cm);
+  init_snapshot_type(IO_SIDM_HSML, SN_MINI);
+
+  init_field(IO_SIDM_NUMNGB, "SING", "SidmNumNgb", MEM_INT, FILE_INT, FILE_INT, 1, A_DMSP, &DMSP[0].SidmNumNgb, 0, DM_ONLY);
+  init_units(IO_SIDM_NUMNGB, 0., 0., 0., 0., 0., 0.0);
+  init_snapshot_type(IO_SIDM_NUMNGB, SN_MINI);
+
+  init_field(IO_SIDM_VELDISP, "SIVD", "SidmVelDisp", MEM_MY_FLOAT, FILE_MY_IO_FLOAT, FILE_MY_IO_FLOAT, 1, A_DMSP,
+             &DMSP[0].SidmVelDisp, 0, DM_ONLY);
+  init_units(IO_SIDM_VELDISP, 0.5, 0., 0., 0., 1., All.UnitVelocity_in_cm_per_s);
+  init_snapshot_type(IO_SIDM_VELDISP, SN_MINI);
+
+  /* Cumulative scatter count -- differencing this between two snapshots
+   * gives an empirical scattering rate per particle, for validation
+   * against Gamma = rho*(sigma/m)*v_rel. See README.md test 1. */
+  init_field(IO_SIDM_SCATTERCOUNT, "SISC", "SidmScatterCount", MEM_INT, FILE_INT, FILE_INT, 1, A_DMSP,
+             &DMSP[0].SidmScatterCount, 0, DM_ONLY);
+  init_units(IO_SIDM_SCATTERCOUNT, 0., 0., 0., 0., 0., 0.0);
+  init_snapshot_type(IO_SIDM_SCATTERCOUNT, SN_MINI);
+#endif /* #ifdef SIDM */
+
+#if defined(HALO_SEEDING) && defined(BLACKHOLES)
+  init_field(IO_BH_FORMATION_TIME, "BFTI", "BlackHoleFormationTime", MEM_MY_DOUBLE, FILE_MY_IO_FLOAT, FILE_NONE, 1, A_BH,
+             &BhP[0].FormationTime, 0, BHS_ONLY);
+  init_units(IO_BH_FORMATION_TIME, 0., 0., 0., 0., 0., 0.);
+  init_snapshot_type(IO_BH_FORMATION_TIME, SN_MINI);
+
+  init_field(IO_BH_FORMATION_METALLICITY, "BFMZ", "BlackHoleFormationMetallicity", MEM_MY_FLOAT, FILE_MY_IO_FLOAT, FILE_NONE, 1, A_BH,
+             &BhP[0].FormationMetallicity, 0, BHS_ONLY);
+  init_units(IO_BH_FORMATION_METALLICITY, 0., 0., 0., 0., 0., 0.);
+  init_snapshot_type(IO_BH_FORMATION_METALLICITY, SN_MINI);
+
+  init_field(IO_BH_FORMATION_CHANNEL, "BFCH", "BlackHoleFormationChannel", MEM_INT, FILE_INT, FILE_NONE, 1, A_BH,
+             &BhP[0].FormationChannel, 0, BHS_ONLY);
+  init_units(IO_BH_FORMATION_CHANNEL, 0., 0., 0., 0., 0., 0.);
+  init_snapshot_type(IO_BH_FORMATION_CHANNEL, SN_MINI);
+
+  init_field(IO_BH_DONOR_VELOCITY, "BFDV", "BlackHoleDonorVelocity", MEM_MY_FLOAT, FILE_MY_IO_FLOAT, FILE_NONE, 3, A_BH,
+             &BhP[0].DonorVelocity[0], 0, BHS_ONLY);
+  init_units(IO_BH_DONOR_VELOCITY, 0.5, 0., 0., 0., 1., All.UnitVelocity_in_cm_per_s);
+  init_snapshot_type(IO_BH_DONOR_VELOCITY, SN_MINI);
+#endif /* #if defined(HALO_SEEDING) && defined(BLACKHOLES) */
 }

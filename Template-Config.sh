@@ -4,19 +4,23 @@
 #  Enable/Disable compile-time options as needed #
 ##################################################
 
-#---------------------------------------- SOLAS additions
+#--------------------------------------- SOLAS additions
+#TODO                   # Placeholder, not a real compile-time option; not referenced by the code
+
+#---------------------------------------- Dark Matter parameters
+#SIDM                   # Self-interacting Dark Matter - allows for particle scattering following Vogelsberger et al. 2019
+#SIDM_H
+#SIDM_TREE_H
+#SIDM_KICK_POSITION_CORRECTION   # SIDM: post-kick position correction + neighbour wake-up (see sidm_scatter.c); off by default
+#SIDM_LOG_COLLISIONS             # SIDM: diagnostic mode, logs detected collisions without applying them (see sidm_scatter.c); off by default
 
 #---------------------------------------- Metal parameters
 #PASSIVE_SCALARS=1      # Number of passive scalar fields advected with fluid (default: 0)
-#METALS                 # Advect all metals, ie metal mass fraction, as a PASSIVE_SCALARS
+#PASSIVE_SCALARS_EXTRA  # Extra passive scalar slots on top of those auto-counted for METALS/GRACKLE/jet tracer (default: 0)
 
-#---------------------------------------- Cooling parameters
-#USE_GRACKLE
-#GRACKLE_CHEMISTRY=0    # Curretly only grackle mode=0 (lookup tables) with no chemistry network is supported
-
-#ENABLE_PROFILE_UTIL
-#_MPI
-#IGNORE_CODE
+#ENABLE_PROFILE_UTIL    # Enables the internal profiling/timing utility (src/utils/system.c, main.c)
+#_MPI                   # Requires ENABLE_PROFILE_UTIL; also logs MPI-specific profiling data (node memory, MPI comm binding)
+#USE_CELIB              # Use the CELib libraries
 
 #---------------------------------------- Star Formation options
 #EEOS_SF                # Default SF scheme in Arepo
@@ -24,9 +28,22 @@
 #JEANS_SF               # Jeans length based SF
 #JEANS_MASS_BASED       # Jeans mass based SF
 
+#SF_THRESHOLD_HALO_MASS_DEPENDENT # Requires USE_SFR, AGORA_SF, and HALO_SEEDING; raises the density threshold for star
+                                   # formation (All.NumberDensThreshold) for gas cells whose on-the-fly-FOF host halo mass
+                                   # is below MinHaloMassForNormalSF (param.txt), by a factor of LowMassHaloNumberDensThresholdFactor
+                                   # (param.txt). A crude, single-knob stand-in for physics not otherwise modelled here --
+                                   # e.g. a background UV/Lyman-Werner radiation field suppressing cooling/self-shielding in
+                                   # small halos, or a Pop III -> Pop II transition in effective collapse threshold. See
+                                   # documentation/source/sf_threshold_halo_mass.md for the full design rationale, including
+                                   # why this is a hard step rather than a smooth transition, and what a collaborator would
+                                   # need to change to improve on it.
+
 #INDIVIDUAL_STAR_BY_STAR_FORMATION # Form individual resolved stars (need STAR_PARTICLES=2 AND USE_SFR)
+#DIVVEL                 # Enables an alternate one-dimensional velocity-divergence gradient calculation (src/mesh/voronoi/voronoi_gradients_onedims.c)
 
 #---------------------------------------- Star options
+#STAR_HOST_REFINEMENT   # Refine cells around star particles (see criterion_refinement.c)
+
 #STARS                  # General stars framework flag
 
 #STAR_PARTICLES=1       # Star particles model flag: set to 0, 1 for massive star particles, set to 2 for resolved individual stars
@@ -34,6 +51,8 @@
 #STAR_FEEDBACK          # Include full star feedback (winds + full radiation + supernovae)
 
 #WINDS                  # Only winds
+
+#AGB                    # AGB star treatment 
 
 #RADIATION              # Full radiation
 #RADIATION_PRESSURE     # Only radiation pressure
@@ -43,16 +62,20 @@
 
 #SUPERNOVAE             # Only supernovae
 
+#TREECOLUMN             # Column density estimate through the gravity tree (src/gravity/forcetree.c)
+#RAD_OPENING_ANGLE      # Alternate tree-opening criterion for radiation transport neighbour walks (src/ngbtree/ngbtree.c)
+
 #---------------------------------------- Blackhole options
 #BLACKHOLES             # General blackholes framework flag
 
 #BH_CONSTANT_RADIUS     # Accretion and thermal feedback in a set radius
 
 #BONDI_ACCRETION        # Accretion models
-#TORQUE_ACCRETION
-#ADP_ACCRETION
+#TORQUE_ACCRETION       # Gravitational-torque-driven accretion model (src/blackholes/bh_accretion.c)
+#ADP_ACCRETION          # Angular-momentum/disc-based accretion model with viscous and capture timescales (src/blackholes/bh_accretion.c)
 
 #BH_FEEDBACK            # Include full bh feedback (thermal + jet)
+#BLACKHOLES_FEEDBACK    # Extra BH feedback prototypes (bh_jet_density/bh_ngb_feedback); see src/blackholes/bh_proto.h
 
 #BH_THERMAL_FEEDBACK    # Only thermal
 
@@ -60,22 +83,44 @@
 #BURST_MODE             # Only turn on for jet (not operational yet)
 #JET_TRACER             # Only turn on for jet (not operational yet)
 
+#BH_MERGER              # Requires BH_ACTIVE; merges gravitationally-bound black hole pairs closer than
+                        # BhMergerRadiusFactor (param.txt) x <length scale> of each other (src/blackholes/bh_merger.c).
+                        # <length scale> is chosen by BhMergerRadiusCriterion (param.txt): HSML (default, legacy
+                        # behaviour, max(Hsml_i,Hsml_j)), SOFTENING, MAX_HSML_SOFTENING, or MIN_HSML_SOFTENING.
+
 #REFINEMENT_AROUND_BH   # BH refinement options
-#MIN_REFINEMENT_BH_MASS
-#REFINEMENT_AROUND_BH_FIXED
-#REFINEMENT_AROUND_BH_HYBRID
-#BH_JET_FEEDBACK
-#BH_JET_REFINEMENT
-#OUTPUT_REFBHCOUNTER
+#MIN_REFINEMENT_BH_MASS # Minimum BH mass above which refinement around the BH is applied (src/blackholes/bh_refinement.c)
+#REFINEMENT_AROUND_BH_FIXED   # Refine within a fixed radius around the BH
+#REFINEMENT_AROUND_BH_HYBRID  # Refine within a radius that adapts between fixed and resolution-dependent behaviour
+#BH_JET_FEEDBACK        # Repeated here as a reminder: required by BH_JET_REFINEMENT below (see main listing above for details, not operational yet)
+#BH_JET_REFINEMENT      # Additional refinement around the BH jet region; requires BH_JET_FEEDBACK
+#OUTPUT_REFBHCOUNTER    # Output a per-cell counter of BH-driven refinement events
 
 #---------------------------------------- Special behaviour
+#FEEDBACK_TESTING_RESTRICT_SNAPSHOTS     # Only dump snapshots after a feedback event
+
 #BLACKHOLE_SEEDING # Requires HALOS_SEEDING; seeds black holes in halos. Requires at least one of BH_SEED_ON_MASS /
-                   # BH_SEED_ON_ZERO_METALLICITY below (channels OR together if more than one is enabled); a halo already
-                   # hosting a black hole is never reseeded regardless of channel.
+                   # BH_SEED_ON_ZERO_METALLICITY / BH_SEED_ON_VELDISP below (channels OR together if more than one is
+                   # enabled); a halo already hosting a black hole is never reseeded regardless of channel.
 #BH_SEED_ON_MASS # Requires BLACKHOLE_SEEDING; seed once halo mass exceeds MinHaloMassForFOFSeeding (param.txt)
 #BH_SEED_ON_ZERO_METALLICITY # Requires BLACKHOLE_SEEDING and METALS; seed pristine halos, i.e. every gas cell's metal mass
                              # fraction <= ZeroMetallicityThresholdForFOFSeeding (param.txt)
+#BH_SEED_ON_VELDISP # Requires BLACKHOLE_SEEDING; seed once a halo's DM-only 3D velocity dispersion exceeds
+                    # MinVelDispForFOFSeeding (param.txt)
+#BH_SEED_ON_POTENTIAL_POSITION # Requires BLACKHOLE_SEEDING and EVALPOTENTIAL; donor cell for a new black hole is the
+                               # densest gas cell (searched over all particle types, not DM-only) within
+                               # PotentialDonorSearchNSoft (param.txt) x the DM softening length of the halo's
+                               # gravitational-potential minimum, instead of the halo's unrestricted densest gas cell.
+                               # If no gas cell qualifies, seeding is deferred to the next FOF pass rather than falling
+                               # back to the unrestricted donor.
 
+#--------------------------------------- Cooling parameters
+#USE_GRACKLE         # Use the Grackle cooling/chemistry library instead of the simple primordial cooling
+#GRACKLE_CHEMISTRY=0 # Curretly only grackle mode=0 (lookup tables) with no chemistry network is supported
+#NOUVBACKGROUND      # Disables the UV background in the main run loop's cooling/star-formation step
+
+#--------------------------------------- Metal parameters
+#METALS # Advect all metals, ie metal mass fraction, as a PASSIVE_SCALARS.
 
 #--------------------------------------- Inline halo finding
 #HALO_SEEDING # Requires FOF; seeds halos above a certain mass threshold with collisionless particles; this can be used for example to seed black holes in halos (with BLACKHOLE_SEEDING)
@@ -281,6 +326,8 @@
 #OUTPUT_COOLHEAT               # output actual energy loss/gain in cooling/heating routine
 #OUTPUT_VORTICITY              # output vorticity of gas
 #OUTPUT_CSND                   # output sound speed. This one is only used for tree-based timesteps! Calculate from hydro quantities in postprocessing if required for science applications.
+#OUTPUT_TIMEBIN_BH      # output BH particle timebin
+#OUTPUT_TIMEBIN_STAR    # output star particle timebin
 
 #---------------------------------------- output options
 #PROCESS_TIMES_OF_OUTPUTLIST   # goes through times of output list prior to starting the simulaiton to ensure that outputs are written as close to the desired time as possible (as opposed to at next possible time if this flag is not active)

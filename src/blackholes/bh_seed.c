@@ -3,7 +3,7 @@
  * \brief       Seed black holes in FOF halos identified on-the-fly.
  * \details     contains functions:
  *                void seed_black_holes_from_events(HaloSeedEvent *events, int n_events)
- *                static void spawn_black_hole_from_cell(int igas, int ibh, double seed_mass)
+ *                static void spawn_black_hole_from_cell(int igas, int ibh, double seed_mass, int formation_channel)
  *
  *              Seeding mirrors the star-formation spawn path (make_star() /
  *              spawn_star_from_cell()): a new Type-5 particle is spawned from
@@ -34,7 +34,7 @@ static int bhs_spawned;            /*!< local number of black holes spawned at t
 static int tot_bhs_spawned;        /*!< global number of black holes spawned at this seeding event */
 static double cum_mass_bhs = 0.0;  /*!< cumulative seeded black hole mass (global, task 0 log only) */
 
-static void spawn_black_hole_from_cell(int igas, int ibh, double seed_mass);
+static void spawn_black_hole_from_cell(int igas, int ibh, double seed_mass, int formation_channel, MyFloat halo_vel[3]);
 
 /*! \brief Spawn black holes for the seed events of this FOF pass.
  *
@@ -92,7 +92,7 @@ void seed_black_holes_from_events(HaloSeedEvent *events, int n_events)
 
       int ibh = NumPart + bhs_spawned; /* index of the new black hole */
 
-      spawn_black_hole_from_cell(igas, ibh, seed_mass);
+      spawn_black_hole_from_cell(igas, ibh, seed_mass, events[i].FormationChannel, events[i].HaloVel);
 
       printf("FOF_SEEDING: Task %d: seeded BH (mass=%g) from cell ID=%llu in halo MinID=%llu (M=%g)\n", ThisTask, seed_mass,
              (unsigned long long)events[i].DonorID, (unsigned long long)events[i].HaloMinID, events[i].HaloMass);
@@ -150,18 +150,39 @@ void seed_black_holes_from_events(HaloSeedEvent *events, int n_events)
  *  mass from the donor cell, whose conserved quantities are reduced in
  *  proportion. The donor cell remains in the mesh.
  *
- *  \param[in] igas      Index of the donor gas cell.
- *  \param[in] ibh       Index for the new black hole particle.
- *  \param[in] seed_mass Mass of the new black hole (must be < cell mass).
+ *  \param[in] igas              Index of the donor gas cell.
+ *  \param[in] ibh               Index for the new black hole particle.
+ *  \param[in] seed_mass         Mass of the new black hole (must be < cell mass).
+ *  \param[in] formation_channel Bitmask of BH_SEED_CHANNEL_* values that triggered this seeding event.
  *
  *  \return void
  */
-static void spawn_black_hole_from_cell(int igas, int ibh, double seed_mass)
+static void spawn_black_hole_from_cell(int igas, int ibh, double seed_mass, int formation_channel, MyFloat halo_vel[3])
 {
+  /* captured before anything below mutates the donor cell, for formation-history bookkeeping */
+  MyFloat donor_vel[3];
+  for(int k = 0; k < 3; k++)
+    donor_vel[k] = P[igas].Vel[k];
+
+#ifdef METALS
+  MyFloat donor_metallicity = (P[igas].Mass > 0) ? SphP[igas].GasMetals / P[igas].Mass : -1;
+#else  /* #ifdef METALS */
+  MyFloat donor_metallicity = -1;
+#endif /* #ifdef METALS #else */
+
   P[ibh]               = P[igas];
   P[ibh].Type          = 5;
   P[ibh].SofteningType = All.SofteningTypeOfPartType[P[ibh].Type];
   P[ibh].Mass          = seed_mass;
+
+  /* seed with the halo's own mass-weighted bulk velocity (all particle types), not the donor
+   * cell's instantaneous velocity -- accretion physics (e.g. Bondi's steep dependence on
+   * relative velocity) is most sensitive to this exactly when seed mass is smallest, and the
+   * donor cell's own velocity is not a reliable proxy for where the BH should sit dynamically.
+   * DonorVelocity below still preserves the donor's own velocity, so this choice can be
+   * checked against the alternative after the fact. */
+  for(int k = 0; k < 3; k++)
+    P[ibh].Vel[k] = halo_vel[k];
 
 #ifdef INDIVIDUAL_GRAVITY_SOFTENING
   if(((1 << P[ibh].Type) & (INDIVIDUAL_GRAVITY_SOFTENING)))
@@ -179,10 +200,6 @@ static void spawn_black_hole_from_cell(int igas, int ibh, double seed_mass)
   SphP[igas].Momentum[1] *= fac;
   SphP[igas].Momentum[2] *= fac;
 
-#ifdef METALS
-  SphP[igas].Metals *= fac;
-#endif /* #ifdef METALS */
-
 #ifdef MAXSCALARS
   for(int s = 0; s < N_Scalar; s++) /* Note, the changes in MATERIALS, HIGHRESGASMASS, etc., are treated as part of the Scalars */
     *(MyFloat *)(((char *)(&SphP[igas])) + scalar_elements[s].offset_mass) *= fac;
@@ -199,16 +216,23 @@ static void spawn_black_hole_from_cell(int igas, int ibh, double seed_mass)
   P[ibh].BhID     = NumBhs;
   BhP[NumBhs].PID = ibh;
 
+  BhP[NumBhs].FormationTime        = All.Time;
+  BhP[NumBhs].FormationMetallicity = donor_metallicity;
+  BhP[NumBhs].FormationChannel     = formation_channel;
+  for(int k = 0; k < 3; k++)
+    BhP[NumBhs].DonorVelocity[k] = donor_vel[k];
+
+#ifdef BH_ACTIVE
   /* initial guess for the smoothing length: radius of the donor cell */
   BhP[NumBhs].Hsml        = cbrt((3.0 * SphP[igas].Volume) / (4.0 * M_PI));
-  BhP[NumBhs].Density     = 0;
-  BhP[NumBhs].NgbMass     = 0;
-  BhP[NumBhs].NgbMassFeed = 0;
-  BhP[NumBhs].NgbMinStep  = 0;
+  BhP[NumBhs].NgbsMass    = 0;
+  BhP[NumBhs].NgbsVolume  = 0;
+  BhP[NumBhs].NgbsMinBin  = 0;
   BhP[NumBhs].DensityFlag = 0;
   BhP[NumBhs].TimeBinBh   = 0;
 
   /* timebin_add_particle(&TimeBinsBh, NumBhs, -1, 0, 1); */
+#endif /* #ifdef BH_ACTIVE */
 
   NumBhs++;
 #endif /* #ifdef BLACKHOLES */

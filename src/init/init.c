@@ -49,7 +49,13 @@
 #include "../domain/domain.h"
 #include "../mesh/voronoi/voronoi.h"
 
+#ifdef HALO_SEEDING
 #include "../fof/fof_seeding.h"
+#endif
+
+#ifdef USE_CELIB
+#include "../../celib/src/config.h"
+#endif
 
 /*! \brief Prepares the loaded initial conditions for the run.
  *
@@ -412,7 +418,8 @@ int init(void)
 #ifndef FOF
 #error "HALO_SEEDING is only implemented for FOF."
 #endif /* #ifndef FOF */
-  fof_seeding_init(RestartFlag);
+  if(RestartFlag != 1) /* when restarting from restart files, the halo seed registry is restored from them by loadrestart() */
+    fof_seeding_init(RestartFlag);
 #endif
  
   if(RestartFlag == 3)
@@ -548,48 +555,21 @@ int init(void)
 
   free_mesh();
 
-#ifdef STAR_PARTICLES
-  if(ThisTask == 0)
-    {
-      build_imf_cdf();
+  /* IMF tables and the star-particle RNG are now set up unconditionally in
+   * begrun1(), since it (unlike this function) also runs on restart. */
 
 #if defined(STAR_PARTICLES) && STAR_PARTICLES < 2
-      setup_mass_bins();
-#endif
-
-#if STAR_PARTICLES == 0
-      setup_imf_integrals();
-#endif
-    }
-  
-  MPI_Bcast(cdf_masses, N_CDF_BINS + 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-  MPI_Bcast(cdf_values, N_CDF_BINS + 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-
-#if defined(STAR_PARTICLES) && STAR_PARTICLES < 2
-  MPI_Bcast(StarMeanMassInBins, NBINS, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-#endif
-
-#if STAR_PARTICLES == 0
-  MPI_Bcast(&norm, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-  MPI_Bcast(bin_imf, NBINS, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-
-#include <gsl/gsl_rng.h>
-
-  rng = gsl_rng_alloc(gsl_rng_mt19937);
-  gsl_rng_set(rng, ThisTask + 1);
-#endif
-
-#if defined(STAR_PARTICLES) && STAR_PARTICLES < 2
+  /* initial IMF-bin sampling for star particles already present in the ICs (newly formed
+   * stars get this from sample_star_particle() in starformation.c instead); needs
+   * NumStars/SP[] to be populated, so unlike the setup above this must stay here rather
+   * than move to begrun1() */
   for(i = 0; i < NumStars; i++)
     sample_star_particle(PPS(i).Mass * All.cf_UnitMass_in_Msun, SP[i].NumOfStarsInBins);
 #endif
 
-#endif
-
-#ifdef STAR_FEEDBACK_ACTIVE  
-  mpi_printf("Loading star evolution tables\n");
-  load_star_tables(All.StarTablesFile);
-
+#ifdef STAR_FEEDBACK_ACTIVE
+  /* load_star_tables() is now called unconditionally in begrun1(), since it
+   * (unlike this function) also runs on restart. */
   feedback_init(&MechanicalFeedbackEvents);
 
   for(i = 0; i < NumStars; i++)
@@ -598,6 +578,7 @@ int init(void)
 
 #ifdef STAR_RADIATION_ACTIVE
   init_h2shield();
+  start_healpix();
 #endif
 
 #ifdef BH_FEEDBACK_ACTIVE 

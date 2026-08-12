@@ -13,8 +13,10 @@ REGULARIZE_MESH_FACE_ANGLE              # Use maximum face angle as roundness cr
 #--------------------------------------- Refinement and derefinement
 REFINEMENT_SPLIT_CELLS 			 # Refinement
 REFINEMENT_MERGE_CELLS                   # Derefinement
+REFINEMENT_VOLUME_LIMIT
 
 #--------------------------------------- Time integration options
+
 TREE_BASED_TIMESTEPS 			 # non-local timestep criterion (take 'signal speed' into account)
 
 #------------------------------------------------ TreePM Options
@@ -63,23 +65,36 @@ DEBUG # enables core-dumps
 
 #--------------------------------------- non-standard phyiscs
 #ENFORCE_JEANS_STABILITY_OF_CELLS # this imposes an adaptive floor for the temperature
-#COOLING                          # Simple primordial cooling
-#USE_GRACKLE			 # Use Grackle library for cooling
-#GRACKLE_CHEMISTRY=0
+COOLING                          # Simple primordial cooling
+USE_GRACKLE			 # Use Grackle library for cooling
+GRACKLE_CHEMISTRY=3
 #NOUVBACKGROUND			 # Switches off UV background
-#USE_SFR                          # Activate star formation
+USE_SFR                          # Activate star formation
 #EEOS_SF			 # AGORA star formation scheme
 #JEANS_SF
 #JEANS_MASS_BASED
+AGORA_SF
+#SF_THRESHOLD_HALO_MASS_DEPENDENT # raises the SF density threshold in low-mass halos; see Template-Config.sh and
+                                   # documentation/source/sf_threshold_halo_mass.md -- new/untested, off by default
 #USE_CELIB
-#STARS
-#SUPERNOVAE
+STARS
+STAR_PARTICLES=0
+WINDS
+SUPERNOVAE
 #PASSIVE_SCALARS=1
-#METALS
+METALS
 
 #REFINEMENT_AROUND_BH
-#BLACKHOLES
-#BONDI_ACCRETION
+BLACKHOLES
+BONDI_ACCRETION
+BH_MERGER                       # merges gravitationally-bound black hole pairs closer than BhMergerRadiusFactor (param.txt)
+                                 # x <length scale> of each other; requires BH_ACTIVE (see src/blackholes/bh_merger.c).
+                                 # <length scale> is chosen by BhMergerRadiusCriterion (param.txt): HSML (default, legacy
+                                 # behaviour, max(Hsml_i,Hsml_j)), SOFTENING (max gravitational softening of the pair),
+                                 # MAX_HSML_SOFTENING, or MIN_HSML_SOFTENING. Pairs are matched greedily by ascending
+                                 # separation (not mutual-nearest-neighbour, which can deadlock 3+ body subsystems).
+
+EVALPOTENTIAL                   # computes gravitational potential; required by BH_SEED_ON_POTENTIAL_POSITION below
 
 HALO_SEEDING
 BLACKHOLE_SEEDING
@@ -87,4 +102,8 @@ BH_SEED_ON_MASS                 # seed once halo mass exceeds MinHaloMassForFOFS
 #BH_SEED_ON_ZERO_METALLICITY     # seed pristine halos (max gas-cell metallicity <= ZeroMetallicityThresholdForFOFSeeding, param.txt);
                                  # requires METALS above to be enabled. Channels OR together if more than one is active, and a halo
                                  # already hosting a black hole (Type 5) is never reseeded regardless of channel.
+#BH_SEED_ON_VELDISP               # seed once a halo's DM-only 3D velocity dispersion exceeds MinVelDispForFOFSeeding (param.txt)
+BH_SEED_ON_POTENTIAL_POSITION    # donor cell is the densest gas cell (all particle types) within PotentialDonorSearchNSoft x the
+                                 # DM softening length of the halo's potential minimum, instead of the unrestricted densest gas
+                                 # cell; defers seeding (rather than falling back) if no gas cell qualifies. Requires EVALPOTENTIAL.
 #OUTPUT_EVERY_STEP

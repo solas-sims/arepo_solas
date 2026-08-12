@@ -977,6 +977,21 @@ extern FILE *FdInfo, /*!< file handle for info.txt log-file. */
 extern FILE *FdDetailed;
 #endif /* #ifdef DETAILEDTIMINGS */
 
+#ifdef SIDM_LOG_COLLISIONS
+extern FILE *FdSidmCollisions; /**< per-task file handle for sidm_collisions_<task>.txt diagnostic log
+                                 *   (SIDM item-4 diagnostic mode, see sidm_scatter.c). */
+#endif                         /* #ifdef SIDM_LOG_COLLISIONS */
+
+#ifdef SIDM
+extern long long SidmTimestepChecks;  /**< cumulative (per-task) count of Type==1 particles for which the SIDM
+                                        *   term in get_timestep_gravity() (timestep.c) was evaluated. */
+extern long long SidmTimestepBinding; /**< cumulative (per-task) subset of the above where the SIDM term was
+                                        *   actually the smallest, i.e. bound the particle's timestep. Reduced
+                                        *   and printed alongside the SIDM_SCATTER diagnostic (sidm_scatter.c)
+                                        *   to answer "does the SIDM timestep criterion ever actually bind in
+                                        *   a real run" (SIDM.md TODO). */
+#endif /* #ifdef SIDM */
+
 #ifdef OUTPUT_CPU_CSV
 extern FILE *FdCPUCSV; /**< file handle for cpu.csv log-file. Used if the cpu log is printed in csv format as well. */
 #endif                 /* #ifdef OUTPUT_CPU_CSV */
@@ -1087,11 +1102,33 @@ extern struct global_data_all_processes
   double ZeroMetallicityThresholdForFOFSeeding; /*!< metal mass fraction below which a halo's most
                                                       enriched gas cell still counts as "pristine" */
 #endif /* #ifdef BH_SEED_ON_ZERO_METALLICITY */
+#ifdef BH_SEED_ON_VELDISP
+  double MinVelDispForFOFSeeding; /*!< DM-only 3D velocity dispersion (sigma_3D) threshold above which a halo qualifies */
+#endif /* #ifdef BH_SEED_ON_VELDISP */
+#ifdef BH_SEED_ON_POTENTIAL_POSITION
+  double PotentialDonorSearchNSoft; /*!< donor-search cutoff radius around the potential minimum, in units
+                                          of the DM gravitational softening length (a force-resolution scale,
+                                          not a halo-boundary one like LinkL) */
+#endif /* #ifdef BH_SEED_ON_POTENTIAL_POSITION */
 #ifdef BLACKHOLE_SEEDING
   double BlackHoleSeedMass;
 #endif
 #endif /* #ifdef HALO_SEEDING */
-    
+
+#ifdef BH_MERGER
+  /* Independent of HALO_SEEDING: BH_MERGER is also used for non-cosmological runs with
+   * black holes already present in the IC (no on-the-fly FOF seeding involved). */
+  double BhMergerRadiusFactor; /*!< two black holes merge once their separation is below this factor times
+                                     the length scale selected by BhMergerRadiusCriterion, and they are
+                                     gravitationally bound to each other */
+  char BhMergerRadiusCriterionString[MAXLEN_PARAM_VALUE]; /*!< raw value from the parameter file: "HSML" (default,
+                                     reproduces the legacy factor*max(Hsml_i,Hsml_j) behaviour), "SOFTENING",
+                                     "MAX_HSML_SOFTENING", or "MIN_HSML_SOFTENING" -- resolved into
+                                     BhMergerRadiusCriterion by check_parameters(); see enum
+                                     bh_merger_radius_criterion in src/blackholes/bh.h */
+  int BhMergerRadiusCriterion; /*!< resolved enum value; set by check_parameters(), do not set directly */
+#endif /* #ifdef BH_MERGER */
+
   double TotCountReducedFluxes;
   double TotCountFluxes;
 
@@ -1393,10 +1430,16 @@ double InitMetallicityinSolar;
   char GrackleDataFile[100];
 #endif
 
-/* enable Springel & Hernquist model */
-#ifdef EEOS_SF
+#if defined(EEOS_SF) || defined(AGORA_SF) || defined(JEANS_SF)
+  /* shared by all three SF schemes: a comoving-overdensity floor below which star formation
+   * is never allowed, regardless of whether the local density/temperature (or Jeans) gate is
+   * otherwise satisfied -- see set_overdens_thresh() in starformation.c */
   double OverDensThresh;
   double CritOverDensity;
+#endif /* #if defined(EEOS_SF) || defined(AGORA_SF) || defined(JEANS_SF) */
+
+/* enable Springel & Hernquist model */
+#ifdef EEOS_SF
   double TemperatureThresh;
   double CritPhysDensity;
   double PhysDensThresh;
@@ -1407,13 +1450,23 @@ double InitMetallicityinSolar;
   double TempClouds;
   double MaxSfrTimescale;
   double FactorSN;
-#endif 
+#endif
 
 #ifdef AGORA_SF
-  double NumberDensThreshold;  
+  double NumberDensThreshold;
   double TemperatureThreshold;
   double StarFormationEfficiency;
 #endif
+
+#ifdef SF_THRESHOLD_HALO_MASS_DEPENDENT
+  /* scheme-agnostic: applies as a multiplicative factor on whichever SF scheme's own
+   * threshold quantity is active (EEOS_SF's PhysDensThresh, AGORA_SF's NumberDensThreshold,
+   * JEANS_SF's criterion) -- see sf_threshold_halo_mass_factor() in starformation.c */
+  double MinHaloMassForNormalSF;              /*!< halo mass above which the ordinary threshold applies; below it
+                                                    (and above 0), the raised threshold below is used instead */
+  double LowMassHaloThresholdFactor;          /*!< multiplier applied to the active scheme's own SF threshold for gas
+                                                    cells whose host halo mass is below MinHaloMassForNormalSF */
+#endif /* #ifdef SF_THRESHOLD_HALO_MASS_DEPENDENT */
 
 #ifdef JEANS_SF
 #ifdef JEANS_MASS_BASED
@@ -1439,13 +1492,19 @@ double InitMetallicityinSolar;
 #ifdef STAR_FEEDBACK_ACTIVE
   double StarFeedbackLocal[6];
   double StarFeedbackGlobal[6];
-  
+
   char StarTablesFile[MAXLEN_PATH];
-#endif 
+#endif
 
 #ifdef SUPERNOVAE
   double SN_HostShellSweepFrac;
 #endif
+
+#ifdef SIDM
+  double SidmDesNumNgb;
+  double SidmDesNumNgbDev;
+  double SidmCrossSection; /*!< sigma/m, constant elastic cross section for v1, in code units (length^2/mass) */
+#endif /* #ifdef SIDM */
 
 #ifdef STAR_RADIATION_ACTIVE
   double RaySplitFactor;
@@ -1507,12 +1566,6 @@ double InitMetallicityinSolar;
   int DesLinkNgb;
   double ErrTolThetaSubfind;
 #endif /* #ifdef SUBFIND */
-
-#ifdef FIND_HALOS
-  double TimeOfFirstHaloFinding;
-  double NextTimeOfHaloFinding;
-  double TimeBetweenHaloFinding;
-#endif
 } All;
 
 /*****************************************************************************
@@ -1588,6 +1641,16 @@ extern struct particle_data
 #ifdef BLACKHOLES
   MyIDType BhID;
 #endif
+
+#ifdef SIDM
+  /* Forward reference into the DMSP[] side array (src/sidm/sidm.h),
+   * mirroring how SID above indexes into SP[] for stars. Only
+   * meaningful for Type==1 particles. The six fields that used to live
+   * directly here (SidmDensity, SidmHsml, SidmVelDisp, SidmNumNgb,
+   * SidmLastScatterTime, SidmScatterFlag) have moved to DM_Particle_Data
+   * -- see sidm.h for the struct and the PDMS/DMPS access macros. */
+  MyIDType SIDMID;
+#endif /* #ifdef SIDM */
 } * P,              /*!< holds particle data on local processor */
     *DomainPartBuf; /*!< buffer for particle data used in domain decomposition */
 
@@ -1668,7 +1731,6 @@ extern struct sph_particle_data
   MyFloat HostHaloMass; /*!< FOF mass of the host halo, refreshed at each on-the-fly FOF pass (0 if not in a halo);
                              can be used e.g. to select the mode of star formation by halo mass */
 #endif /* #ifdef HALO_SEEDING */
-
 
 #ifdef OUTPUT_SURFACE_AREA
   int CountFaces;
@@ -2149,6 +2211,19 @@ enum iofields
 #ifdef OUTPUT_TIMEBIN_BH
   IO_TIMEBIN_BH,
 #endif
+#ifdef SIDM
+  IO_SIDM_DENSITY,
+  IO_SIDM_HSML,
+  IO_SIDM_NUMNGB,
+  IO_SIDM_VELDISP,
+  IO_SIDM_SCATTERCOUNT,
+#endif
+#if defined(HALO_SEEDING) && defined(BLACKHOLES)
+  IO_BH_FORMATION_TIME,
+  IO_BH_FORMATION_METALLICITY,
+  IO_BH_FORMATION_CHANNEL,
+  IO_BH_DONOR_VELOCITY,
+#endif
   IO_LASTENTRY /* This should be kept - it signals the end of the list */
 };
 
@@ -2162,6 +2237,9 @@ enum arrays
 #endif
 #ifdef BLACKHOLES
   A_BH,
+#endif
+#ifdef SIDM
+  A_DMSP,
 #endif
   A_PS
 };
@@ -2191,6 +2269,7 @@ enum types_in_memory
 enum e_typelist
 {
   GAS_ONLY                      = 1,
+  DM_ONLY                       = 2,
   STARS_ONLY                    = 16,
   GAS_AND_STARS                 = 17,
   BHS_ONLY                      = 32,

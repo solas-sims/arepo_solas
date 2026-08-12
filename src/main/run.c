@@ -56,6 +56,11 @@
 
 #include "../fof/fof.h"
 
+#ifdef SIDM
+#include "../sidm/sidm.h"
+#include "../sidm/sidm_tree.h"
+#endif
+
 #ifdef HALO_SEEDING
 #include "../fof/fof_seeding.h"
 #define MAX_HALO_SEED 10000 /* maximum number of seed events per FOF pass */
@@ -108,12 +113,22 @@ void run(void)
       set_non_standard_physics_for_current_time();
 
       ngb_treefree();
+#ifdef SIDM
+        sidm_treefree();
+#endif /* #ifdef SIDM */
       domain_free();
       domain_Decomposition(); /* do domain decomposition if needed */
 
       ngb_treeallocate();
+#ifdef SIDM
+        sidm_treeallocate();
+#endif /* #ifdef SIDM */
       ngb_treebuild(NumGas);
-
+#ifdef SIDM
+        sidm_treebuild();
+        sidm_density();
+#endif /* #ifdef SIDM */
+        
       calculate_non_standard_physics_prior_mesh_construction();
 
       create_mesh();
@@ -272,6 +287,9 @@ void run(void)
 #endif /* #ifdef VORONOI_STATIC_MESH */
 
           ngb_treefree();
+#ifdef SIDM
+          sidm_treefree();
+#endif /* #ifdef SIDM */
           domain_free();
 
           drift_all_particles();
@@ -279,7 +297,14 @@ void run(void)
           domain_Decomposition(); /* do new domain decomposition, will also make a new chained-list of synchronized particles */
 
           ngb_treeallocate();
+#ifdef SIDM
+          sidm_treeallocate();
+#endif /* #ifdef SIDM */
           ngb_treebuild(NumGas);
+#ifdef SIDM
+          sidm_treebuild();
+          sidm_density();
+#endif /* #ifdef SIDM */
 
 #if defined(VORONOI_STATIC_MESH)
           create_mesh();
@@ -427,20 +452,12 @@ void calculate_non_standard_physics_with_valid_gravity_tree_always(void) {}
  */
 void calculate_non_standard_physics_prior_mesh_construction(void)
 {
-  if(All.Time > 0) 
+  if(All.Time > 0)
     {
-#ifdef FIND_HALOS
-      if(All.Time>=All.NextTimeOfHaloFinding)
-        {
-          fof_seeding();
-          mpi_printf("FOF_SEEDING: Found %d FOF groups at %g...\n",TotNgroups, All.Time);
-          All.NextTimeOfHaloFinding *= All.TimeBetweenHaloFinding;
-        }
-#endif
 
 #if defined(COOLING) && defined(USE_SFR) && !defined(INDIVIDUAL_STAR_BY_STAR_FORMATION)
       sfr_create_star_particles();
-#endif 
+#endif
 
 #ifdef INDIVIDUAL_STAR_BY_STAR_FORMATION
       individual_starbystar_formation();
@@ -492,12 +509,16 @@ void calculate_non_standard_physics_end_of_step(void)
       star_radiation();
 #endif
 
-#ifdef STAR_FEEDBACK_ACTIVE
+#if defined(WINDS) || defined(RADIATION_PRESSURE) || defined(SUPERNOVAE)
       star_perform_end_of_step_physics();
 #endif
 
 #ifdef BH_ACTIVE
       bh_perform_end_of_step_physics();
+#endif
+
+#ifdef BH_MERGER
+      bh_merger();
 #endif
 
 #ifdef COOLING

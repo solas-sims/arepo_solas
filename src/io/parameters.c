@@ -520,11 +520,13 @@ void read_parameter_file(char *fname)
 #endif 
         
 /* Star Formation */
-#ifdef EEOS_SF
+#if defined(EEOS_SF) || defined(AGORA_SF) || defined(JEANS_SF)
         strcpy(tag[nt], "CritOverDensity");
         addr[nt] = &All.CritOverDensity;
         id[nt++] = REAL;
-        
+#endif /* #if defined(EEOS_SF) || defined(AGORA_SF) || defined(JEANS_SF) */
+
+#ifdef EEOS_SF
         strcpy(tag[nt], "CritPhysDensity");
         addr[nt] = &All.CritPhysDensity;
         id[nt++] = REAL;
@@ -563,10 +565,20 @@ void read_parameter_file(char *fname)
         addr[nt] = &All.TemperatureThreshold;
         id[nt++] = REAL;
 
-        strcpy(tag[nt], "StarFormationEfficiency");  
+        strcpy(tag[nt], "StarFormationEfficiency");
         addr[nt] = &All.StarFormationEfficiency;
         id[nt++] = REAL;
 #endif
+
+#ifdef SF_THRESHOLD_HALO_MASS_DEPENDENT
+        strcpy(tag[nt], "MinHaloMassForNormalSF");
+        addr[nt] = &All.MinHaloMassForNormalSF;
+        id[nt++] = REAL;
+
+        strcpy(tag[nt], "LowMassHaloThresholdFactor");
+        addr[nt] = &All.LowMassHaloThresholdFactor;
+        id[nt++] = REAL;
+#endif /* #ifdef SF_THRESHOLD_HALO_MASS_DEPENDENT */
 
 #ifdef JEANS_SF
 #ifdef JEANS_MASS_BASED
@@ -637,13 +649,13 @@ void read_parameter_file(char *fname)
       strcpy(tag[nt], "RTIonizationTimestepFraction");
       addr[nt] = &All.RTIonizationTimestepFraction;
       id[nt++] = REAL;
-#endif  
+#endif
 
 #ifdef RADIATION_PRESSURE
       strcpy(tag[nt], "IRDtauMomentumBoostCoeff");
       addr[nt] = &All.IRDtauMomentumBoostCoeff;
       id[nt++] = REAL;
-#endif  
+#endif
 
 #ifdef BH_ACTIVE
 #ifdef BH_CONSTANT_RADIUS
@@ -725,6 +737,18 @@ void read_parameter_file(char *fname)
       id[nt++] = REAL;
 #endif /* #ifdef BH_SEED_ON_ZERO_METALLICITY */
 
+#ifdef BH_SEED_ON_VELDISP
+      strcpy(tag[nt], "MinVelDispForFOFSeeding");
+      addr[nt] = &All.MinVelDispForFOFSeeding;
+      id[nt++] = REAL;
+#endif /* #ifdef BH_SEED_ON_VELDISP */
+
+#ifdef BH_SEED_ON_POTENTIAL_POSITION
+      strcpy(tag[nt], "PotentialDonorSearchNSoft");
+      addr[nt] = &All.PotentialDonorSearchNSoft;
+      id[nt++] = REAL;
+#endif /* #ifdef BH_SEED_ON_POTENTIAL_POSITION */
+
 #ifdef BLACKHOLE_SEEDING
       strcpy(tag[nt], "BlackHoleSeedMass");
       addr[nt] = &All.BlackHoleSeedMass;
@@ -732,8 +756,35 @@ void read_parameter_file(char *fname)
 #endif
 #endif
 
+#ifdef BH_MERGER
+      strcpy(tag[nt], "BhMergerRadiusFactor");
+      addr[nt] = &All.BhMergerRadiusFactor;
+      id[nt++] = REAL;
 
-      if((fd = fopen(fname, "r")))
+      /* HSML reproduces the pre-existing factor*max(Hsml_i,Hsml_j) behaviour exactly; see
+       * enum bh_merger_radius_criterion (src/blackholes/bh.h) for the other options. This is
+       * a mandatory parameter like every other tag above -- existing parameter files need to
+       * add "BhMergerRadiusCriterion HSML" to keep today's behaviour unchanged. */
+      strcpy(tag[nt], "BhMergerRadiusCriterion");
+      addr[nt] = All.BhMergerRadiusCriterionString;
+      id[nt++] = STRING;
+#endif /* #ifdef BH_MERGER */
+
+#ifdef SIDM
+        strcpy(tag[nt], "SidmDesNumNgb");
+        addr[nt] = &All.SidmDesNumNgb;
+        id[nt++] = REAL;
+        
+        strcpy(tag[nt], "SidmDesNumNgbDev");
+        addr[nt] = &All.SidmDesNumNgbDev;
+        id[nt++] = REAL;
+        
+        strcpy(tag[nt], "SidmCrossSection");
+        addr[nt] = &All.SidmCrossSection;
+        id[nt++] = REAL;
+#endif
+      
+        if((fd = fopen(fname, "r")))
         {
           sprintf(buf, "%s%s", fname, "-usedvalues");
           if(!(fdout = fopen(buf, "w")))
@@ -1003,6 +1054,24 @@ void check_parameters()
   if(ThisTask == 0)
     warn("Code was compiled with ENFORCE_JEANS_STABILITY_OF_CELLS together with another EOS. Please make sure you really want this.");
 #endif /* #if defined(ENFORCE_JEANS_STABILITY_OF_CELLS) && (defined(ISOTHERM_EQS) || (defined(USE_SFR) && !defined(FM_SFR))) */
+
+#ifdef BH_MERGER
+  /* resolve the BhMergerRadiusCriterion string into its enum value (bh.h); this runs
+   * identically on every task since All is already broadcast by read_parameter_file() */
+  if(strcmp(All.BhMergerRadiusCriterionString, "HSML") == 0)
+    All.BhMergerRadiusCriterion = BH_MERGER_RADIUS_HSML;
+  else if(strcmp(All.BhMergerRadiusCriterionString, "SOFTENING") == 0)
+    All.BhMergerRadiusCriterion = BH_MERGER_RADIUS_SOFTENING;
+  else if(strcmp(All.BhMergerRadiusCriterionString, "MAX_HSML_SOFTENING") == 0)
+    All.BhMergerRadiusCriterion = BH_MERGER_RADIUS_MAX_HSML_SOFTENING;
+  else if(strcmp(All.BhMergerRadiusCriterionString, "MIN_HSML_SOFTENING") == 0)
+    All.BhMergerRadiusCriterion = BH_MERGER_RADIUS_MIN_HSML_SOFTENING;
+  else
+    mpi_terminate(
+        "check_parameters: BhMergerRadiusCriterion='%s' not recognised. Valid values: HSML (legacy default), "
+        "SOFTENING, MAX_HSML_SOFTENING, MIN_HSML_SOFTENING.\n",
+        All.BhMergerRadiusCriterionString);
+#endif /* #ifdef BH_MERGER */
 }
 
 /*! \brief This function reads a table with a list of desired output times.

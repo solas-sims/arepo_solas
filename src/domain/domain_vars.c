@@ -73,7 +73,10 @@ int *toGet, *toGetSph;
 
 #ifdef STARS
 int *toGoStars, *toGetStars;
-#endif
+#endif /* #ifdef STARS */
+#ifdef SIDM
+int *toGoDM, *toGetDM;
+#endif /* #ifdef SIDM */
 
 #ifdef BLACKHOLES
 int *toGoBhs, *toGetBhs;
@@ -111,6 +114,11 @@ void domain_allocate_lists(void)
   toGetBhs         = (int *)mymalloc_movable(&toGetBhs, "toGetBhs", (sizeof(int) * NTask));
 #endif
 
+#ifdef SIDM
+  toGoDM           = (int *)mymalloc_movable(&toGoDM, "toGoDM", (sizeof(int) * NTask));
+  toGetDM          = (int *)mymalloc_movable(&toGetDM, "toGetDM", (sizeof(int) * NTask));
+#endif /* #ifdef SIDM */
+
   list_NumPart    = (int *)mymalloc_movable(&list_NumPart, "list_NumPart", (sizeof(int) * NTask));
   list_NumGas     = (int *)mymalloc_movable(&list_NumGas, "list_NumGas", (sizeof(int) * NTask));
   list_load       = (int *)mymalloc_movable(&list_load, "list_load", (sizeof(int) * NTask));
@@ -138,6 +146,11 @@ void domain_free_lists(void)
   myfree(list_load);
   myfree(list_NumGas);
   myfree(list_NumPart);
+
+#ifdef SIDM
+  myfree(toGetDM);
+  myfree(toGoDM);
+#endif /* #ifdef SIDM */
 
 #ifdef BLACKHOLES
   myfree(toGetBhs);

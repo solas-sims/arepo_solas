@@ -50,6 +50,9 @@
 #include <string.h>
 
 #include "../main/allvars.h"
+#ifdef SIDM
+#include "../sidm/sidm.h"
+#endif /* #ifdef SIDM */
 #include "../main/proto.h"
 
 #include "../domain/domain.h"
@@ -317,6 +320,11 @@ void reorder_particles(int *Id)
 #ifdef STARS
               if(P[dest].Type==4)
                 SPP(dest).PID = dest;
+#endif
+
+#ifdef SIDM
+              if(P[dest].Type==1)
+                DMPS(dest).PIndex = dest;
 #endif
 
 #ifdef BLACKHOLES

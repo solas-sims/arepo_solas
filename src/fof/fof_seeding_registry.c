@@ -97,7 +97,12 @@ void halo_seed_registry_grow(HaloSeedRegistry *r)
 
     r->max = 2 * r->max + 64;
 
-    myrealloc_movable(&r->ids,
+    /* myrealloc_movable() looks up the block by its CURRENT pointer value (matching
+     * what mymalloc's own tracking table has recorded for it), not by the address of
+     * the variable that holds that pointer -- pass r->ids itself, not &r->ids, and
+     * assign the (possibly updated) result back, mirroring every other movable
+     * reallocation in this codebase (e.g. P = myrealloc_movable(P, ...)) */
+    r->ids = (MyIDType *)myrealloc_movable(r->ids,
                       r->max * sizeof(MyIDType));
 }
 
