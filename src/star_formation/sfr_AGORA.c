@@ -42,6 +42,8 @@
 
 #include "../gravity/forcetree.h"
 
+#ifdef AGORA_SF
+
 /* Function that checks whether a cell i satisfies star formation criteria*/
 static int sf_criteria(int i)
 {
@@ -166,3 +168,5 @@ double get_starformation_rate(int i)
 
   return rateOfSF;
 }
+
+#endif /* #ifdef AGORA_SF */

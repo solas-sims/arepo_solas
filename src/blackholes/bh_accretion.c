@@ -8,6 +8,7 @@
 
 #include "../domain/domain.h"
 
+#ifdef BH_ACCRETION_ACTIVE
 
 static int bh_accretion_evaluate(int target, int mode, int threadid);
 static void bh_accretion_rate(void);
@@ -154,7 +155,6 @@ static void out2particle(data_out *out, int i, int mode)
 //#endif
     }
 }
-
 
 #include "../utils/generic_comm_helpers2.h"
 
@@ -743,3 +743,5 @@ static void bh_accretion_rate(void)
   mpi_printf("BLACKHOLES: Number of active blackholes = %lld, Black hole max ADP accretion rate = %e (code units)\n", bh_active, acc_rate_for_print);
 }
 #endif
+
+#endif /* #ifdef BH_ACCRETION_ACTIVE */

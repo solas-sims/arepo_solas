@@ -7,6 +7,8 @@
 #include "../main/allvars.h"
 #include "../main/proto.h"
 
+#ifdef USE_GRACKLE
+
 /* 'mode' -- tells the routine what to do
  *
  *     0 == solve chemistry and assign new abundances
@@ -620,3 +622,5 @@ double compute_mu(int i)
   /* mu = 1 / sum_s (X_s / A_s), where A_s is the atomic mass in units of m_H */
   return 1.0 / (Xe + XH + XH2 / 2.0 + XD / 2.0 + XHD / 3.0 + XHe / 4.0 + Z / 16.0);
 }
+
+#endif /* #ifdef USE_GRACKLE */

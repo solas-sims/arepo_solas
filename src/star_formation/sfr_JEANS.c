@@ -46,6 +46,7 @@
 
 #include "../gravity/forcetree.h"
 
+#ifdef JEANS_SF
 
 /*! \brief Return the Jeans length of the cell.
  *
@@ -204,3 +205,5 @@ double get_starformation_rate(int i)
 
   return rateOfSF;
 }
+
+#endif /* #ifdef JEANS_SF */

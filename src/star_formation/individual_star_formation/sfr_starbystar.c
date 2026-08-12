@@ -42,6 +42,8 @@
 
 #include "../../gravity/forcetree.h"
 
+#ifdef INDIVIDUAL_STAR_BY_STAR_FORMATION
+
 /* Function that checks whether a cell i satisfies star formation criteria*/
 static int sf_criteria(int i)
 {
@@ -139,3 +141,5 @@ double get_starformation_rate(int i)
 
   return 1;
 }
+
+#endif /* #ifdef INDIVIDUAL_STAR_BY_STAR_FORMATION */

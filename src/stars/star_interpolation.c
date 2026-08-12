@@ -6,6 +6,7 @@
 #include "../main/allvars.h"
 #include "../main/proto.h"
 
+#ifdef STAR_FEEDBACK_ACTIVE
 
 /* Feedback tables interpolation */
 static inline double linear_interpolation(double x, double x0, double x1, double y0, double y1);
@@ -711,3 +712,5 @@ Star_Feedback star_particle_feedback(int index, double dt, double z, double a)
   return StarParticle;
 }
 #endif
+
+#endif /* #ifdef STAR_FEEDBACK_ACTIVE */

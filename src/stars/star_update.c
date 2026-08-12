@@ -5,6 +5,7 @@
 #include "../main/allvars.h"
 #include "../main/proto.h"
 
+#ifdef STAR_FEEDBACK_ACTIVE
 
 static int int_compare(const void *a, const void *b)
 {
@@ -463,3 +464,5 @@ void star_perform_end_of_step_physics(void)
     mpi_printf("STARS: Energy given by StarParts = %e, Energy taken up by gas particles = %e \n",
     All.StarFeedbackGlobal[2], All.StarFeedbackGlobal[5]);
 } 
+
+#endif /* #ifdef STAR_FEEDBACK_ACTIVE */

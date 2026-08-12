@@ -7,6 +7,8 @@
 #include "../main/allvars.h"
 #include "../main/proto.h"
 
+#if defined(WINDS) || defined(SUPERNOVAE)
+
 /* SN host-injection modes, returned by SN_feedback_radius() */
 #define MESH 0 /* Couple across Voronoi faces */
 #define HOST 1 /* Thermal dump into host  */
@@ -913,3 +915,5 @@ void star_feedback(void)
  
   TIMER_STOP(CPU_STARS_FEEDBACK);
 }
+
+#endif /* #if defined(WINDS) || defined(SUPERNOVAE) */

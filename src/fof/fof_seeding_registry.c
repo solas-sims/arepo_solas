@@ -46,6 +46,8 @@
 
 #include "fof_seeding.h"
 
+#ifdef HALO_SEEDING
+
 HaloSeedRegistry HaloSeeds;
 
 typedef enum {
@@ -142,3 +144,4 @@ void halo_mark_seeded(HaloSeedRegistry *r, MyIDType id)
     r->n++;
 }
 
+#endif /* #ifdef HALO_SEEDING */

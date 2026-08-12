@@ -7,6 +7,8 @@
 
 #include "../../domain/domain.h"
 
+#ifdef INDIVIDUAL_STAR_BY_STAR_FORMATION
+
 static int sf_massdrain_evaluate(int target, int mode, int threadid);
 
 /*! \brief Local data structure for collecting particle/cell data that is sent
@@ -92,7 +94,6 @@ static void out2particle(data_out *out, int i, int mode)
 #endif
     }
 }
-
 
 #include "../../utils/generic_comm_helpers2.h"
 
@@ -297,3 +298,5 @@ static int sf_massdrain_evaluate(int target, int mode, int threadid)
 
   return 0;
 }
+
+#endif /* #ifdef INDIVIDUAL_STAR_BY_STAR_FORMATION */

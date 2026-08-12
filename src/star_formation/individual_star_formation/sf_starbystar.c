@@ -7,6 +7,8 @@
 
 #include "../../domain/domain.h"
 
+#ifdef INDIVIDUAL_STAR_BY_STAR_FORMATION
+
 static int sf_starbystar_evaluate(int target, int mode, int threadid);
 static int sf_starbystar_isactive(int n);
 
@@ -75,7 +77,6 @@ static void out2particle(data_out *out, int i, int mode)
       SP[i].NgbsMass += out->NgbsMass;
     }
 }
-
 
 #include "../../utils/generic_comm_helpers2.h"
 
@@ -388,3 +389,5 @@ int sf_starbystar_isactive(int n)
 
   return 1;
 }
+
+#endif /* #ifdef INDIVIDUAL_STAR_BY_STAR_FORMATION */
