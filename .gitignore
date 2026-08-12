@@ -41,3 +41,8 @@ uses-machines.txt
 #Python notebook stuff
 **/*ipynb
 .ipynb*
+
+#downloaded example ICs and data tables (fetched via get_ics.sh / get_tables.sh, not committed)
+examples/*/ICs/
+examples/*/grackle_data/
+examples/*/star_tables/
