@@ -9,8 +9,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 GRACKLE_DIR="${SCRIPT_DIR}/grackle_data"
-GRACKLE_FILE="${GRACKLE_DIR}/CloudyData_UVB=HM2012_high_density.h5"
-GRACKLE_URL="https://raw.githubusercontent.com/grackle-project/grackle_data_files/928696482fbe15d9bac4382de6134d95568f099c/input/CloudyData_UVB%3DHM2012_high_density.h5"
+GRACKLE_FILE="${GRACKLE_DIR}/CloudyData_UVB=FG2011_shielded.h5"
+GRACKLE_URL="https://raw.githubusercontent.com/grackle-project/grackle_data_files/928696482fbe15d9bac4382de6134d95568f099c/input/CloudyData_UVB%3DFG2011_shielded.h5"
 
 STAR_TABLES_DIR="${SCRIPT_DIR}/star_tables"
 STAR_TABLES_FILE="${STAR_TABLES_DIR}/star_feedback_tables.hdf5"

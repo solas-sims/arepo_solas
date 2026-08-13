@@ -63,11 +63,11 @@ embedded groups so the two stay consistent:
 
 Downloads two files (gitignored, same pattern as `ICs/`):
 
-### `./grackle_data/CloudyData_UVB=HM2012_high_density.h5`
+### `./grackle_data/CloudyData_UVB=FG2011_shielded.h5`
 
 Grackle cooling/UV-background table, from
 [grackle_data_files](https://github.com/grackle-project/grackle_data_files)
-(pinned to commit `9286964`). Matches `GRACKLE_CHEMISTRY=3` in `Config.sh`.
+(pinned to commit `9286964`).
 
 ### `./star_tables/star_feedback_tables.hdf5`
 
@@ -125,6 +125,9 @@ reader — see the script's docstring for the full set of options
 
 ## Known gaps / things to revisit
 
+- `InitMetallicityinSolar = 0.1` (required by `METALS`) is an assumed
+  starting value, not one taken from the IC file or validated against this
+  fork's implementation.
 - `param.txt`'s star formation and feedback parameters
   (`NumberDensThreshold=5 cm^-3`, `TemperatureThreshold=1e4 K`,
   `StarFormationEfficiency=0.01`, `SN_LeadTime=3 Myr`,
