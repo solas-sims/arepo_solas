@@ -10,8 +10,7 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-IC_DIR="${SCRIPT_DIR}/ICs"
+IC_DIR="./ICs"
 IC_FILE="${IC_DIR}/agora_lowres_arepo_ic_without_u-with-grid.hdf5"
 IC_URL="https://www.dropbox.com/scl/fi/m439mkz9vfjvcbflucu3f/agora_lowres_arepo_ic_without_u-with-grid.hdf5?rlkey=c142iij59ruj9nwehj28licsp&dl=1"
 

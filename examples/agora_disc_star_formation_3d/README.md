@@ -11,6 +11,11 @@ This example does **not** plug into `test.sh` — it downloads external ICs
 and data tables rather than generating them with `create.py`. Run it by
 hand, following the steps below.
 
+`get_ics.sh` and `get_tables.sh` write to `./ICs/`, `./grackle_data/`, and
+`./star_tables/` relative to the current working directory (not to wherever
+the scripts themselves live), so run them from inside this directory — or
+from wherever you've copied it, e.g. a `test.sh`-style run directory.
+
 ## What's in this directory
 
 | File | Purpose |
