@@ -6,13 +6,11 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
-GRACKLE_DIR="${SCRIPT_DIR}/grackle_data"
+GRACKLE_DIR="./grackle_data"
 GRACKLE_FILE="${GRACKLE_DIR}/CloudyData_UVB=FG2011_shielded.h5"
 GRACKLE_URL="https://raw.githubusercontent.com/grackle-project/grackle_data_files/928696482fbe15d9bac4382de6134d95568f099c/input/CloudyData_UVB%3DFG2011_shielded.h5"
 
-STAR_TABLES_DIR="${SCRIPT_DIR}/star_tables"
+STAR_TABLES_DIR="./star_tables"
 STAR_TABLES_FILE="${STAR_TABLES_DIR}/star_feedback_tables.hdf5"
 STAR_TABLES_URL="https://www.dropbox.com/scl/fi/a085tatarnwrx3we553eu/star_feedback_tables.hdf5?rlkey=t07hdi3t5k18868kojd6nsk1y&dl=1"
 
