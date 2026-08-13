@@ -93,6 +93,14 @@ Units for these fields aren't documented anywhere in `src/stars/` — worth
 double-checking with whoever built the table generation pipeline if
 feedback strengths look physically off.
 
+### `TreecoolFile` (COOLING)
+
+Unlike the two tables above, this one ships with the repo already — no
+download needed. `param.txt`'s `TreecoolFile` points at
+`../../TREECOOL_ep`, i.e. the repo root's copy; an identical copy also
+lives at [`data/TREECOOL_ep`](../../data/TREECOOL_ep) in the Arepo source
+directory if you'd rather reference that one.
+
 ## 3. Build
 
 You'll need a Grackle install (`GRACKLE_DIR` in `Makefile.systype`, see
