@@ -1,5 +1,5 @@
 %----  Relevant files
-InitCondFile                            ./ICs/agora_lowres_arepo_ic_without_u-with-grid.hdf5
+InitCondFile                            ./ICs/agora_lowres_arepo_ic_without_u-with-grid    % Arepo appends .hdf5 itself for ICFormat=3; the file on disk (from get_ics.sh) keeps the extension
 OutputDir                               ./output
 SnapshotFileBase                        snap
 OutputListFilename                      ./output_list.txt
