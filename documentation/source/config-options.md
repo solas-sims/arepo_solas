@@ -1,6 +1,49 @@
 Code Configuration
 *************************
 
+Flag tiers: primary, master switch, derived
+============================================
+
+Every compile-time flag documented on this page falls into one of three
+tiers:
+
+1. **Primary options** -- set directly by the user in ``Config.sh`` (or the
+   equivalent ``template_config.yaml`` key for CMake builds). This is the
+   vast majority of flags on this page, e.g. ``BONDI_ACCRETION``, ``WINDS``,
+   ``BLACKHOLES``.
+
+2. **Master switches** -- also user-settable, but enabling one auto-enables a
+   whole set of primary flags as a convenience (each of those flags also
+   remains independently settable on its own). For example, ``BH_FEEDBACK``
+   auto-enables both ``BH_THERMAL_FEEDBACK`` and ``BH_JET_FEEDBACK``.
+
+3. **Derived flags** -- **never** set by the user. These are computed as
+   "true if any of a set of trigger flags is active", and exist purely to
+   gate code shared across several specific physics models (e.g. any BH
+   accretion or feedback model needs the same particle-array, domain, and
+   I/O infrastructure, gated on ``BH_ACTIVE``). Examples: ``BH_ACTIVE``,
+   ``BH_ACCRETION_ACTIVE``, ``BH_FEEDBACK_ACTIVE``, ``STAR_FEEDBACK_ACTIVE``,
+   ``STAR_RADIATION_ACTIVE``.
+
+The single source of truth for tiers 2 and 3 is
+`config_flags.yaml <https://github.com/solas-sims/arepo_solas/blob/main/config_flags.yaml>`_
+at the repository root. It is consumed by:
+
+- ``scripts/validate_config_flags.py``, run in CI on every change to the
+  Makefile, ``Template-Config.sh``, any ``template_config*.yaml``, or
+  ``config_flags.yaml`` itself. It fails the build if a derived flag is ever
+  added as a standalone option to ``Template-Config.sh``/``template_config*.yaml``,
+  or if the Makefile's hand-written derivation blocks drift from the spec.
+- ``cmake/parse_yaml.py``, which computes the same master-switch expansions
+  and derived flags for CMake/YAML-driven builds that the Makefile computes
+  for ``Config.sh``-driven builds, so the two build systems stay behaviourally
+  equivalent.
+
+**If you add a new derived or master-switch flag**, add it to
+``config_flags.yaml`` first, then update the Makefile's ``CONFIGVARS``
+derivation blocks to match -- the CI check will tell you if they disagree.
+Do not add a derived flag as a standalone entry to ``Template-Config.sh``.
+
 Basic operation mode
 ============================
 
