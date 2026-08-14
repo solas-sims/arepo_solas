@@ -45,7 +45,16 @@
 /* Function that checks whether a cell i satisfies star formation criteria*/
 static int sf_criteria(int i)
 {
+#ifdef USE_GRACKLE
+#if defined(POPIII_SF) && (GRACKLE_CHEMISTRY >= 2)
+  if(SphP[i].GasMetallicity < All.PopIIIMetallicityThreshold &&
+     get_H2_fraction(i) < All.PopIIIH2FractionThreshold)
+    return 0;
+#endif
   double mu = compute_mu(i);
+#else
+  double mu = 4 / (8 - 5 * (1 - HYDROGEN_MASSFRAC));
+#endif
   
   double number_dens = (SphP[i].Density * All.cf_UnitDensity_in_cgs) / mu / PROTONMASS;
   double temp = (SphP[i].Utherm * All.cf_UnitVelocity_in_cm_per_s * All.cf_UnitVelocity_in_cm_per_s) 
@@ -60,16 +69,6 @@ static int sf_criteria(int i)
 #ifdef DIVVEL
   if(SphP[i].DivVel >= 0)
     return 0;
-#endif
-
-#if defined(POPIII_SF) && defined(USE_GRACKLE)
-#if (GRACKLE_CHEMISTRY >= 2)
-  if(SphP[i].GasMetallicity < All.PopIIIMetallicityThreshold)
-  {
-    if(SphP[i].GrackleSpecies(GRACKLE_H2I) < All.PopIIIH2FractionThreshold)
-      return 0;
-  }
-#endif
 #endif
 
   return 1;

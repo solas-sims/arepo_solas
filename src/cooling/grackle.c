@@ -617,3 +617,24 @@ double compute_mu(int i)
   /* mu = 1 / sum_s (X_s / A_s), where A_s is the atomic mass in units of m_H */
   return 1.0 / (Xe + XH + XH2 / 2.0 + XD / 2.0 + XHD / 3.0 + XHe / 4.0 + Z / 16.0);
 }
+
+#if defined(POPIII_SF) && (GRACKLE_CHEMISTRY >= 2)
+/*! \brief Computes the molecular hydrogen fraction of a gas cell.
+ *
+ *  Equivalent to f_H2 = 2 * n[H2] / n_H, where n_H = n[HI] + n[HII] + 2 * n[H2].
+ *
+ *  \param[in] i Index of the gas cell.
+ *
+ *  \return The molecular hydrogen fraction of the gas cell.
+ */
+double get_H2_fraction(int i)
+{
+  double mHI  = SphP[i].GrackleSpeciesConserved(GRACKLE_HI);
+  double mHII = SphP[i].GrackleSpeciesConserved(GRACKLE_HII);
+  double mH2  = SphP[i].GrackleSpeciesConserved(GRACKLE_H2I);
+
+  double denom = mHI + mHII + mH2;
+
+  return (denom > 0.0) ? mH2 / denom : 0.0;
+}
+#endif

@@ -84,6 +84,15 @@ double get_jeans_mass(int i)
 /* Function that checks whether a cell i satisfies star formation criteria*/
 static int sf_criteria(int i)
 {
+
+#if defined(POPIII_SF) && defined(USE_GRACKLE)
+#if (GRACKLE_CHEMISTRY >= 2)
+  if(SphP[i].GasMetallicity < All.PopIIIMetallicityThreshold &&
+     get_H2_fraction(i) < All.PopIIIH2FractionThreshold)
+    return 0;
+#endif
+#endif
+
 #ifdef JEANS_MASS_BASED
   /* SF if Jeans mass is smaller than threshold x cell mass */
   if(get_jeans_mass(i) < All.JeansMassThreshold * P[i].Mass)
