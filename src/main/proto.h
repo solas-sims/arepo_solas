@@ -691,6 +691,9 @@ void make_star(int idx, int i, double prob, MyDouble mass_of_star, double *sum_m
 
 #ifdef USE_GRACKLE
 double compute_mu(int i);
+#if defined(POPIII_SF) && (GRACKLE_CHEMISTRY >= 2)
+double get_H2_fraction(int i);
+#endif
 #endif
 
 #endif /* #ifndef PROTO_H */
