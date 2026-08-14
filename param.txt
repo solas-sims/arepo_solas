@@ -1,4 +1,3 @@
-
 %---- SOLAS additions
 
 %---- Metal parameters
@@ -18,11 +17,11 @@ TemperatureThreshold        1e6
 IMF                     1
 StarTablesFile          star_feedback_tables.hdf5
 
-SN_HostShellSweepFrac    0.5
+SN_HostShellSweepFrac    0.1
 SN_LeadTime              40
 
 %RaySplitFactor          4
-%RTIonizationTimestepFraction  0.5
+%RTIonizationTimestepFraction  1
 
 %RefStarsPerCell         4 %Refine cells hosting more than this number of stars
 

@@ -84,7 +84,7 @@ void split_ray(const RayPacket *parent, RayPacket children[4]);
 void append_export(RayExportBuffer *buf, const RayPacket *ray, int task);
 
 void star_radiation(void);
-void raytrace_treewalk(RayPacket *ray, RayWorkStack *work, RayExportBuffer *export_buf);
+void raytrace_voronoi(RayPacket *ray, RayWorkStack *work, RayExportBuffer *export_buf);
 #endif
 
 #if defined(WINDS) || defined(SUPERNOVAE)

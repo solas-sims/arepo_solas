@@ -754,6 +754,16 @@ void fof_compute_group_properties(int gr, int start, int len)
       gr_MassType[k]       = 0;
     }
 
+#ifdef HALO_SEEDING
+  Group[gr].MaxGasDens      = -1;
+  Group[gr].MaxGasDensID    = 0;
+  Group[gr].MaxGasDensTask  = -1;
+  Group[gr].MaxGasDensIndex = -1;
+#ifdef BH_SEED_ON_ZERO_METALLICITY
+  Group[gr].MaxGasMetallicity = -1;
+#endif /* #ifdef BH_SEED_ON_ZERO_METALLICITY */
+#endif /* #ifdef HALO_SEEDING */
+
   // calculate
   for(k = 0; k < len; k++)
     {
@@ -771,6 +781,29 @@ void fof_compute_group_properties(int gr, int start, int len)
       if(P[index].Type == 0)
         gr_Sfr += SphP[index].Sfr;
 #endif /* #ifdef USE_SFR */
+
+#ifdef HALO_SEEDING
+      /* track the densest gas cell of the group as potential seeding donor */
+      if(type == 0 && P[index].Mass > 0 && SphP[index].Density > Group[gr].MaxGasDens)
+        {
+          Group[gr].MaxGasDens      = SphP[index].Density;
+          Group[gr].MaxGasDensID    = P[index].ID;
+          Group[gr].MaxGasDensTask  = ThisTask;
+          Group[gr].MaxGasDensIndex = index;
+        }
+
+#ifdef BH_SEED_ON_ZERO_METALLICITY
+      /* track the most metal-enriched gas cell of the group; a halo is only
+       * "pristine" (eligible for zero-metallicity seeding) if even this cell
+       * is below All.ZeroMetallicityThresholdForFOFSeeding */
+      if(type == 0 && P[index].Mass > 0)
+        {
+          double Z = SphP[index].Metals / P[index].Mass;
+          if(Z > Group[gr].MaxGasMetallicity)
+            Group[gr].MaxGasMetallicity = Z;
+        }
+#endif /* #ifdef BH_SEED_ON_ZERO_METALLICITY */
+#endif /* #ifdef HALO_SEEDING */
 
       for(j = 0; j < 3; j++)
         {
@@ -875,6 +908,24 @@ void fof_exchange_group_data(void)
 #ifdef USE_SFR
       Group[start].Sfr += get_Group[i].Sfr;
 #endif /* #ifdef USE_SFR */
+
+#ifdef HALO_SEEDING
+      /* keep the globally densest gas cell across group fragments */
+      if(get_Group[i].MaxGasDens > Group[start].MaxGasDens)
+        {
+          Group[start].MaxGasDens      = get_Group[i].MaxGasDens;
+          Group[start].MaxGasDensID    = get_Group[i].MaxGasDensID;
+          Group[start].MaxGasDensTask  = get_Group[i].MaxGasDensTask;
+          Group[start].MaxGasDensIndex = get_Group[i].MaxGasDensIndex;
+        }
+
+#ifdef BH_SEED_ON_ZERO_METALLICITY
+      /* keep the highest gas metallicity across group fragments, so a halo is
+       * only judged pristine once every fragment's gas has been accounted for */
+      if(get_Group[i].MaxGasMetallicity > Group[start].MaxGasMetallicity)
+        Group[start].MaxGasMetallicity = get_Group[i].MaxGasMetallicity;
+#endif /* #ifdef BH_SEED_ON_ZERO_METALLICITY */
+#endif /* #ifdef HALO_SEEDING */
 
       for(j = 0; j < 3; j++)
         {

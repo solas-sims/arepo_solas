@@ -593,6 +593,12 @@ void init_io_fields()
   init_snapshot_type(IO_SFR, SN_MINI);
 #endif /* #ifdef USE_SFR */
 
+#ifdef HALO_SEEDING
+  init_field(IO_HOSTHALOMASS, "HHMA", "HostHaloMass", MEM_MY_FLOAT, FILE_MY_IO_FLOAT, FILE_MY_IO_FLOAT, 1, A_SPHP,
+             &SphP[0].HostHaloMass, 0, GAS_ONLY); /* FOF mass of host halo from last on-the-fly FOF pass */
+  init_units(IO_HOSTHALOMASS, 0., -1., 0., 1., 0., All.UnitMass_in_g);
+#endif /* #ifdef HALO_SEEDING */
+
 #ifdef OUTPUT_DIVVEL
   init_field(IO_DIVVEL, "DIVV", "VelocityDivergence", MEM_MY_FLOAT, FILE_MY_IO_FLOAT, FILE_MY_IO_FLOAT, 1, A_SPHP, &SphP[0].DivVel, 0,
              GAS_ONLY);

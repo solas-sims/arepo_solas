@@ -621,10 +621,6 @@ void read_parameter_file(char *fname)
       strcpy(tag[nt], "RaySplitFactor");
       addr[nt] = &All.RaySplitFactor;
       id[nt++] = REAL;
-
-      strcpy(tag[nt], "RayBoxPadFactor");
-      addr[nt] = &All.RayBoxPadFactor;
-      id[nt++] = REAL;
 #endif  
 
 #ifdef RAD_OPENING_ANGLE
@@ -635,7 +631,7 @@ void read_parameter_file(char *fname)
       strcpy(tag[nt], "NodeAspectRatio");
       addr[nt] = &All.NodeAspectRatio;
       id[nt++] = REAL;
-#endif  
+#endif
 
 #ifdef PHOTOIONIZATION
       strcpy(tag[nt], "RTIonizationTimestepFraction");
@@ -705,7 +701,10 @@ void read_parameter_file(char *fname)
       id[nt++] = REAL;
 #endif
         
-#ifdef FIND_HALOS
+#ifdef HALO_SEEDING 
+#ifndef FOF
+#error "HALO_SEEDING requires FOF to be defined"
+#endif /* #ifndef(FOF) */
       strcpy(tag[nt], "TimeOfFirstHaloFinding");
       addr[nt] = &All.TimeOfFirstHaloFinding;
       id[nt++] = REAL;
@@ -713,6 +712,24 @@ void read_parameter_file(char *fname)
       strcpy(tag[nt], "TimeBetweenHaloFinding");
       addr[nt] = &All.TimeBetweenHaloFinding;
       id[nt++] = REAL;
+
+#ifdef BH_SEED_ON_MASS
+    strcpy(tag[nt], "MinHaloMassForFOFSeeding");
+      addr[nt] = &All.MinHaloMassForFOFSeeding;
+      id[nt++] = REAL;
+#endif /* #ifdef BH_SEED_ON_MASS */
+
+#ifdef BH_SEED_ON_ZERO_METALLICITY
+      strcpy(tag[nt], "ZeroMetallicityThresholdForFOFSeeding");
+      addr[nt] = &All.ZeroMetallicityThresholdForFOFSeeding;
+      id[nt++] = REAL;
+#endif /* #ifdef BH_SEED_ON_ZERO_METALLICITY */
+
+#ifdef BLACKHOLE_SEEDING
+      strcpy(tag[nt], "BlackHoleSeedMass");
+      addr[nt] = &All.BlackHoleSeedMass;
+      id[nt++] = REAL;
+#endif
 #endif
 
 

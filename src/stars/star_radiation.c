@@ -10,9 +10,9 @@
    Gas mass per H = 2.311e-24 g (M_dust/H = 1.398e-26, M_gas/M_dust = 165.3) */
 double Kappa_E[WAVEBANDS] =
 {
-  [INFRARED] = 34.9, 
-  [OPTICAL] = 278.3, 
-  [ULTRAVIOLET] = 417.7,  
+  [INFRARED] = 34.9,
+  [OPTICAL] = 278.3,
+  [ULTRAVIOLET] = 417.7,
   [LYMAN_WERNER] = 736.6, /* Dust component */
   [IONIZING_HI] = 1.0,
   [IONIZING_HeI] = 1.0,
@@ -21,9 +21,9 @@ double Kappa_E[WAVEBANDS] =
 
 double Kappa_N[WAVEBANDS] =
 {
-  [INFRARED] = 30.0, 
-  [OPTICAL] = 242.3, 
-  [ULTRAVIOLET] = 406.9,  
+  [INFRARED] = 30.0,
+  [OPTICAL] = 242.3,
+  [ULTRAVIOLET] = 406.9,
   [LYMAN_WERNER] = 731.4, /* Dust component */
   [IONIZING_HI] = 1.0,
   [IONIZING_HeI] = 1.0,
@@ -46,7 +46,7 @@ double TrueAbsorbedFraction[WAVEBANDS] =
   [IONIZING_HeII] = 1.0,
 };
 
-double ReradiatedFraction[WAVEBANDS] = 
+double ReradiatedFraction[WAVEBANDS] =
 {
   [INFRARED] = 0.54,
   [OPTICAL] = 0.62,
@@ -65,7 +65,7 @@ void update_dtau(void)
         continue;
 
       double Units = All.cf_UnitLength_in_cm * All.cf_UnitLength_in_cm / All.cf_UnitMass_in_g;
-      
+
 #ifdef METALS
       double Zsol = ((SphP[i].GasMetals + SphP[i].StarMetalsFeed) / (P[i].Mass + SphP[i].StarMassFeed)) / SOLAR_METALLICITY;
 #else
@@ -78,34 +78,34 @@ void update_dtau(void)
 
       SphP[i].DtauOverLength_E[INFRARED] = (Kappa_E[INFRARED] / Units) * Zsol * Density;
       SphP[i].DtauOverLength_E[OPTICAL] = (Kappa_E[OPTICAL] / Units) * Zsol * Density;
-      SphP[i].DtauOverLength_E[ULTRAVIOLET] = (Kappa_E[ULTRAVIOLET] / Units) * Zsol * Density;      
+      SphP[i].DtauOverLength_E[ULTRAVIOLET] = (Kappa_E[ULTRAVIOLET] / Units) * Zsol * Density;
 
       /* Dust only */
       SphP[i].DtauOverLength_E[LYMAN_WERNER] = (Kappa_E[LYMAN_WERNER] / Units) * Zsol * Density;
-      
+
       /* Band averaged sigma0*(v/v0)^(-3), in cm^2 */
       sigma_HI = 3.25e-18;
       sigma_HeI = 5.04e-18;
-      sigma_HeII = 1.30e-18; 
+      sigma_HeII = 1.30e-18;
       SphP[i].DtauOverLength_E[IONIZING_HI] = (sigma_HI / (PROTONMASS) / Units) * SphP[i].GrackleSpeciesConserved(GRACKLE_HI) / SphP[i].Volume;
       SphP[i].DtauOverLength_E[IONIZING_HeI] = (sigma_HeI / (4.0 * PROTONMASS) / Units) * SphP[i].GrackleSpeciesConserved(GRACKLE_HeI) / SphP[i].Volume;
-      SphP[i].DtauOverLength_E[IONIZING_HeII] = (sigma_HeII / (4.0 * PROTONMASS) / Units) * SphP[i].GrackleSpeciesConserved(GRACKLE_HeII) / SphP[i].Volume;  
-      
+      SphP[i].DtauOverLength_E[IONIZING_HeII] = (sigma_HeII / (4.0 * PROTONMASS) / Units) * SphP[i].GrackleSpeciesConserved(GRACKLE_HeII) / SphP[i].Volume;
+
 
       SphP[i].DtauOverLength_N[INFRARED] = (Kappa_N[INFRARED] / Units) * Zsol * Density;
       SphP[i].DtauOverLength_N[OPTICAL] = (Kappa_N[OPTICAL] / Units) * Zsol * Density;
-      SphP[i].DtauOverLength_N[ULTRAVIOLET] = (Kappa_N[ULTRAVIOLET] / Units) * Zsol * Density;      
+      SphP[i].DtauOverLength_N[ULTRAVIOLET] = (Kappa_N[ULTRAVIOLET] / Units) * Zsol * Density;
 
       /* Dust only */
       SphP[i].DtauOverLength_N[LYMAN_WERNER] = (Kappa_N[LYMAN_WERNER] / Units) * Zsol * Density;
-      
+
       /* Band averaged sigma0*(v/v0)^(-3), in cm^2 */
-      sigma_HI = 3.48e-18; 
+      sigma_HI = 3.48e-18;
       sigma_HeI = 5.27e-18;
-      sigma_HeII = 1.31e-18; 
+      sigma_HeII = 1.31e-18;
       SphP[i].DtauOverLength_N[IONIZING_HI] = (sigma_HI / (PROTONMASS) / Units) * SphP[i].GrackleSpeciesConserved(GRACKLE_HI) / SphP[i].Volume;
       SphP[i].DtauOverLength_N[IONIZING_HeI] = (sigma_HeI / (4.0 * PROTONMASS) / Units) * SphP[i].GrackleSpeciesConserved(GRACKLE_HeI) / SphP[i].Volume;
-      SphP[i].DtauOverLength_N[IONIZING_HeII] = (sigma_HeII / (4.0 * PROTONMASS) / Units) * SphP[i].GrackleSpeciesConserved(GRACKLE_HeII) / SphP[i].Volume;  
+      SphP[i].DtauOverLength_N[IONIZING_HeII] = (sigma_HeII / (4.0 * PROTONMASS) / Units) * SphP[i].GrackleSpeciesConserved(GRACKLE_HeII) / SphP[i].Volume;
     }
 }
 
@@ -113,14 +113,14 @@ void update_dtau(void)
 double dtau_IR(int i, double length)
 {
   double Units = All.cf_UnitLength_in_cm * All.cf_UnitLength_in_cm / All.cf_UnitMass_in_g;
-      
+
 #ifdef METALS
   double Zsol = ((SphP[i].GasMetals + SphP[i].StarMetalsFeed) / (P[i].Mass + SphP[i].StarMassFeed)) / SOLAR_METALLICITY;
 #else
   double Zsol = 0;
 #endif
 
- double Density = (P[i].Mass + SphP[i].StarMassFeed) / SphP[i].Volume;
+  double Density = (P[i].Mass + SphP[i].StarMassFeed) / SphP[i].Volume;
 
   double Dtau_IR = All.IRDtauMomentumBoostCoeff * (1.0 / Units) * Zsol * Density * length;
 
@@ -131,7 +131,7 @@ double dtau_IR(int i, double length)
 static double H2Tab_A[H2TAB_N]; /* A at table nodes */
 static double H2Tab_dlogN; /* log10 spacing */
 static double H2Tab_A_thinmin; /* A(NMIN) = SIGMA_PUMP * NMIN */
- 
+
 /* Wolcott-Green et al. (2011) self-shielding function */
 static inline double f_selfshield_H2(double N_H2)
 {
@@ -140,23 +140,23 @@ static inline double f_selfshield_H2(double N_H2)
   return 0.965 / pow(1.0 + x / H2_SHIELD_B5, 1.1)
        + 0.035 / sq * exp(-8.5e-4 * sq);
 }
- 
+
 /* Build A(N) once at startup (trapezoid, log-spaced with linear-N areas,
    16 sub-steps per interval so table error << fit error) */
 void init_h2shield(void)
 {
   H2Tab_dlogN = (H2TAB_LOGNMAX - H2TAB_LOGNMIN) / (H2TAB_N - 1);
   H2Tab_A_thinmin = SIGMA_PUMP * pow(10.0, H2TAB_LOGNMIN);
- 
+
   /* Thin part below NMIN: f_sh=1 */
-  double A = H2Tab_A_thinmin;          
+  double A = H2Tab_A_thinmin;
   H2Tab_A[0] = A;
- 
+
   for(int i = 1; i < H2TAB_N; i++)
     {
       double N0 = pow(10.0, H2TAB_LOGNMIN + (i - 1) * H2Tab_dlogN);
       double N1 = pow(10.0, H2TAB_LOGNMIN + i * H2Tab_dlogN);
- 
+
       const int nsub = 16;
       double dN = (N1 - N0) / nsub;
       for(int k = 0; k < nsub; k++)
@@ -164,34 +164,34 @@ void init_h2shield(void)
           double Na = N0 + k * dN;
           A += 0.5 * (f_selfshield_H2(Na) + f_selfshield_H2(Na + dN)) * dN * SIGMA_PUMP;
         }
-      
+
       H2Tab_A[i] = A;
     }
 }
- 
+
 /* A(N): thin analytic below NMIN, clamp above NMAX, linear-in-logN inside */
 static inline double h2shield_A(double N_H2)
 {
   if(N_H2 <= 0.0)
     return 0.0;
- 
+
   double logN = log10(N_H2);
- 
+
   /* f_sh = 1 exactly */
   if(logN <= H2TAB_LOGNMIN)
-    return SIGMA_PUMP * N_H2; 
- 
+    return SIGMA_PUMP * N_H2;
+
   /* Lines exhausted */
   if(logN >= H2TAB_LOGNMAX)
-    return H2Tab_A[H2TAB_N - 1];     
- 
+    return H2Tab_A[H2TAB_N - 1];
+
   double u = (logN - H2TAB_LOGNMIN) / H2Tab_dlogN;
   int    j = (int)u;
   double f = u - j;
- 
+
   return H2Tab_A[j] * (1.0 - f) + H2Tab_A[j + 1] * f;
 }
- 
+
 /* Exact per-cell line optical depth for a cell adding dN_H2 to a ray
    that has already accumulated N_H2 */
 double h2shield_dtau(double N_H2, double dN_H2)
@@ -301,83 +301,116 @@ static void free_work_stack(RayWorkStack *w)
   free(w->rays); free(w);
 }
 
+/*
+ * Rays are born inside their host cell, which the star density
+ * machinery already identified through the SPH neighbour loop
+ */
 static void init_rays(RayWorkStack *work)
 {
-  double SQRT3 = sqrt(3);
-    
+  double xtmp, ytmp, ztmp;
+
+  double SQRT3 = sqrt(3.0);
+
   int ray_idx = 0;
-     
-  /* Act on host cells */
-  for(int ev = 0; ev < MechanicalFeedbackEvents.NumEvents; ev++)
-    {
-      Mechanical_Feedback_Data *MechanicalFeedbackData = &MechanicalFeedbackEvents.MechanicalFeedbackData[ev];
-      Mechanical_Feedback *MechanicalFeedback = &MechanicalFeedbackData->MechanicalFeedback;
 
-      unsigned long long rotation_seed = seed_rotation(MechanicalFeedbackData->StarID);
-        
-      /* Loop over rays for this star */
-      for(int iray = 0; iray < NRays; iray++)
-        {  
-          /* Initialize ray from star i */
-          RayPacket ray = {0};
+  for(int ev = 0; ev < MechanicalFeedbackEvents.NumEvents;)
+  {
+    int host = MechanicalFeedbackEvents.MechanicalFeedbackData[ev].HostIndex;
 
-          ray.star_id = MechanicalFeedbackData->StarID;
+    for(int h = 0; h < SphP[host].Host; h++)
+      {
+        Mechanical_Feedback_Data *MechanicalFeedbackData = &MechanicalFeedbackEvents.MechanicalFeedbackData[ev + h];
+        Mechanical_Feedback *MechanicalFeedback = &MechanicalFeedbackData->MechanicalFeedback;
 
-          ray.pos[0] = MechanicalFeedback->StarPosition[0];      
-          ray.pos[1] = MechanicalFeedback->StarPosition[1]; 
-          ray.pos[2] = MechanicalFeedback->StarPosition[2]; 
+        /* Skip dark stars entirely rather than pushing dead rays */
+        int flag_luminosity = 0;
+        for(int w = 0; w < WAVEBANDS; w++)
+          {
+            if(MechanicalFeedback->Radiated[w].Energy > 0.0 || MechanicalFeedback->Radiated[w].Photons > 0.0)
+              {
+                flag_luminosity = 1;
+                break;
+              }
+          }
 
-          ray.rotation_seed = rotation_seed;
-          healpix_dir(rotation_seed, NSIDE_MIN, iray, ray.dir);
+        if(!flag_luminosity)
+          continue;
 
-          ray.t = 0.0;
-          ray.t_exit = MAX_REAL_NUMBER;
-          ray.t_maximum = SQRT3 * All.BoxSize;
+        /* Star position relative to the host generator, minimum image */
+        double xrel[3];
 
-          ray.nside = NSIDE_MIN;        
-          ray.healpix_pixel = iray;    
+        xrel[0] = NEAREST_X(MechanicalFeedback->StarPosition[0] - P[host].Pos[0]);
+        xrel[1] = NEAREST_Y(MechanicalFeedback->StarPosition[1] - P[host].Pos[1]);
+        xrel[2] = NEAREST_Z(MechanicalFeedback->StarPosition[2] - P[host].Pos[2]);
 
-          ray.active_bands = NO_IR_ACTIVE;
+        unsigned long long rotation_seed = seed_rotation(MechanicalFeedbackData->StarID);
 
-          for(int w = 0; w < WAVEBANDS; w++)
-            { 
-              ray.Radiated[w].Energy = MechanicalFeedback->Radiated[w].Energy / NRays;
-              ray.Radiated[w].Photons = MechanicalFeedback->Radiated[w].Photons / NRays;
+        /* Loop over rays for this star */
+        for(int iray = 0; iray < NRays; iray++)
+          {
+            RayPacket ray = {0};
 
-              ray.Radiated_Init[w].Energy = MechanicalFeedback->Radiated[w].Energy / NRays;
-              ray.Radiated_Init[w].Photons = MechanicalFeedback->Radiated[w].Photons / NRays;
+            ray.star_id = MechanicalFeedbackData->StarID;
 
-              if(ray.Radiated[w].Energy <= 0.0 && ray.Radiated[w].Photons <= 0.0)
-                ray.active_bands &= (uint8_t)(~(1u << w));
-            }
-          
-          ray.ray_id = ray_idx;
-          ray.home_task = ThisTask;
+            ray.cell = host;
 
-          ray.target_node = -1;
-          ray.is_paused = 0;  
-          
-          ray.n_pending = 0;
-        
-          ray_idx++;
+            ray.pos[0] = xrel[0];
+            ray.pos[1] = xrel[1];
+            ray.pos[2] = xrel[2];
 
-          append_ray(work, &ray);
-        }
-    }
+            ray.rotation_seed = rotation_seed;
+            healpix_dir(rotation_seed, NSIDE_MIN, iray, ray.dir);
+
+            ray.t = 0.0;
+            ray.t_maximum = SQRT3 * All.BoxSize;
+
+            ray.nside = NSIDE_MIN;
+            ray.healpix_pixel = iray;
+
+            ray.active_bands = NO_IR_ACTIVE;
+
+            for(int w = 0; w < WAVEBANDS; w++)
+              {
+                ray.Radiated[w].Energy = MechanicalFeedback->Radiated[w].Energy / NRays;
+                ray.Radiated[w].Photons = MechanicalFeedback->Radiated[w].Photons / NRays;
+
+                ray.Radiated_Init[w].Energy = MechanicalFeedback->Radiated[w].Energy / NRays;
+                ray.Radiated_Init[w].Photons = MechanicalFeedback->Radiated[w].Photons / NRays;
+
+                if(ray.Radiated[w].Energy <= 0.0 && ray.Radiated[w].Photons <= 0.0)
+                  ray.active_bands &= (uint8_t)(~(1u << w));
+              }
+
+            if(ray.active_bands == 0)
+              continue;
+
+            ray.N_H2 = 0.0;
+
+            ray.ray_id = ray_idx++;
+            ray.home_task = ThisTask;
+
+            append_ray(work, &ray);
+          }
+      }
+    
+    ev += SphP[host].Host;
+  }
 }
 
-/* Splits to 4 child rays */
+/* Splits to 4 child rays. Children inherit position, cell and path length,
+   so they simply restart the exit search in the cell the parent entered. */
 void split_ray(const RayPacket *parent, RayPacket children[4])
 {
   int new_nside = parent->nside * 2;
 
   for(int k = 0; k < 4; k++)
     {
-      /* Copy all state including t, active_bands etc */
-      children[k] = *parent;   
+      /* Copy all state including t, cell, pos, N_H2, active_bands */
+      children[k] = *parent;
 
       children[k].nside = new_nside;
       children[k].healpix_pixel = 4 * parent->healpix_pixel + k;
+      children[k].needs_locate = 1;
 
       healpix_dir(parent->rotation_seed, new_nside, children[k].healpix_pixel, children[k].dir);
 
@@ -395,7 +428,7 @@ void split_ray(const RayPacket *parent, RayPacket children[4])
 static RayExportBuffer *init_export_buffer(long long capacity)
 {
   RayExportBuffer *buf = malloc(sizeof(RayExportBuffer));
- 
+
   buf->n = 0;
   buf->capacity = capacity;
   buf->task = malloc(capacity * sizeof(int));
@@ -437,22 +470,22 @@ static void sort_by_task(RayExportBuffer *buf)
 
   int *sorted_task = malloc(buf->n * sizeof(int));
   RayPacket *sorted_rays = malloc(buf->n * sizeof(RayPacket));
- 
+
   for(long long i = 0; i < buf->n; i++)
     {
       int t = buf->task[i];
       long long pos = cursor[t]++;
       sorted_task[pos] = t;
-      sorted_rays[pos] = buf->rays[i]; 
+      sorted_rays[pos] = buf->rays[i];
     }
 
   memcpy(buf->task, sorted_task, buf->n * sizeof(int));
   memcpy(buf->rays, sorted_rays, buf->n * sizeof(RayPacket));
 
-  free(sorted_rays); 
-  free(sorted_task); 
-  free(cursor); 
-  free(count); 
+  free(sorted_rays);
+  free(sorted_task);
+  free(cursor);
+  free(count);
 }
 
 static void exchange_rays(RayExportBuffer *send, RayWorkStack *work)
@@ -492,7 +525,7 @@ static void exchange_rays(RayExportBuffer *send, RayWorkStack *work)
     }
 
   /* In ray Units */
-  sort_by_task(send);   
+  sort_by_task(send);
 
   MPI_Alltoallv(send->rays, send_count, send_offset, MPI_RAYPACKET,
   work->rays + work->n, recv_count, recv_offset, MPI_RAYPACKET,
@@ -500,257 +533,25 @@ static void exchange_rays(RayExportBuffer *send, RayWorkStack *work)
 
   work->n += total_recv;
 
-  free(recv_offset); 
-  free(send_offset); 
-  free(recv_count); 
+  free(recv_offset);
+  free(send_offset);
+  free(recv_count);
   free(send_count);
 }
 
-#ifdef TREEPOINTS
-/* Not operational yet -Ngb tree does not use Tree_Points */
-struct rad_resultsactiveimported_data *Rad_ResultsActiveImported;
-
-static void send_results_home(void)
-{
-  int i, j, n, k, ncount;
-  int *Recv_count = malloc(NTask * sizeof(int));
-  int *Send_count = malloc(NTask * sizeof(int));
-  int *Recv_offset = malloc(NTask * sizeof(int));
-  int *Send_offset = malloc(NTask * sizeof(int));
-
-  /* Count gas cells among imported particles */
-  for(i = 0, ncount = 0; i < Tree_NumPartImported; i++)
-    if(Ngb_Tree_Points[i].Type == 0)
-      ncount++;
-
-  Rad_ResultsActiveImported = malloc(ncount * sizeof(struct rad_resultsactiveimported_data));
-
-  /* Pack gas cell results */
-  for(j = 0; j < NTask; j++)
-    Recv_count[j] = 0;
-
-  for(i = 0, n = 0, k = 0; i < NTask; i++)
-    for(j = 0; j < Force_Recv_count[i]; j++, n++)
-      if(Ngb_Tree_Points[n].Type == 0)
-        {
-          Rad_ResultsActiveImported[k].StarMomentumFeed[0] = Ngb_Tree_Points[n].StarMomentumFeed[0];
-          Rad_ResultsActiveImported[k].StarMomentumFeed[1] = Ngb_Tree_Points[n].StarMomentumFeed[1];
-          Rad_ResultsActiveImported[k].StarMomentumFeed[2] = Ngb_Tree_Points[n].StarMomentumFeed[2];
-
-          for(int w = 0; w < WAVEBANDS; w++)
-            {
-              Rad_ResultsActiveImported[k].Absorbed[w].Energy = Ngb_Tree_Points[n].Absorbed[w].Energy;
-              Rad_ResultsActiveImported[k].Absorbed[w].Photons = Ngb_Tree_Points[n].Absorbed[w].Photons;
-            }
-
-          Rad_ResultsActiveImported[k].index = Ngb_Tree_Points[n].index;
-          Recv_count[i]++;
-          k++;
-        }
-
-  MPI_Alltoall(Recv_count, 1, MPI_INT, Send_count, 1, MPI_INT, MPI_COMM_WORLD);
-
-  int Nexport = 0, Nimport = 0;
-  Send_offset[0] = Recv_offset[0] = 0;
-  for(j = 0; j < NTask; j++)
-    {
-      Nexport += Send_count[j];
-      Nimport += Recv_count[j];
-      if(j > 0)
-        {
-          Send_offset[j] = Send_offset[j-1] + Send_count[j-1];
-          Recv_offset[j] = Recv_offset[j-1] + Recv_count[j-1];
-        }
-    }
-
-  struct rad_resultsactiveimported_data *tmp_results = malloc(Nexport * sizeof(struct rad_resultsactiveimported_data));
-
-  /* Exchange results back to home ranks */
-  for(int ngrp = 1; ngrp < (1 << PTask); ngrp++)
-    {
-      int recvTask = ThisTask ^ ngrp;
-      if(recvTask < NTask)
-        if(Send_count[recvTask] > 0 || Recv_count[recvTask] > 0)
-          MPI_Sendrecv(&Rad_ResultsActiveImported[Recv_offset[recvTask]],
-          Recv_count[recvTask] * sizeof(struct rad_resultsactiveimported_data), MPI_BYTE, recvTask, TAG_RAD,
-          &tmp_results[Send_offset[recvTask]],
-          Send_count[recvTask] * sizeof(struct rad_resultsactiveimported_data), MPI_BYTE, recvTask, TAG_RAD,
-          MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-    }
-
-  /* Apply results to local particles */
-  for(i = 0; i < Nexport; i++)
-    {  
-      SphP[tmp_results[i].index].StarMomentumFeed[0] += tmp_results[i].StarMomentumFeed[0];
-      SphP[tmp_results[i].index].StarMomentumFeed[1] += tmp_results[i].StarMomentumFeed[1];
-      SphP[tmp_results[i].index].StarMomentumFeed[2] += tmp_results[i].StarMomentumFeed[2];
-      
-      for(int w = 0; w < WAVEBANDS; w++)
-        {
-          SphP[tmp_results[i].index].Absorbed[w].Energy += tmp_results[i].Absorbed[w].Energy;
-          SphP[tmp_results[i].index].Absorbed[w].Photons += tmp_results[i].Absorbed[w].Photons;
-        }
-    }
-
-  /* Free in reverse allocation order */
-  free(tmp_results);
-  free(Rad_ResultsActiveImported);
-  free(Send_offset); free(Recv_offset);
-  free(Send_count); free(Recv_count);
-}
-#endif
-
-#ifdef RAD_OPENING_ANGLE
-static void distribute_node_rad(int no)
-{
-  /* Quick check - skip empty nodes */
-  int has_rad = 0;
-        
-  for(int w = 0; w < WAVEBANDS; w++)
-    if(RtNgb_Nodes[no].Absorbed[w].Energy > 0 || RtNgb_Nodes[no].Absorbed[w].Photons > 0) 
-      { 
-        has_rad = 1; 
-        break; 
-      }
-      
-  if(!has_rad) 
-    return;
-  
-  double node_dtau_E[WAVEBANDS], node_dtau_N[WAVEBANDS];
-
-  for(int w = 0; w < WAVEBANDS; w++)
-    {
-      if(w == LYMAN_WERNER)
-        {
-          node_dtau_E[w] = RtNgb_Nodes[no].Volume * RtNgb_Nodes[no].DtauOverLength_E[w];
-          node_dtau_N[w] = RtNgb_Nodes[no].Volume * RtNgb_Nodes[no].dN_H2_OverLength;
-        }
-      else
-        {
-          node_dtau_E[w] = RtNgb_Nodes[no].Volume * RtNgb_Nodes[no].DtauOverLength_E[w];
-          node_dtau_N[w] = RtNgb_Nodes[no].Volume * RtNgb_Nodes[no].DtauOverLength_N[w];
-        }
-    }
-
-  int child = Ngb_Nodes[no].u.d.nextnode;
-  while(child != Ngb_Nodes[no].u.d.sibling && child >= 0)
-    {
-      /* Leaf particle - deposit directly */
-      if(child < Ngb_MaxPart)
-        {
-          if(P[child].Type != 0 || P[child].Mass == 0 || P[child].ID == 0)
-            {
-              child = Ngb_Nextnode[child];
-              continue;
-            }
-          
-          for(int w = 0; w < WAVEBANDS; w++)
-            {
-              if(node_dtau_E[w] > 0)
-                {
-                  double child_dtau_E;
-                  if(w == LYMAN_WERNER)
-                    {
-                       child_dtau_E = SphP[child].Volume * SphP[child].DtauOverLength_E[w];
-                    }
-                  else
-                    {
-                       child_dtau_E = SphP[child].Volume * SphP[child].DtauOverLength_E[w];
-                    }
-                  
-                  double frac_E = child_dtau_E / node_dtau_E[w];
-                  
-                  SphP[child].Absorbed[w].Energy += frac_E * RtNgb_Nodes[no].Absorbed[w].Energy;
-                }
-              
-              if(node_dtau_N[w] > 0)
-                {
-                  double child_dtau_N;
-                  if(w == LYMAN_WERNER)
-                    {
-                      child_dtau_N = SphP[child].Volume * SphP[child].GrackleSpeciesConserved(GRACKLE_H2I) / SphP[child].Volume;
-                    }
-                  else
-                    {
-                      child_dtau_N = SphP[child].Volume * SphP[child].DtauOverLength_N[w];
-                    }
-
-                  double frac_N = child_dtau_N / node_dtau_N[w];
-                  
-                  SphP[child].Absorbed[w].Photons += frac_N * RtNgb_Nodes[no].Absorbed[w].Photons;
-                }
-            }
-
-          child = Ngb_Nextnode[child];
-        }
-      /* Internal node - pass fraction down recursively */
-      else if(child < Ngb_MaxPart + Ngb_MaxNodes)
-        {
-          for(int w = 0; w < WAVEBANDS; w++)
-            {
-              if(node_dtau_E[w] > 0)
-                {
-                  double child_dtau_E;
-                  if(w == LYMAN_WERNER)
-                    {
-                      child_dtau_E = RtNgb_Nodes[child].Volume * RtNgb_Nodes[child].DtauOverLength_E[w];
-                    }
-                  else
-                    {
-                      child_dtau_E = RtNgb_Nodes[child].Volume * RtNgb_Nodes[child].DtauOverLength_E[w];
-                    }
-                  
-                  double frac_E = child_dtau_E / node_dtau_E[w];
-                  
-                  RtNgb_Nodes[child].Absorbed[w].Energy += frac_E * RtNgb_Nodes[no].Absorbed[w].Energy;
-                }
-              
-              if(node_dtau_N[w] > 0)
-                {
-                  double child_dtau_N;
-                  if(w == LYMAN_WERNER)
-                    {
-                      child_dtau_N = RtNgb_Nodes[child].Volume * RtNgb_Nodes[child].dN_H2_OverLength;
-                    }
-                  else
-                    {
-                      child_dtau_N = RtNgb_Nodes[child].Volume * RtNgb_Nodes[child].DtauOverLength_N[w];
-                    }
-                  
-                  double frac_N = child_dtau_N / node_dtau_N[w];
-                  
-                  RtNgb_Nodes[child].Absorbed[w].Photons += frac_N * RtNgb_Nodes[no].Absorbed[w].Photons;
-                }
-            }
-
-          distribute_node_rad(child);
-          child = Ngb_Nodes[child].u.d.sibling;
-        }
-      /* Pseudo-particle - skip, handled by export */
-      else
-        {    
-          child = Ngb_Nextnode[child - Ngb_MaxNodes];
-        }
-    }
-
-  for(int w = 0; w < WAVEBANDS; w++)
-    RtNgb_Nodes[no].Absorbed[w].Energy = RtNgb_Nodes[no].Absorbed[w].Photons = 0.0;
-}
-#endif
-
 static void radiation_feedback(void)
 {
-  /* Photoionization and photoelectric heating here -> we do rad pressure inside the tree walk */
+  /* Photoionization and photoelectric heating here -> we do rad pressure inside the mesh walk */
   int i, w;
-  
+
   for(i = 0; i < NumGas; i++)
     {
       if(P[i].Type != 0 || P[i].Mass == 0 || P[i].ID == 0)
         continue;
-      
+
       /* Volume, timestep */
       double V = SphP[i].Volume;
-      double dt = (P[i].TimeBinHydro ? (((integertime)1) << P[i].TimeBinHydro) : 0) * All.Timebase_interval; 
+      double dt = (P[i].TimeBinHydro ? (((integertime)1) << P[i].TimeBinHydro) : 0) * All.Timebase_interval;
 
       /* In cgs */
       double V_cgs = V * (All.cf_UnitLength_in_cm * All.cf_UnitLength_in_cm * All.cf_UnitLength_in_cm);
@@ -763,7 +564,7 @@ static void radiation_feedback(void)
       double E_pe = (SphP[i].Absorbed[ULTRAVIOLET].Energy  * TrueAbsorbedFraction[ULTRAVIOLET]
                      + SphP[i].Absorbed[LYMAN_WERNER].Energy * TrueAbsorbedFraction[LYMAN_WERNER])
                      * epsilon_pe * All.cf_UnitEnergy_in_cgs;
-      
+
       /* Volumetric_heating_rate: grackle docs say erg/(s cm^3), straight CGS, no conversion */
       SphP[i].PE_VolHeatingRate +=  E_pe / dt_cgs / V_cgs;
 #endif
@@ -779,7 +580,7 @@ static void radiation_feedback(void)
 #endif
 
 #ifdef PHOTOIONIZATION
-      /* Photoionization */     
+      /* Photoionization */
       /* Number densities */
       double n_HI = SphP[i].GrackleSpeciesConserved(GRACKLE_HI) / V / (PROTONMASS / All.cf_UnitMass_in_g);
       double n_HeI = SphP[i].GrackleSpeciesConserved(GRACKLE_HeI) / V / (4 * PROTONMASS / All.cf_UnitMass_in_g);
@@ -789,39 +590,39 @@ static void radiation_feedback(void)
       double n_HI_cgs = n_HI / (All.cf_UnitLength_in_cm * All.cf_UnitLength_in_cm * All.cf_UnitLength_in_cm);
       double n_HeI_cgs = n_HeI / (All.cf_UnitLength_in_cm * All.cf_UnitLength_in_cm * All.cf_UnitLength_in_cm);
       double n_HeII_cgs = n_HeII / (All.cf_UnitLength_in_cm * All.cf_UnitLength_in_cm * All.cf_UnitLength_in_cm);
-     
-      /* Threshold energies */ 
+
+      /* Threshold energies */
       double energy_thresh_HI = 13.6 * ELECTRONVOLT_IN_ERGS;
       double energy_thresh_HeI = 24.6 * ELECTRONVOLT_IN_ERGS;
       double energy_thresh_HeII = 54.4 * ELECTRONVOLT_IN_ERGS;
 
       double E_abs_HI = SphP[i].Absorbed[IONIZING_HI].Energy * All.cf_UnitEnergy_in_cgs;
       double E_abs_HeI = SphP[i].Absorbed[IONIZING_HeI].Energy * All.cf_UnitEnergy_in_cgs;
-      double E_abs_HeII = SphP[i].Absorbed[IONIZING_HeII].Energy * All.cf_UnitEnergy_in_cgs;      
+      double E_abs_HeII = SphP[i].Absorbed[IONIZING_HeII].Energy * All.cf_UnitEnergy_in_cgs;
 
       double N_abs_HI = SphP[i].Absorbed[IONIZING_HI].Photons;
       double N_abs_HeI = SphP[i].Absorbed[IONIZING_HeI].Photons;
       double N_abs_HeII = SphP[i].Absorbed[IONIZING_HeII].Photons;
 
       /* RT_heating_rate: grackle docs say erg/(s cm^3) / n, straight CGS, no conversion */
-      double E_threshold_HI = N_abs_HI * energy_thresh_HI; 
-      
+      double E_threshold_HI = N_abs_HI * energy_thresh_HI;
+
       if(n_HI_cgs)
         SphP[i].HI_HeatingRate += (E_abs_HI - E_threshold_HI) > 0 ? ((E_abs_HI - E_threshold_HI) / dt_cgs / V_cgs) / n_HI_cgs : 0.0;
-      
+
       double E_threshold_HeI = N_abs_HeI * energy_thresh_HeI;
-      
-      if(n_HeI_cgs) 
+
+      if(n_HeI_cgs)
         SphP[i].HeI_HeatingRate += (E_abs_HeI - E_threshold_HeI) > 0 ? ((E_abs_HeI - E_threshold_HeI) / dt_cgs / V_cgs) / n_HeI_cgs : 0.0;
-      
+
       double E_threshold_HeII = N_abs_HeII * energy_thresh_HeII;
-      
+
       if(n_HeII_cgs)
         SphP[i].HeII_HeatingRate += (E_abs_HeII - E_threshold_HeII) > 0 ? ((E_abs_HeII - E_threshold_HeII) / dt_cgs / V_cgs) / n_HeII_cgs : 0.0;
 
       /* RT_ionization_rate: 1 / (time Units) */
-      SphP[i].HI_IonizationRate += n_HI > 0 ? (N_abs_HI / (dt/All.cf_hubble_a/All.HubbleParam) / V) / n_HI : 0.0;     
-      
+      SphP[i].HI_IonizationRate += n_HI > 0 ? (N_abs_HI / (dt/All.cf_hubble_a/All.HubbleParam) / V) / n_HI : 0.0;
+
       SphP[i].HeI_IonizationRate += n_HeI > 0 ? (N_abs_HeI / (dt/All.cf_hubble_a/All.HubbleParam) / V) / n_HeI : 0.0;
 
       SphP[i].HeII_IonizationRate += n_HeII > 0 ? (N_abs_HeII / (dt/All.cf_hubble_a/All.HubbleParam) / V) / n_HeII : 0.0;
@@ -837,7 +638,7 @@ static void rt_timestep(void)
 {
   int idx, i;
   double eps_ion = All.RTIonizationTimestepFraction;
-  
+
   for(idx = 0; idx < TimeBinsHydro.NActiveParticles; idx++)
     {
       i = TimeBinsHydro.ActiveParticleList[idx];
@@ -850,15 +651,15 @@ static void rt_timestep(void)
       double m_H = SphP[i].GrackleSpeciesConserved(GRACKLE_HI) + SphP[i].GrackleSpeciesConserved(GRACKLE_HII);
 
 #if GRACKLE_CHEMISTRY >= 2
-      m_H += SphP[i].GrackleSpeciesConserved(GRACKLE_H2I) + SphP[i].GrackleSpeciesConserved(GRACKLE_H2II) 
+      m_H += SphP[i].GrackleSpeciesConserved(GRACKLE_H2I) + SphP[i].GrackleSpeciesConserved(GRACKLE_H2II)
           + SphP[i].GrackleSpeciesConserved(GRACKLE_HM);
 #endif
 
 #if GRACKLE_CHEMISTRY >= 3
-      m_H += SphP[i].GrackleSpeciesConserved(GRACKLE_DI) + SphP[i].GrackleSpeciesConserved(GRACKLE_DII) 
+      m_H += SphP[i].GrackleSpeciesConserved(GRACKLE_DI) + SphP[i].GrackleSpeciesConserved(GRACKLE_DII)
           + SphP[i].GrackleSpeciesConserved(GRACKLE_HDI);
 #endif
-    
+
       double rate = 0.0;
       if(m_H > 0)
         {
@@ -879,26 +680,11 @@ void star_radiation(void)
 
   update_dtau();
 
-#ifdef RAD_OPENING_ANGLE
-  /* Zero accumulator on all nodes before treewalk - important for top nodes! */
-  for(int no = Ngb_MaxPart; no < Ngb_MaxPart + Ngb_NumNodes; no++)
-    {
-      for(int w = 0; w < WAVEBANDS; w++)
-        {
-          RtNgb_Nodes[no].Absorbed[w].Energy = RtNgb_Nodes[no].Absorbed[w].Photons = 0.0;
-        }
-    }
-#endif
-
-  /* Zero accumulator on all leaves before treewalk */
+  /* Zero accumulators before the walk */
   for(int i = 0; i < NumGas; i++)
-    {
-      for(int w = 0; w < WAVEBANDS; w++)
-        {
-          SphP[i].Absorbed[w].Energy = SphP[i].Absorbed[w].Photons = 0.0;
-        }
-    }
- 
+    for(int w = 0; w < WAVEBANDS; w++)
+      SphP[i].Absorbed[w].Energy = SphP[i].Absorbed[w].Photons = 0.0;
+
   int n_stars = MechanicalFeedbackEvents.NumEvents;
   long long n_rays_local = (long long)n_stars * NRays;
 
@@ -913,7 +699,7 @@ void star_radiation(void)
 
   RayWorkStack *work = init_work_stack(work_capacity);
   RayExportBuffer *export_buf = init_export_buffer(export_capacity);
-  
+
   init_rays(work);
 
   long long n_global;
@@ -922,10 +708,11 @@ void star_radiation(void)
     {
       t0 = second();
 
+      /* Do local work first then exchange */
       while(work->n > 0)
         {
           RayPacket ray = work->rays[--work->n];
-          raytrace_treewalk(&ray, work, export_buf);
+          raytrace_voronoi(&ray, work, export_buf);
         }
 
       /* Send rays to remote ranks, receive rays from remote ranks */
@@ -944,17 +731,11 @@ void star_radiation(void)
       if(n_global > 0 && iter > 0)
         mpi_printf("STAR_RADIATION: Rad iteration %3d: need to repeat for %12lld rays. (took %g sec)\n", iter, n_global,
         timediff(t0, t1));
-      
+
       if(iter > MAXITER)
         terminate("STAR_RADIATION: %lld rays still in flight after %d iterations\n", n_global, iter);
-      
-    } while(n_global > 0);
-    
-  //send_results_home();
 
-#ifdef RAD_OPENING_ANGLE
-  distribute_node_rad(Ngb_MaxPart);
-#endif
+    } while(n_global > 0);
 
   radiation_feedback();
 

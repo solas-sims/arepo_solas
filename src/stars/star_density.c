@@ -375,14 +375,6 @@ void star_density(void)
 
   generic_comm_pattern(TimeBinsStar.NActiveParticles, kernel_local, kernel_imported);
 
-  /* Clean up */
-  for(idx = 0; idx < TimeBinsStar.NActiveParticles; idx++)
-    {
-      i = TimeBinsStar.ActiveParticleList[idx];
-
-      memset(&SP[i].MechanicalFeedback, 0, sizeof(Mechanical_Feedback));
-    }
-
   /* Sort the hosts list */
   mysort(MechanicalFeedbackEvents.MechanicalFeedbackData, MechanicalFeedbackEvents.NumEvents, 
   sizeof(Mechanical_Feedback_Data), feedback_compare);
