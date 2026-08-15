@@ -127,7 +127,10 @@ mpiexec -np <N> ./Arepo ./param.txt
 
 ```bash
 python agora_disc_diagnostics.py --snapshot output/snap_000.hdf5 output/snap_010.hdf5 \
-    --output disc_profiles.png --grid-output "disc_grid_{name}.png"
+    --output disc_profiles.png --grid-output "disc_grid_{name}.png" \
+    --metals-grid-output "disc_grid_metals_{name}.png" \
+    --dust-grid-output "disc_grid_dust_{name}.png" \
+    --metals-dust-output "disc_metals_dust_profiles.png"
 ```
 
 Produces overlaid radial surface-density / scale-height / vertical velocity
@@ -136,6 +139,16 @@ density-grid projection image per snapshot. Uses the group's `analysistools`
 package if installed, otherwise falls back to a self-contained `h5py`-based
 reader — see the script's docstring for the full set of options
 (`--mask-radius`, `--ngrid`, `--save-data`, etc).
+
+Also reads each snapshot's gas-cell metal mass (`PassiveScalars`) and, if
+present, dust mass (`DustMass`, only written when `Config.sh` has `DUST`
+enabled) directly from `PartType0`. This produces the same smoothed-grid
+XY/XZ/YZ projection as gas mass gets (`disc_grid_metals_*`/
+`disc_grid_dust_*`), plus a second overlaid-profile figure
+(`disc_metals_dust_profiles.png`) of metal and dust surface density vs.
+radius, mirroring the gas surface-density panel. The dust grid/profile is
+skipped (with a log message, not an error) if the run has no `DustMass`
+field.
 
 ## 6. Sanity checks
 
