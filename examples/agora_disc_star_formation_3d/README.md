@@ -157,7 +157,7 @@ python check.py .
 ```
 
 Run from this directory (or pass whatever directory contains your
-`output/`). Two checks, printed per-snapshot and summarized pass/fail:
+`output/`). Five checks, printed per-snapshot and summarized pass/fail:
 
 - **Metals**: total metal mass (gas-phase + whatever's locked into star
   particles) must never decrease across the run — metals are only ever
@@ -166,6 +166,22 @@ Run from this directory (or pass whatever directory contains your
   with a message otherwise): every gas cell's `DustMass` must satisfy
   `0 <= DustMass <= GasMetals` at every snapshot — dust is a subset of
   the metal budget it condensed from.
+- **Star formation**: number of star particles must never decrease —
+  stars are only "deactivated" when dead, never removed from the
+  particle list.
+- **Star-forming gas** (informational, no hard pass/fail beyond "did it
+  compute"): mass and mass fraction of gas above the `AGORA_SF` density
+  threshold and below the temperature threshold, using thresholds read
+  from each snapshot's own embedded `/Parameters` group. Temperature
+  uses the same non-Grackle mean-molecular-weight fallback the C code
+  itself uses when `USE_GRACKLE` is off — an approximation of the real
+  (Grackle-chemistry-dependent) trigger condition, not an exact
+  reproduction, so treat this as trend monitoring rather than a precise
+  reconstruction of what actually decided each cell's eligibility.
+- **Stellar spatial extent** (informational, `WARN` rather than `FAIL`):
+  min/median/max cylindrical radius and `|z|`-height of star particles
+  relative to the box centre, flagged if a star approaches the box edge
+  (a sign of numerical ejection rather than staying in the disc).
 
 Not a reference-solution comparison like the `test.sh`-integrated
 examples' `check.py` scripts — there's no golden run for this example
