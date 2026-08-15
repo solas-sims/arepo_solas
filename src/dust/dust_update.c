@@ -34,9 +34,10 @@ static void dust_get_nH_and_temp(int i, double *n_H_cgs, double *temp_K)
 /*! \brief Residual for the implicit backward-Euler dust growth/sputtering
  *  update: M - M_old - dt * (growth_rate(M) + sputtering_rate(M)).
  */
-static double dust_ode_residual(double M, double M_old, double M_metal, double n_H_cgs, double temp_K, double dt_gyr)
+static double dust_ode_residual(double M, double M_old, double M_metal, double n_H_cgs, double temp_K,
+                                 double Z_gas_massfrac, double dt_gyr)
 {
-  double rate = dust_growth_rate(DUST_PHASE1_SPECIES, M, M_metal, n_H_cgs, temp_K) +
+  double rate = dust_growth_rate(DUST_PHASE1_SPECIES, M, M_metal, n_H_cgs, temp_K, Z_gas_massfrac) +
                 dust_sputtering_rate(DUST_PHASE1_SPECIES, M, n_H_cgs, temp_K);
 
   return M - M_old - dt_gyr * rate;
@@ -78,9 +79,11 @@ void dust_cell(int i)
   double n_H_cgs, temp_K;
   dust_get_nH_and_temp(i, &n_H_cgs, &temp_K);
 
+  double Z_gas_massfrac = SphP[i].GasMetallicity;
+
   double lo = 0.0, hi = M_metal;
-  double f_lo = dust_ode_residual(lo, M_old, M_metal, n_H_cgs, temp_K, dt_gyr);
-  double f_hi = dust_ode_residual(hi, M_old, M_metal, n_H_cgs, temp_K, dt_gyr);
+  double f_lo = dust_ode_residual(lo, M_old, M_metal, n_H_cgs, temp_K, Z_gas_massfrac, dt_gyr);
+  double f_hi = dust_ode_residual(hi, M_old, M_metal, n_H_cgs, temp_K, Z_gas_massfrac, dt_gyr);
 
   double M_new;
 
@@ -100,7 +103,7 @@ void dust_cell(int i)
       do
         {
           M_new     = 0.5 * (lo + hi);
-          double f  = dust_ode_residual(M_new, M_old, M_metal, n_H_cgs, temp_K, dt_gyr);
+          double f  = dust_ode_residual(M_new, M_old, M_metal, n_H_cgs, temp_K, Z_gas_massfrac, dt_gyr);
 
           if(f > 0)
             hi = M_new;

@@ -6,7 +6,7 @@
 /*! \brief Thermal sputtering rate, Tsai & Mathews (1995) timescale form.
  *
  *  tau_sp = DUST_SPUTTER_TAU_REF_GYR * (n_ref / n_H) * [(T_ref/T)^omega + 1]
- *  dM/dt = -M_dust / tau_sp
+ *  dM/dt = -M_dust / (tau_sp / 3)
  *
  *  Pure function -- M_dust and the return value share a consistent mass
  *  unit, per Gyr. n_H_cgs/temp_K must be physical (proper) values in
@@ -29,5 +29,5 @@ double dust_sputtering_rate(int species, double M_dust, double n_H_cgs, double t
   double tau_sp_gyr = DUST_SPUTTER_TAU_REF_GYR * (DUST_SPUTTER_REF_NH_CGS / n_H_cgs) *
                        (pow(DUST_SPUTTER_REF_TEMP_K / temp_K, DUST_SPUTTER_OMEGA) + 1.0);
 
-  return -M_dust / tau_sp_gyr;
+  return -3.0 * M_dust / tau_sp_gyr;
 }

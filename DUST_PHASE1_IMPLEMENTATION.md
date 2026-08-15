@@ -31,7 +31,31 @@ unit tests) before Phase 2b adds species/size resolution.
 | Example | `examples/dust_isolated_disk_3d/` | `Config.sh`/`param.txt` scaffold for the flag combination Phase 1 needs (`STARS`+`SUPERNOVAE`+`WINDS`+`METALS`+`DUST`) — no example in the repo had this combination before. **No IC included** — see that directory's `README.md`. |
 
 Verified: builds and links cleanly both with `DUST` on and off (off-path is
-a true no-op); all 19 standalone rate-law tests pass.
+a true no-op); all 21 standalone rate-law tests pass.
+
+**Rate-law constants verified against Li, Narayanan & Dave (2019,
+arXiv:1906.09277) primary text and Table 1** — cross-checked against a raw
+`pdftotext` extraction of the actual paper, not an AI-summarized secondary
+source. Every constant/functional form in `src/dust/dust.h` was wrong or
+missing something before this pass; all four rate laws were corrected:
+
+| Rate law | Before | After (Li+2019) |
+|---|---|---|
+| SN condensation efficiency | 0.01 | 0.15 (Table 1, `DUST_SN_CONDENSATION_EFFICIENCY`) |
+| Growth `tau_ref` | 30 Myr | 10 Myr |
+| Growth `rho_ref` | 1000 cm⁻³ | 100 cm⁻³ |
+| Growth T-scaling | `sqrt(T_ref/T)` | linear `(T_ref/T)` |
+| Growth metallicity term | absent | `(Z_sun/Z_gas)` added, `dust_growth_rate()` now takes a `Z_gas_massfrac` argument |
+| Sputtering `rho_ref` | 1.0 cm⁻³ | 4.543e-4 cm⁻³ (paper's 1e-27 g/cm³ mass density converted to this code's H-number-density convention) |
+| Sputtering rate | `-M/tau_sp` | `-3*M/tau_sp` (paper's `dM/dt = -M/(tau_sp/3)`) |
+| SN destruction efficiency | none applied | `DUST_SN_DESTRUCTION_EFFICIENCY = 0.3` (eq. 8's epsilon) now multiplied in |
+
+Destruction still reuses this code's own Kim & Ostriker (2015) swept-mass
+estimate in place of the paper's independent `M_s` (see "Scope decisions"
+below) — that structural difference is unchanged, only the missing
+epsilon=0.3 factor was added. Production still applies the efficiency to
+total `SN_MetalsLoss` rather than per-element ejecta (Phase 1's
+single-scalar simplification) — only the 0.01→0.15 magnitude was fixed.
 
 ## Validation results (real Arepo runs, not just unit tests)
 
@@ -70,6 +94,18 @@ invariant violations** under real dynamic SN-driven conditions. This
 confirms the SN production/destruction hooks work correctly, not just
 compile.
 
+**Rerun after the Li+2019 rate-law fixes** (same fast-SN table, 4 MPI
+ranks, `TimeMax=0.005`, `TimeBetSnapshot=0.0002`, 752K gas cells): 10 stars
+formed, 10 feedback events, dust mass rises from first SN through all 16
+snapshots (1.03e-6 → 3.31e-6 in code mass units) with nonzero dust cells
+climbing from 13 to 27010 as it spreads across the mesh, metal mass
+non-decreasing throughout, star count non-decreasing throughout, and
+`check.py`'s full five-check suite (metals, dust, star formation,
+star-forming-gas-fraction, stellar spatial extent) passes with **zero
+`0 <= GasDustMass <= GasMetals` invariant violations** and no ejection
+warnings. Confirms the corrected constants integrate correctly end-to-end,
+not just in the standalone unit tests.
+
 **Environment notes from getting this running** (all fixed inline, not
 dust-specific, but worth knowing about):
 - This repo's `src/cooling/grackle.c` needs the `solas-sims/grackle` fork
@@ -89,6 +125,22 @@ dust-specific, but worth knowing about):
   anywhere near the loop's safety cap) — very likely a transient
   environment/system-contention issue on this dev machine, not a code
   defect. No code changes made; flagging in case it recurs elsewhere.
+- **Stale-object build trap** (found during the rate-law-fix rerun): if an
+  earlier `make` invocation compiled any files against the wrong Grackle
+  headers (e.g. before passing the correct `GRACKLE_INCL`/`GRACKLE_LIB`),
+  incremental `make` will NOT recompile those `.o` files on a later
+  correctly-configured invocation, since the header path is a
+  command-line variable, not a tracked file dependency. The result links
+  fine but corrupts memory at runtime (manifested here as `All.GrackleDataFile`
+  silently truncated before `InitGrackle()`, causing an obscure
+  "Can't open Cooling in ..." HDF5 error deep inside Grackle, unrelated to
+  the actual bug). Fix: `rm -rf <BUILD_DIR> <EXEC>` and rebuild clean
+  whenever `GRACKLE_INCL`/`GRACKLE_LIB` change between invocations.
+  On this dev machine, `SYSTYPE=Darwin GRACKLE_INCL="-I$HOME/software/grackle_solas/include" GRACKLE_LIB="-L$HOME/software/grackle_solas/lib -lgrackle -Wl,-rpath,$HOME/software/grackle_solas/lib -L/opt/homebrew/Cellar/gcc/15.2.0_1/lib/gcc/current"`
+  is needed (the Makefile's default `GRACKLE_INCL`/`GRACKLE_LIB` point at
+  `~/Codes/grackle`, the vanilla install, not the `solas-sims/grackle`
+  fork this repo actually needs; `-lgfortran` also isn't on the default
+  linker search path on this machine).
 
 ## Scope decisions (already made, documented here for reference)
 
@@ -103,18 +155,22 @@ dust-specific, but worth knowing about):
    `star_feedback.c`), not an independent McKee (1989) 6800 M☉ constant —
    more self-consistent with the existing SN physics, but means Phase 1's
    destruction rate is coupled to whatever `SN_HostShellSweepFrac` is set to.
-3. **Rate-law constants are literature-standard placeholders, not verified
-   against a specific source.** Every constant in `src/dust/dust.h` is
-   commented `VERIFY` — none have been checked against Li, Narayanan & Dave
-   (2019) directly.
+3. **Rate-law constants are now verified against Li, Narayanan & Dave
+   (2019) directly** (see "Verified" note above) — all four rate laws'
+   constants/functional forms were corrected to match the paper. The two
+   *structural* simplifications (single total-metals scalar instead of
+   per-element production; destruction reusing this code's own swept-mass
+   estimate instead of the paper's independent `M_s`) are unchanged and
+   still Phase 1 scope decisions, not bugs.
 
 ## What needs to be done
 
 ### Before any physics results can be trusted
-- [ ] **Verify rate-law constants** in `src/dust/dust.h`
-  (`DUST_SN_CONDENSATION_EFFICIENCY`, `DUST_GROWTH_TAU_REF_GYR`/`REF_NH_CGS`/`REF_TEMP_K`,
-  `DUST_SPUTTER_TAU_REF_GYR`/`REF_NH_CGS`/`REF_TEMP_K`/`OMEGA`) against
-  Li, Narayanan & Dave (2019) directly, with collaborators.
+- [x] **Verify rate-law constants** in `src/dust/dust.h` against
+  Li, Narayanan & Dave (2019) directly — done (see "Verified" note above);
+  worth a second look from collaborators given the unit-conversion
+  judgment call on the sputtering reference density (paper gives a mass
+  density, this code's rate laws take H number density).
 - [ ] **Decide on the wind-channel dust production gap.** Either accept SN-only
   as a standing Phase 1 limitation, or prioritize splitting the `WINDS`
   yield table into AGB vs. massive-star components (a `src/stars/`
