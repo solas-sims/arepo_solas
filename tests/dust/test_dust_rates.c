@@ -55,12 +55,15 @@ int main(void)
   CHECK(dust_destruction_sn(DUST_PHASE1_SPECIES, 10.0, 1e4, 1e3, 0.0) == 0.0, "destruction_sn: zero weight -> zero destroyed");
 
   {
-    /* threshold == cell_gas_mass, weight=1 -> full destruction */
-    double destroyed = dust_destruction_sn(DUST_PHASE1_SPECIES, 10.0, 1000.0, 1000.0, 1.0);
-    CHECK(fabs(destroyed - 10.0) < 1e-9, "destruction_sn: threshold==cell mass, weight=1 -> destroys all dust");
+    /* threshold == cell_gas_mass / DUST_SN_DESTRUCTION_EFFICIENCY, weight=1
+     * -> exactly the destruction efficiency's worth of the swept mass
+     * destroys all the dust */
+    double threshold = 1000.0 / DUST_SN_DESTRUCTION_EFFICIENCY;
+    double destroyed  = dust_destruction_sn(DUST_PHASE1_SPECIES, 10.0, 1000.0, threshold, 1.0);
+    CHECK(fabs(destroyed - 10.0) < 1e-9, "destruction_sn: threshold at the efficiency-scaled cap -> destroys all dust");
   }
   {
-    /* threshold > cell_gas_mass must still cap at destroying all dust, not overshoot */
+    /* threshold beyond that must still cap at destroying all dust, not overshoot */
     double destroyed = dust_destruction_sn(DUST_PHASE1_SPECIES, 10.0, 1000.0, 5000.0, 1.0);
     CHECK(fabs(destroyed - 10.0) < 1e-9, "destruction_sn: oversized threshold caps at full destruction, no overshoot");
   }
@@ -72,27 +75,36 @@ int main(void)
   }
 
   /* --- dust_growth_rate ------------------------------------------------ */
-  CHECK(dust_growth_rate(DUST_PHASE1_SPECIES, 0.0, 100.0, 1e3, 20.0) == 0.0, "growth_rate: zero dust mass -> zero rate");
-  CHECK(dust_growth_rate(DUST_PHASE1_SPECIES, 50.0, 50.0, 1e3, 20.0) == 0.0,
+  CHECK(dust_growth_rate(DUST_PHASE1_SPECIES, 0.0, 100.0, 1e3, 20.0, 0.02) == 0.0, "growth_rate: zero dust mass -> zero rate");
+  CHECK(dust_growth_rate(DUST_PHASE1_SPECIES, 50.0, 50.0, 1e3, 20.0, 0.02) == 0.0,
         "growth_rate: M_dust==M_metal (fully condensed) -> zero rate (saturated)");
+  CHECK(dust_growth_rate(DUST_PHASE1_SPECIES, 10.0, 100.0, 1e3, 20.0, 0.0) == 0.0,
+        "growth_rate: zero gas-phase metallicity -> zero rate (guarded)");
 
   {
-    double rate = dust_growth_rate(DUST_PHASE1_SPECIES, 10.0, 100.0, 1e3, 20.0);
+    double rate = dust_growth_rate(DUST_PHASE1_SPECIES, 10.0, 100.0, 1e3, 20.0, 0.02);
     CHECK(rate > 0.0, "growth_rate: 0 < M_dust < M_metal -> positive growth rate");
   }
   {
     /* Higher density -> shorter growth timescale -> higher rate */
-    double rate_lo = dust_growth_rate(DUST_PHASE1_SPECIES, 10.0, 100.0, 1e2, 20.0);
-    double rate_hi = dust_growth_rate(DUST_PHASE1_SPECIES, 10.0, 100.0, 1e4, 20.0);
+    double rate_lo = dust_growth_rate(DUST_PHASE1_SPECIES, 10.0, 100.0, 1e2, 20.0, 0.02);
+    double rate_hi = dust_growth_rate(DUST_PHASE1_SPECIES, 10.0, 100.0, 1e4, 20.0, 0.02);
     CHECK(rate_hi > rate_lo, "growth_rate: rate increases with density");
   }
   {
-    /* Dwek (1998)/Hirashita (2000) accretion timescale scales as 1/sqrt(T)
-     * (collision rate with thermal velocity), so tau shortens -- and the
-     * rate rises -- as T increases. */
-    double rate_cold = dust_growth_rate(DUST_PHASE1_SPECIES, 10.0, 100.0, 1e3, 20.0);
-    double rate_hot   = dust_growth_rate(DUST_PHASE1_SPECIES, 10.0, 100.0, 1e3, 2000.0);
+    /* Li+2019 eq. 5: accretion timescale scales linearly as 1/T (not
+     * 1/sqrt(T)), so tau shortens -- and the rate rises -- as T increases. */
+    double rate_cold = dust_growth_rate(DUST_PHASE1_SPECIES, 10.0, 100.0, 1e3, 20.0, 0.02);
+    double rate_hot   = dust_growth_rate(DUST_PHASE1_SPECIES, 10.0, 100.0, 1e3, 2000.0, 0.02);
     CHECK(rate_hot > rate_cold, "growth_rate: rate increases with temperature (faster thermal collisions)");
+  }
+  {
+    /* Li+2019 eq. 5: accretion timescale scales as 1/Z_gas, so higher
+     * gas-phase metallicity (more metals available to accrete) -> shorter
+     * tau -> higher rate. */
+    double rate_lo_z = dust_growth_rate(DUST_PHASE1_SPECIES, 10.0, 100.0, 1e3, 20.0, 0.001);
+    double rate_hi_z = dust_growth_rate(DUST_PHASE1_SPECIES, 10.0, 100.0, 1e3, 20.0, 0.1);
+    CHECK(rate_hi_z > rate_lo_z, "growth_rate: rate increases with gas-phase metallicity");
   }
 
   /* --- dust_sputtering_rate --------------------------------------------- */
@@ -116,7 +128,7 @@ int main(void)
      * driving growth (M_dust == M_metal keeps growth at exactly zero via
      * saturation), only sputtering can move M -- confirm it does not
      * spontaneously produce dust out of nothing at M_dust == 0. */
-    double g = dust_growth_rate(DUST_PHASE1_SPECIES, 0.0, 100.0, 1e3, 20.0);
+    double g = dust_growth_rate(DUST_PHASE1_SPECIES, 0.0, 100.0, 1e3, 20.0, 0.02);
     double s = dust_sputtering_rate(DUST_PHASE1_SPECIES, 0.0, 1.0, 1e6);
     CHECK(g == 0.0 && s == 0.0, "combined: M_dust=0 is a fixed point of growth+sputtering (no spontaneous creation)");
   }

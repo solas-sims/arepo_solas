@@ -15,7 +15,8 @@ double dust_destruction_sn(int species, double M_dust, double cell_gas_mass, dou
 /* Continuous rate terms (per active gas cell), used by dust_cell(). Return
  * dM/dt in [mass-unit of M_dust / Gyr]; density/temperature must be passed
  * in physical cgs units (n_H in cm^-3, T in K). */
-double dust_growth_rate(int species, double M_dust, double M_metal, double n_H_cgs, double temp_K);
+double dust_growth_rate(int species, double M_dust, double M_metal, double n_H_cgs, double temp_K,
+                         double Z_gas_massfrac);
 double dust_sputtering_rate(int species, double M_dust, double n_H_cgs, double temp_K);
 
 /* Per-cell rate-ODE integration and driver, mirrors cool_cell()/cooling_only()
