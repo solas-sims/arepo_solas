@@ -1,0 +1,131 @@
+%----  Relevant files
+InitCondFile                            ./ICs/agora_lowres_arepo_ic_without_u-with-grid    % Arepo appends .hdf5 itself for ICFormat=3; the file on disk (from get_ics.sh) keeps the extension
+OutputDir                               ./output
+SnapshotFileBase                        snap
+OutputListFilename                      ./output_list.txt
+
+%---- File formats
+ICFormat                                3
+SnapFormat                              3
+
+%---- CPU-time limits
+TimeLimitCPU                            93000
+CpuTimeBetRestartFile                   12000
+ResubmitOn                              0
+ResubmitCommand                         my-scriptfile
+
+%----- Memory alloction
+MaxMemSize                              2500
+
+%---- Caracteristics of run
+TimeBegin                               0.0
+TimeMax                                 0.5     % ~489 Myr; AGORA-style isolated disc tests are usually run to ~500 Myr-1 Gyr
+
+%---- Basic code options that set the type of simulation
+ComovingIntegrationOn                   0
+PeriodicBoundariesOn                    0
+
+%---- Cosmological parameters (not used, ComovingIntegrationOn=0)
+Omega0                                  0.0
+OmegaLambda                             0.0
+OmegaBaryon                             0.0
+HubbleParam                             1.0
+BoxSize                                 1200    % kpc, taken from the IC file's /Header
+
+%---- Output frequency and output parameters
+OutputListOn                            0
+TimeBetSnapshot                         0.02    % ~19.6 Myr between snapshots
+TimeOfFirstSnapshot                     0.0
+TimeBetStatistics                       0.0234375
+NumFilesPerSnapshot                     1
+NumFilesWrittenInParallel               1
+
+%---- Accuracy of time integration
+TypeOfTimestepCriterion                 0
+ErrTolIntAccuracy                       0.012
+CourantFac                              0.3
+MaxSizeTimestep                         0.0005
+MinSizeTimestep                         2.0e-8
+
+%---- Treatment of empty space and temperature limits
+InitGasTemp                             10000     % K; only applies where InternalEnergy=0 in the IC (true for all gas cells here)
+MinGasTemp                              10
+MinimumDensityOnStartUp                 1.0e-10
+LimitUBelowThisDensity                  0.0
+LimitUBelowCertainDensityToThisValue    0.0
+MinEgySpec                              0.0
+
+%---- Tree algorithm, force accuracy, domain update frequency
+TypeOfOpeningCriterion                  1
+ErrTolTheta                             0.7
+ErrTolForceAcc                          0.0025
+MultipleDomains                         8
+TopNodeFactor                           2.5
+ActivePartFracForNewDomainDecomp        0.01
+
+%---- Initial density estimate
+DesNumNgb                               64
+MaxNumNgbDeviation                      4
+
+%---- System of units (matches the units baked into the IC file's /Header)
+UnitLength_in_cm                        3.08568e21    %  1.0 kpc
+UnitMass_in_g                           1.989e42      %  1.0e9 solar masses
+UnitVelocity_in_cm_per_s                1e5           %  1 km/sec
+GravityConstantInternal                 0
+
+%---- Gravitational softening lengths
+SofteningComovingType0                  0.08
+SofteningComovingType1                  0.08
+SofteningComovingType2                  0.08
+SofteningComovingType3                  0.08
+
+SofteningMaxPhysType0                   0.08
+SofteningMaxPhysType1                   0.08
+SofteningMaxPhysType2                   0.08
+SofteningMaxPhysType3                   0.08
+
+GasSoftFactor                           2.5
+
+SofteningTypeOfPartType0                0    % gas
+SofteningTypeOfPartType1                1    % dark matter halo
+SofteningTypeOfPartType2                2    % stellar disc
+SofteningTypeOfPartType3                3    % stellar bulge
+SofteningTypeOfPartType4                3    % new star particles formed during the run
+SofteningTypeOfPartType5                1
+
+MinimumComovingHydroSoftening           1.0
+AdaptiveHydroSofteningSpacing           1.2
+
+%----- Mesh regularization options
+CellShapingSpeed                        0.5
+CellMaxAngleFactor                      2.25
+ReferenceGasPartMass                    8.59322e-05
+TargetGasMassFactor                     1
+RefinementCriterion                     1
+DerefinementCriterion                   1
+MeanVolume                              52734.4
+MaxVolumeDiff                           10
+MinVolume                               1
+MaxVolume                               1.0e9
+
+%---- Metallicity (METALS)
+InitMetallicityinSolar                  0.1
+
+%---- Cooling
+TreecoolFile                            ../../TREECOOL_ep
+
+%---- Grackle (USE_GRACKLE)
+GrackleDataFile                         ./grackle_data/CloudyData_UVB=FG2011_shielded.h5
+
+%---- Star formation (AGORA_SF)
+NumberDensThreshold                     5.0     % cm^-3, physical density threshold (AGORA fiducial)
+TemperatureThreshold                    1.0e4   % K
+StarFormationEfficiency                 0.01    % per free-fall time
+
+%---- Star particles (STAR_PARTICLES)
+IMF                                     0       % 0 = Kroupa, 1 = Chabrier, 2 = Salpeter (src/stars/star_particle.c)
+
+%---- Star feedback (WINDS + SUPERNOVAE -> STAR_FEEDBACK_ACTIVE)
+StarTablesFile                          ./star_tables/star_feedback_tables.hdf5
+SN_LeadTime                             3.0     % Myr, time between star formation and first SN (TREE_BASED_TIMESTEPS+SUPERNOVAE)
+SN_HostShellSweepFrac                   0.5     % dimensionless, internally capped at 0.9 (src/stars/star_feedback.c)
