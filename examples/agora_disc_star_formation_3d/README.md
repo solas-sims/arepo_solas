@@ -25,6 +25,7 @@ from wherever you've copied it, e.g. a `test.sh`-style run directory.
 | `get_ics.sh` | Downloads the initial conditions into `./ICs/` |
 | `get_tables.sh` | Downloads the Grackle cooling table and stellar feedback table into `./grackle_data/` and `./star_tables/` |
 | `agora_disc_diagnostics.py` | Post-processing: radial surface density / scale height / vertical velocity dispersion profiles, plus a smoothed density-grid projection, from one or more output snapshots |
+| `check.py` | Sanity checks (not a reference-solution comparison): total metal mass never decreases across snapshots, and every gas cell's `DustMass` stays within `0 <= DustMass <= GasMetals` at every snapshot (skipped with a message if the run wasn't built with `DUST`) |
 
 ## 1. Get the initial conditions
 
@@ -136,6 +137,30 @@ package if installed, otherwise falls back to a self-contained `h5py`-based
 reader — see the script's docstring for the full set of options
 (`--mask-radius`, `--ngrid`, `--save-data`, etc).
 
+## 6. Sanity checks
+
+```bash
+python check.py .
+```
+
+Run from this directory (or pass whatever directory contains your
+`output/`). Two checks, printed per-snapshot and summarized pass/fail:
+
+- **Metals**: total metal mass (gas-phase + whatever's locked into star
+  particles) must never decrease across the run — metals are only ever
+  created by stellar enrichment in this code, never destroyed.
+- **Dust** (only meaningful if `Config.sh` has `DUST` enabled; skipped
+  with a message otherwise): every gas cell's `DustMass` must satisfy
+  `0 <= DustMass <= GasMetals` at every snapshot — dust is a subset of
+  the metal budget it condensed from.
+
+Not a reference-solution comparison like the `test.sh`-integrated
+examples' `check.py` scripts — there's no golden run for this example
+(external IC/data dependencies), so these are invariant/sanity checks
+only, meant to catch an obviously broken run (mass appearing from
+nowhere, dust exceeding its metal budget) rather than verify exact
+physics.
+
 ## Known gaps / things to revisit
 
 - `InitMetallicityinSolar = 0.1` (required by `METALS`) is an assumed
@@ -147,5 +172,3 @@ reader — see the script's docstring for the full set of options
   `SN_HostShellSweepFrac=0.5`, `IMF=0` for Kroupa) are literature-typical
   defaults, not values validated against this fork's implementation —
   treat as a starting point.
-- No `check.py`/reference data, unlike the `test.sh`-integrated examples —
-  there's nothing here yet to catch a silent regression automatically.
