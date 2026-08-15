@@ -33,6 +33,63 @@ unit tests) before Phase 2b adds species/size resolution.
 Verified: builds and links cleanly both with `DUST` on and off (off-path is
 a true no-op); all 19 standalone rate-law tests pass.
 
+## Validation results (real Arepo runs, not just unit tests)
+
+Run against `examples/agora_disc_star_formation_3d/` (ported from `main`,
+see git log) — an isolated AGORA-disc IC with `STARS`+`SUPERNOVAE`+`WINDS`+
+`METALS`+`USE_GRACKLE` all enabled, 752K gas cells.
+
+**Structural check** (short run, no SN yet): gas and metal mass conserved,
+`DustMass` present in snapshots and correctly zero everywhere pre-SN
+(production is SN-only; growth has no seed to grow from), zero invariant
+violations.
+
+**Physics check** (SN actually firing): the organic run doesn't produce a
+supernova quickly enough to check in reasonable wall-clock time — real
+massive-star lifetimes are Myr-scale and the IMF makes SN-eligible stars
+(≥8 M☉) rare in a small early population. Forced this by patching a local
+copy of the stellar yield table (`star_feedback_tables.hdf5`): rescaled the
+`Age` track (`star_interpolation.c`'s `star_lifetime()` reads its last
+entry as the star's lifetime, in years) down by 1e5 for every
+`(Z, M)` entry with `M >= 8` and `SN_MassLoss > 0`, so any SN-eligible star
+sampled explodes almost immediately instead of after Myr. Result:
+
+| Snapshot | Time | Stars | Total `DustMass` | Nonzero dust cells | Invariant violations |
+|---|---|---|---|---|---|
+| before any SN | — | 0 | 0 | 0 | 0 |
+| first SN fires | — | 2 | 2.00e-08 | 25 | 0 |
+| — | — | 2 | 1.99e-08 | 209 | 0 |
+| second SN fires | — | 3 | 2.34e-08 | 620 | 0 |
+
+Dust appears exactly when the first SN fires, spreads across the mesh via
+the MESH-mode `Feedback_Kick` redistribution (25 → 209 → 620 nonzero
+cells) as designed, and total mass both rises (fresh production) and dips
+(destruction winning a step) as expected from combined production +
+destruction physics — with **zero `0 <= GasDustMass <= GasMetals`
+invariant violations** under real dynamic SN-driven conditions. This
+confirms the SN production/destruction hooks work correctly, not just
+compile.
+
+**Environment notes from getting this running** (all fixed inline, not
+dust-specific, but worth knowing about):
+- This repo's `src/cooling/grackle.c` needs the `solas-sims/grackle` fork
+  specifically (has `RT_HI/HeI/HeII_heating_rate` fields that upstream
+  Grackle doesn't) — built locally at `~/software/grackle_solas`.
+- Two pre-existing bugs on `Star_feedback_radiation` blocked building at
+  all: an unbalanced `Makefile` (orphaned `endif`s around
+  `FOF`/`HALO_SEEDING`) and a missing `#ifdef RAD_OPENING_ANGLE` guard
+  around `NodeAspectRatio` in `src/io/parameters.c`. Both fixed in the
+  `991754c` merge commit.
+- The AGORA example's `param.txt` (as pulled from `main`) had a
+  `CritOverDensity` line that's only a valid parameter under `EEOS_SF`,
+  not `AGORA_SF` — removed in `3d6c98f`.
+- One apparent 30+ minute hang in `sample_star_particle()`
+  (`src/stars/star_particle.c`, `STAR_PARTICLES=1` IMF sampling) did not
+  reproduce on a rerun with diagnostic instrumentation (zero iterations
+  anywhere near the loop's safety cap) — very likely a transient
+  environment/system-contention issue on this dev machine, not a code
+  defect. No code changes made; flagging in case it recurs elsewhere.
+
 ## Scope decisions (already made, documented here for reference)
 
 1. **SN-channel production only.** This code's `WINDS` channel blends
@@ -64,31 +121,29 @@ a true no-op); all 19 standalone rate-law tests pass.
   change, not a dust-module change).
 
 ### To actually run and validate Phase 1
-- [ ] Supply an isolated-disk (or similar idealized ISM) **initial conditions
-  file** for `examples/dust_isolated_disk_3d/`.
-- [ ] Supply a **Grackle chemistry/cooling data file** (`GrackleDataFile` in
-  `param.txt`).
-- [ ] Supply the **stellar yield/feedback table** (`StarTablesFile` in
-  `param.txt`, consumed by `load_star_tables()`).
-- [ ] Tune the placeholder parameters in `param.txt` (`BoxSize`,
-  `ReferenceGasPartMass`, `MeanVolume`, softening lengths, `SN_LeadTime`,
+- [x] Real IC / Grackle data / star tables — solved via
+  `examples/agora_disc_star_formation_3d/` (ported from `main`, includes
+  `get_ics.sh`/`get_tables.sh` downloaders), not the placeholder
+  `examples/dust_isolated_disk_3d/` scaffold. Consider pointing
+  `dust_isolated_disk_3d/` at this instead, or retiring it, now that a
+  real working example exists.
+- [x] Metal mass conservation — held across every run, including the
+  SN-firing one.
+- [x] SN production/destruction actually firing, with correct invariants
+  — see "Validation results" above.
+- [ ] Zero-rate bit-for-bit check (`DUST` on vs. off with rate constants
+  zeroed) — not yet run.
+- [ ] D/Z–metallicity trend vs. Li et al. (2019) — needs a much longer,
+  statistically meaningful run (the validation run here used an
+  artificially shortened stellar lifetime table specifically to force a
+  fast SN; not representative of real D/Z evolution). A real check needs
+  the *unpatched* table and enough runtime for organic star formation/SN
+  statistics to build up.
+- [ ] Tune the placeholder parameters in `param.txt` (`SN_LeadTime`,
   `SN_HostShellSweepFrac`, `NumberDensThreshold`, `TemperatureThreshold`,
-  `StarFormationEfficiency`, `InitMetallicityinSolar`) to match whatever IC
-  is supplied.
-- [ ] Run the **Phase 1 exit gate**:
-  - Zero-rate bit-for-bit check: build with `DUST` on and off, with rate
-    constants effectively zeroed (e.g. `DUST_SN_CONDENSATION_EFFICIENCY 0`),
-    confirm the two runs agree to machine precision outside `DustMass`.
-  - Metal mass conservation: `GasMetals` (gas-phase + dust-phase) conserved
-    over the run.
-  - D/Z–metallicity trend qualitatively consistent with Li et al. (2019)'s
-    published relation.
-- [ ] Note this build environment's local `Config_AGORA.sh`/`USE_GRACKLE`
-  path currently fails to compile against the Grackle library installed on
-  this dev machine (API version mismatch, pre-existing and unrelated to
-  dust) — verification here used a `USE_GRACKLE`-free config instead. Confirm
-  the real run environment (cluster) has a matching Grackle version before
-  using `Config_AGORA.sh`-style flags for real.
+  `StarFormationEfficiency`, `InitMetallicityinSolar`) — currently
+  literature-typical defaults per that example's own README, not
+  validated against this fork.
 
 ### Beyond Phase 1 (already scoped in the phaseplan doc, not started)
 - **Phase 2a** (metals-model track, not dust-module work): extend chemical
