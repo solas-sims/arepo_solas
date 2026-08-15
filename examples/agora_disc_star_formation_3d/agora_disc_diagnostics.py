@@ -8,6 +8,16 @@ snapshots. Profiles from multiple snapshots are overlaid on a single set of
 axes; the smoothed-grid projection plot is always produced, one image per
 snapshot.
 
+Also reads the gas cells' metal mass (`PassiveScalars`, METALS_INDEX==0)
+and, if present, dust mass (`DustMass`, only written when the run was
+built with `DUST`) directly from PartType0 -- these are gas-only Arepo
+scalar fields, independent of whatever `--ptype` is requested for the
+main mass/kinematic profiles. For each snapshot this produces the same
+smoothed-grid XY/XZ/YZ projection plots as gas mass gets, plus a second
+overlaid-profile figure of metal and dust surface density vs. radius,
+mirroring the gas surface-density panel. The dust grid/profile is skipped
+(with a log message, not an error) if the snapshot has no DustMass field.
+
 Dependencies
 ------------
 If the `analysistools` package is installed, it is used directly
@@ -27,10 +37,15 @@ Examples:
     python agora_disc_diagnostics.py --snapshot snap_200.hdf5
 
     # multiple snapshots, overlaid profiles + per-snapshot grid images
+    # (gas, metals, and dust -- dust grid/profile auto-skipped if the run
+    # has no DustMass field)
     python agora_disc_diagnostics.py \
         --snapshot snap_100.hdf5 snap_150.hdf5 snap_200.hdf5 \
         --output disc_profiles.png \
         --grid-output "disc_grid_{name}.png" \
+        --metals-grid-output "disc_grid_metals_{name}.png" \
+        --dust-grid-output "disc_grid_dust_{name}.png" \
+        --metals-dust-output "disc_metals_dust_profiles.png" \
         --mask-radius 15 \
         --save-data disc_profiles.npz
 """
@@ -443,6 +458,36 @@ def read_snapshot_h5py(path, ptype):
     return pos, vel, mass, boxsize
 
 
+def read_gas_scalars_h5py(path):
+    """Read gas (PartType0) positions, mass, metal mass, and dust mass (if
+    present) directly from an Arepo HDF5 snapshot. Always reads via h5py,
+    even when analysistools is available, since PassiveScalars/DustMass are
+    Arepo-specific fields not exposed by a generic snapshot reader.
+
+    Returns (pos, mass, metal_mass, dust_mass); dust_mass is None if the
+    run wasn't built with DUST.
+    """
+    import h5py
+
+    with h5py.File(path, "r") as f:
+        if "PartType0" not in f:
+            raise KeyError(f"'PartType0' not present in {path}")
+        grp = f["PartType0"]
+
+        pos = grp["Coordinates"][()]
+        mass = grp["Masses"][()]
+
+        metal_mass = None
+        if "PassiveScalars" in grp:
+            passive_scalars = grp["PassiveScalars"][()]
+            metallicity = passive_scalars[:, 0] if passive_scalars.ndim == 2 else passive_scalars
+            metal_mass = metallicity * mass
+
+        dust_mass = grp["DustMass"][()] if "DustMass" in grp else None
+
+    return pos, mass, metal_mass, dust_mass
+
+
 def parse_args():
     parser = argparse.ArgumentParser(
         description="Compute AGORA disc diagnostics from one or more Arepo snapshots"
@@ -486,10 +531,27 @@ def parse_args():
     )
     parser.add_argument(
         "--grid-output", default="disc_grid_{name}.png",
-        help="Output figure template for the per-snapshot grid projection. "
+        help="Output figure template for the per-snapshot gas mass grid projection. "
              "May contain {name} (snapshot filename stem) and/or {index}. "
              "If neither placeholder is present, the snapshot name is appended "
              "automatically so multiple snapshots don't overwrite each other.",
+    )
+    parser.add_argument(
+        "--metals-grid-output", default="disc_grid_metals_{name}.png",
+        help="Output figure template for the per-snapshot gas metal-mass grid "
+             "projection. Same {name}/{index} substitution as --grid-output.",
+    )
+    parser.add_argument(
+        "--dust-grid-output", default="disc_grid_dust_{name}.png",
+        help="Output figure template for the per-snapshot gas dust-mass grid "
+             "projection. Same {name}/{index} substitution as --grid-output. "
+             "Skipped if the snapshot has no DustMass field.",
+    )
+    parser.add_argument(
+        "--metals-dust-output", default="disc_metals_dust_profiles.png",
+        help="Output figure for overlaid metal and dust surface-density radial "
+             "profiles (mirrors --output for gas). Dust panel is omitted if no "
+             "snapshot has a DustMass field.",
     )
     parser.add_argument("--save-data", default=None, help="Optional .npz path to save the computed profiles (all snapshots, one file)")
     parser.add_argument("-v", "--verbose", action="store_true", help="Verbose logging")
@@ -546,19 +608,25 @@ def load_particles(snapshot_path, args):
     return pos, vel, mass, centre
 
 
-def apply_mask(pos, vel, mass, centre, args):
-    """Restrict to a cylindrical region around the centre. Optional: improves
-    speed and avoids off-disc contamination when enabled via --mask-radius."""
+def compute_mask(pos, centre, args):
+    """Boolean mask selecting particles within a cylindrical region around
+    the centre (radius --mask-radius, half-height --mask-zheight). Returns
+    an all-True mask if --mask-radius is unset."""
     if args.mask_radius is None:
-        return pos, vel, mass
+        return np.ones(len(pos), dtype=bool)
 
     dxy = pos[:, :2] - centre[:2]
     r = np.hypot(dxy[:, 0], dxy[:, 1])
     dz = np.abs(pos[:, 2] - centre[2])
 
-    mask = (r <= args.mask_radius) & (dz <= args.mask_zheight)
-    log.info("Mask kept %d / %d particles", mask.sum(), len(pos))
+    return (r <= args.mask_radius) & (dz <= args.mask_zheight)
 
+
+def apply_mask(pos, vel, mass, centre, args):
+    """Restrict to a cylindrical region around the centre. Optional: improves
+    speed and avoids off-disc contamination when enabled via --mask-radius."""
+    mask = compute_mask(pos, centre, args)
+    log.info("Mask kept %d / %d particles", mask.sum(), len(pos))
     return pos[mask], vel[mask], mass[mask]
 
 
@@ -581,6 +649,21 @@ def compute_profiles(pos, vel, mass, centre, args):
     sigmaz = profiler.vertical_velocity_dispersion(pos, vel, centre, args.rmin, inner_rmax, nbins=inner_nbins)
 
     return sigma, hz, sigmaz
+
+
+def compute_metals_dust_profiles(pos, metal_mass, dust_mass, centre, args):
+    """Radial surface-density profiles for gas metal mass and (if present)
+    dust mass, mirroring compute_profiles' gas surface-density panel.
+    pos/metal_mass/dust_mass are expected already masked (see apply_mask)."""
+    profiler = ProfileTools(numbins=args.nbins)
+
+    sigma_metals = profiler.surface_density(pos, metal_mass, centre, args.rmin, args.rmax)
+
+    sigma_dust = None
+    if dust_mass is not None:
+        sigma_dust = profiler.surface_density(pos, dust_mass, centre, args.rmin, args.rmax)
+
+    return sigma_metals, sigma_dust
 
 
 def plot_overlaid_profiles(results, output):
@@ -610,10 +693,44 @@ def plot_overlaid_profiles(results, output):
     plt.close(fig)
     log.info("Saved %s", output)
 
-def plot_grid(pos, mass, centre, args, output_path):
-    """Smoothed-grid projection plot for a single snapshot. Always run,
-    regardless of --mask-radius (uses the full particle set, like the
-    source notebook)."""
+
+def plot_metals_dust_profiles(results, output):
+    """results: list of dicts with keys name, sigma_metals, sigma_dust
+    (sigma_dust may be None for a given snapshot). Mirrors
+    plot_overlaid_profiles' gas surface-density panel."""
+    have_dust = any(res["sigma_dust"] is not None for res in results)
+
+    ncols = 2 if have_dust else 1
+    fig, axes = plt.subplots(1, ncols, figsize=(5 * ncols + 2, 4))
+    axes = np.atleast_1d(axes)
+
+    for res in results:
+        axes[0].plot(res["sigma_metals"]["r"], res["sigma_metals"]["density"], label=res["name"])
+        if have_dust and res["sigma_dust"] is not None:
+            axes[1].plot(res["sigma_dust"]["r"], res["sigma_dust"]["density"], label=res["name"])
+
+    axes[0].set_xlabel("R [kpc]")
+    axes[0].set_ylabel(r"$\Sigma_{\rm metals}(R)$")
+    axes[0].set_yscale("log")
+    if len(results) > 1:
+        axes[0].legend(fontsize="small")
+
+    if have_dust:
+        axes[1].set_xlabel("R [kpc]")
+        axes[1].set_ylabel(r"$\Sigma_{\rm dust}(R)$")
+        axes[1].set_yscale("log")
+
+    fig.tight_layout()
+    fig.savefig(output, dpi=200)
+    plt.close(fig)
+    log.info("Saved %s", output)
+
+
+def plot_grid(pos, values, centre, args, output_path, title=None):
+    """Smoothed-grid projection plot for a single quantity/snapshot. Always
+    run on the full particle set (regardless of --mask-radius), like the
+    source notebook. `values` is whatever per-particle quantity is being
+    projected (mass, metal mass, or dust mass)."""
     gridding = GriddingTools()
 
     lzgrid = args.lzgrid if args.lzgrid is not None else args.lgrid / 4
@@ -632,14 +749,19 @@ def plot_grid(pos, mass, centre, args, output_path):
 
     smoothed_grid = gridding.smooth_to_grid(
         positions=pos[box_mask],
-        values=mass[box_mask],
+        values=values[box_mask],
         grid_size=grid_size,
         grid_limits=grid_limits,
         method="Gaussian",
         sigma=args.smooth_sigma,
     )
 
-    fig, _ = gridding.plot_3d_projections(smoothed_grid, grid_limits, projection="mean")
+    try:
+        fig, _ = gridding.plot_3d_projections(smoothed_grid, grid_limits, projection="mean", title=title)
+    except TypeError:
+        # the installed analysistools.GriddingTools.plot_3d_projections may not
+        # accept `title` -- degrade gracefully rather than failing the run
+        fig, _ = gridding.plot_3d_projections(smoothed_grid, grid_limits, projection="mean")
     fig.savefig(output_path, dpi=200)
     plt.close(fig)
     log.info("Saved %s", output_path)
@@ -655,6 +777,12 @@ def save_data(results, path):
         arrays[f"{name}__hz_scale_height"] = res["hz"]["scale_height"]
         arrays[f"{name}__sigmaz_r"] = res["sigmaz"]["r"]
         arrays[f"{name}__sigmaz_sigma_z"] = res["sigmaz"]["sigma_z"]
+        if res.get("sigma_metals") is not None:
+            arrays[f"{name}__sigma_metals_r"] = res["sigma_metals"]["r"]
+            arrays[f"{name}__sigma_metals_density"] = res["sigma_metals"]["density"]
+        if res.get("sigma_dust") is not None:
+            arrays[f"{name}__sigma_dust_r"] = res["sigma_dust"]["r"]
+            arrays[f"{name}__sigma_dust_density"] = res["sigma_dust"]["density"]
     np.savez(path, **arrays)
     log.info("Saved profile data to %s", path)
 
@@ -676,14 +804,55 @@ def main():
         pos, vel, mass, centre = load_particles(snapshot_path, args)
 
         grid_out = format_output_path(args.grid_output, name, index)
-        plot_grid(pos, mass, centre, args, grid_out)
+        plot_grid(pos, mass, centre, args, grid_out, title=f"Gas mass ({name})")
+
+        # Gas-only metal/dust scalars, independent of --ptype (metals/dust
+        # only exist on PartType0). Reused for both the grid projections
+        # (unmasked, mirroring the gas mass grid) and the radial surface
+        # density profiles (masked, mirroring the gas sigma profile).
+        try:
+            gas_pos, gas_mass, metal_mass, dust_mass = read_gas_scalars_h5py(snapshot_path)
+        except (OSError, IOError, KeyError) as exc:
+            log.error("Could not read gas scalars from '%s': %s", snapshot_path, exc)
+            sys.exit(1)
+
+        sigma_metals = sigma_dust = None
+
+        if metal_mass is not None:
+            metals_grid_out = format_output_path(args.metals_grid_output, name, index)
+            plot_grid(gas_pos, metal_mass, centre, args, metals_grid_out, title=f"Metal mass ({name})")
+        else:
+            log.warning("No PassiveScalars field in %s -- skipping metals grid/profile", snapshot_path)
+
+        if dust_mass is not None:
+            dust_grid_out = format_output_path(args.dust_grid_output, name, index)
+            plot_grid(gas_pos, dust_mass, centre, args, dust_grid_out, title=f"Dust mass ({name})")
+        else:
+            log.info("No DustMass field in %s -- skipping dust grid/profile (run not built with DUST?)", snapshot_path)
+
+        if metal_mass is not None:
+            gas_mask = compute_mask(gas_pos, centre, args)
+            gas_pos_m = gas_pos[gas_mask]
+            metal_mass_m = metal_mass[gas_mask]
+            dust_mass_m = dust_mass[gas_mask] if dust_mass is not None else None
+            sigma_metals, sigma_dust = compute_metals_dust_profiles(
+                gas_pos_m, metal_mass_m, dust_mass_m, centre, args
+            )
 
         pos_m, vel_m, mass_m = apply_mask(pos, vel, mass, centre, args)
         sigma, hz, sigmaz = compute_profiles(pos_m, vel_m, mass_m, centre, args)
 
-        results.append({"name": name, "sigma": sigma, "hz": hz, "sigmaz": sigmaz})
+        results.append({
+            "name": name, "sigma": sigma, "hz": hz, "sigmaz": sigmaz,
+            "sigma_metals": sigma_metals, "sigma_dust": sigma_dust,
+        })
 
     plot_overlaid_profiles(results, args.output)
+
+    if any(res["sigma_metals"] is not None for res in results):
+        plot_metals_dust_profiles(results, args.metals_dust_output)
+    else:
+        log.warning("No metals data in any snapshot -- skipping %s", args.metals_dust_output)
 
     if args.save_data:
         save_data(results, args.save_data)
