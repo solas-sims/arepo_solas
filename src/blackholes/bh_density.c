@@ -8,6 +8,7 @@
 
 #include "../domain/domain.h"
 
+#ifdef BH_ACTIVE
 
 static int bh_density_evaluate(int target, int mode, int threadid);
 static int bh_density_isactive(int n);
@@ -106,7 +107,6 @@ static void out2particle(data_out *out, int i, int mode)
     }
 }
 
-
 #include "../utils/generic_comm_helpers2.h"
 
 /*! \brief Routine that defines what to do with local particles.
@@ -198,7 +198,38 @@ void bh_density(void)
     {
       Left[i] = Right[i] = 0;
       BhP[i].DensityFlag = 1;
-       
+
+      /* All.SofteningTable[] is only ever populated by set_softenings() for indices in
+       * [0, NSOFTTYPES+NSOFTTYPES_HYDRO) -- the one extra sentinel slot beyond that is
+       * meaningful only for the separate ForceSoftening[] array (explicitly set to 0 there,
+       * see grav_softening.c). A particle whose SofteningType equals that sentinel index (or
+       * is otherwise out of range) reads a never-initialized slot of SofteningTable[], which
+       * is a static global array and so deterministically reads back 0 -- not randomly
+       * corrupted, just the wrong type stored on the particle. A permanent 0 here forces
+       * hmax (below) to 0 forever, which forces Hsml down to 0 on every density iteration
+       * and guarantees the "zero neighbours at maximum Hsml=0" terminate() a few dozen lines
+       * down, regardless of what this Hsml self-heal does, since it reads the same value.
+       * Repair SofteningType itself back to this particle's normal type-based default (the
+       * same value spawn_black_hole_from_cell() assigns a fresh BH) before using it.
+       *
+       * Do NOT read that default via All.SofteningTypeOfPartType[PPB(i).Type]: production
+       * logs showed the "repaired" value itself coming out as nonsense (e.g. 1063818100),
+       * which means PPB(i).Type -- unsigned char, so up to 255 -- was *also* out of range
+       * for these same corrupted zombie BH entries. SofteningTypeOfPartType[] only has
+       * NTYPES (6) elements; indexing it with a bad Type reads far past the array into
+       * unrelated fields of the All struct. We already know this is a BH (we're inside
+       * bh_density()), so use the literal BH type (5, matching P[ibh].Type = 5 in
+       * spawn_black_hole_from_cell()) directly instead of trusting PPB(i).Type at all. */
+      if(PPB(i).SofteningType < 0 || PPB(i).SofteningType >= NSOFTTYPES + NSOFTTYPES_HYDRO ||
+         All.SofteningTable[PPB(i).SofteningType] <= 0)
+        {
+          printf("WARNING: BH_DENSITY: BhP[%d] (ID=%llu) has invalid/degenerate SofteningType=%d (particle Type=%d) -- resetting to "
+                 "BH type default %d\n",
+                 i, (unsigned long long)PPB(i).ID, PPB(i).SofteningType, PPB(i).Type, All.SofteningTypeOfPartType[5]);
+          myflush(stdout);
+          PPB(i).SofteningType = All.SofteningTypeOfPartType[5];
+        }
+
       if(BhP[i].Hsml <= 0)
         BhP[i].Hsml = All.SofteningTable[PPB(i).SofteningType];
     }
@@ -344,7 +375,7 @@ static int bh_density_evaluate(int target, int mode, int threadid)
   int i, n, numnodes, *firstnode; 
   int ngbs = 0, ngbsminbin = TIMEBINS; 
   MyDouble xtmp, ytmp, ztmp;   
-  MyDouble h, h2, dx, dy, dz, r, r2, wk; 
+  MyDouble h, h2, dx, dy, dz, r2; 
   MyDouble *pos, *vel, ngbsmass = 0, ngbsvolume = 0;
 
   data_in local, *target_data;
@@ -375,9 +406,9 @@ static int bh_density_evaluate(int target, int mode, int threadid)
     gas_angular_momentum[j] = 0;
 #endif 
 
-  //MyDouble hinv, hinv3, hinv4, u, dwk;
+  MyDouble hinv, hinv3, hinv4, u, dwk;
 
-  //h2   = h * h;
+  h2 = h * h;
   //hinv = 1.0 / h;
 //#ifndef TWODIMS
 //  hinv3 = hinv * hinv * hinv;
@@ -419,8 +450,8 @@ static int bh_density_evaluate(int target, int mode, int threadid)
       if(r2 < h2)
 #endif
         {
-          r = sqrt(r2);
-          u = r * hinv;
+          //r = sqrt(r2);
+          //u = r * hinv;
 
           //bh_kernel(u, hinv3, hinv4, &wk, &dwk);
           
@@ -475,3 +506,5 @@ int bh_density_isactive(int n)
 
   return 1;
 }
+
+#endif /* #ifdef BH_ACTIVE */

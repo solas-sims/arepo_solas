@@ -70,9 +70,11 @@ double get_jeans_length(int i);
 double get_jeans_mass(int i);
 #endif
 
-#if defined(FIND_HALOS) && defined(FOF)
-void fof_seeding(void);
-double fof_seeding_get_time_increment(void);
+#ifdef HALO_SEEDING
+#ifndef FOF
+#error "HALO_SEEDING requires FOF to be defined"
+#endif /* #ifndef FOF */
+/* seeding API lives in src/fof/fof_seeding.h */
 #endif
 
 void sfr_init(void);
@@ -687,13 +689,22 @@ void subfind_add_grp_props_calc_fof_angular_momentum(int num, int ngroups_cat);
 void convert_cell_into_star(int i, double birthtime);
 void spawn_star_from_cell(int igas, double birthtime, int istar, MyDouble mass_of_star);
 void make_star(int idx, int i, double prob, MyDouble mass_of_star, double *sum_mass_stars);
+#ifdef SF_THRESHOLD_HALO_MASS_DEPENDENT
+double sf_threshold_halo_mass_factor(int i);
+#endif /* #ifdef SF_THRESHOLD_HALO_MASS_DEPENDENT */
+#if defined(EEOS_SF) || defined(AGORA_SF) || defined(JEANS_SF)
+void set_overdens_thresh(void);
+#endif /* #if defined(EEOS_SF) || defined(AGORA_SF) || defined(JEANS_SF) */
 #endif /* #ifdef USE_SFR */
 
 #ifdef USE_GRACKLE
 double compute_mu(int i);
+<<<<<<< HEAD
 #if defined(POPIII_SF) && (GRACKLE_CHEMISTRY >= 2)
 double get_H2_fraction(int i);
 #endif
+=======
+>>>>>>> origin/main
 #endif
 
 #endif /* #ifndef PROTO_H */

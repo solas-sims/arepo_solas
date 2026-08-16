@@ -108,8 +108,38 @@ void domain_mark_in_trans_table(int i, int task)
             {
               int qq = DC[q].next;
               if(q == qq)
-                terminate("preventing getting stuck in a loop due to q == DC[q].next : i=%d q=%d last_connection=%d", i, q,
-                          SphP[i].last_connection);
+                {
+                  /* Confirmed via production diagnostics: this is a genuinely inactive cell
+                   * (TimeBinSynchronized[P[i].TimeBinHydro] == 0) whose claimed connection
+                   * range [first_connection, last_connection] should be stable and untouched
+                   * -- AREPO's incremental connectivity scheme (voronoi_update_connectivity())
+                   * only rebuilds/frees connections for cells in TimeBinsHydro.ActiveParticleList
+                   * each step. Despite that, one of this cell's own connection slots partway
+                   * through its range has been silently reallocated to a completely different
+                   * particle's connection list (confirmed: DC[q].ID belongs to a different
+                   * particle than P[i].ID) -- a real gap in that stability guarantee, not yet
+                   * root-caused. Walking the (now foreign) slot's .next field routes into
+                   * unrelated territory and can loop back on itself here.
+                   *
+                   * Stop walking this cell's chain at the point of corruption rather than
+                   * crashing the whole run. Connections already walked before this point keep
+                   * whatever .next/task assignment was already written to them above; slots
+                   * from here to the recorded last_connection are left untouched, since they
+                   * likely belong to a different particle now and overwriting them would
+                   * corrupt that particle's own connection instead. This cell's connections
+                   * will be correctly rebuilt from scratch the next time it becomes active
+                   * (voronoi_update_connectivity() only rebuilds active cells' connections, so
+                   * this defers the fix rather than resolving it -- if this fires often, the
+                   * underlying slot-reclaim gap still needs a proper fix). */
+                  printf(
+                      "WARNING: DOMAIN_DC: Task=%d cell i=%d (ID=%llu, inactive, TimeBinHydro=%d) has a corrupted connection "
+                      "chain -- slot q=%d (claimed range [%d,%d]) unexpectedly self-loops and now belongs to a different "
+                      "particle (DC[q].ID=%llu) -- stopping this cell's chain walk early rather than crashing\n",
+                      ThisTask, i, (unsigned long long)P[i].ID, P[i].TimeBinHydro, q, SphP[i].first_connection,
+                      SphP[i].last_connection, (unsigned long long)DC[q].ID);
+                  myflush(stdout);
+                  break;
+                }
 
               if((P[i].Mass == 0 && P[i].ID == 0) || P[i].Type != 0) /* this cell has been deleted or turned into a star */
                 DC[q].next = -1;
@@ -261,14 +291,26 @@ void domain_exchange_and_update_DC(void)
   myfree(recv_trans_data);
   myfree(send_trans_data);
 
-  /* it's now time to transcribe the task and index fields in the DC list */
+  /* it's now time to transcribe the task and index fields in the DC list.
+   *
+   * DC[i].index < 0 marks a connection whose target cell has already been removed (see
+   * the "cell has been removed" convention in voronoi_get_connected_particles()) -- its
+   * slot can still be marked live (task >= 0) even though there's no real particle left
+   * to look up in trans_table[] on the owning task. The second exchange round below
+   * (search "count where they should go") already excludes these via `DC[i].index >= 0`
+   * and lets them simply vanish from the rebuilt DC[] after the exchange; this first
+   * round must exclude them the same way, and consistently across all three loops that
+   * touch it (count / populate / copy-back), since they all rely on matching iteration
+   * order over MaxNvc to stay in sync with send_transscribe_data[]/recv_transscribe_data[].
+   * Skipping this guard here sends a removed cell's connection to its owning task, whose
+   * trans_table[] lookup receives an out-of-range index and terminates. */
   for(int j = 0; j < NTask; j++)
     Send_count[j] = 0;
 
   for(int i = 0; i < MaxNvc; i++)
     {
       int task = DC[i].task;
-      if(task >= 0)
+      if(task >= 0 && DC[i].index >= 0)
         {
           if(task >= NTask)
             terminate("i=%d Nvc=%d MaxNvc=%d task=%d\n", i, Nvc, MaxNvc, task);
@@ -303,7 +345,7 @@ void domain_exchange_and_update_DC(void)
   for(int i = 0; i < MaxNvc; i++)
     {
       int task = DC[i].task;
-      if(task >= 0)
+      if(task >= 0 && DC[i].index >= 0)
         {
           send_transscribe_data[Send_offset[task] + Send_count[task]].old_index   = DC[i].index;
           send_transscribe_data[Send_offset[task] + Send_count[task]].image_flags = DC[i].image_flags;
@@ -438,11 +480,16 @@ void domain_exchange_and_update_DC(void)
   for(int j = 0; j < NTask; j++)
     Send_count[j] = 0;
 
-  /* copy the results over to the DC structure */
+  /* copy the results over to the DC structure. Must use the exact same condition as the
+   * count/populate loops above (task >= 0 && index >= 0) -- this consumes
+   * send_transscribe_data[] in the same per-task order it was produced in, so skipping a
+   * different set of entries here would desync the two and misattribute results to the
+   * wrong connections. DC[i].index itself hasn't been overwritten yet at this point, so
+   * it's still safe to test here for the same "cell already removed" condition. */
   for(int i = 0; i < MaxNvc; i++)
     {
       int task = DC[i].task;
-      if(task >= 0)
+      if(task >= 0 && DC[i].index >= 0)
         {
           DC[i].task        = send_transscribe_data[Send_offset[task] + Send_count[task]].new_task;
           DC[i].index       = send_transscribe_data[Send_offset[task] + Send_count[task]].new_index;
@@ -467,10 +514,24 @@ void domain_exchange_and_update_DC(void)
           if(task >= 0)
             {
               if(task >= NTask)
-                terminate("Thistask=%d  i=%d Nvc=%d MaxNvc=%d DC[i].task=%d DC[i].next=%d\n", ThisTask, i, Nvc, MaxNvc, DC[i].task,
-                          DC[i].next);
-
-              if(DC[i].index >= 0)
+                {
+                  /* .next was never assigned a valid destination task this round -- this is a
+                   * slot past the point where domain_mark_in_trans_table() stopped walking a
+                   * corrupted connection chain (see the "corrupted connection chain" WARNING
+                   * there), so .next still holds a stale leftover value (e.g. an old
+                   * free-list/connection index) instead of a task. Treat it the same as an
+                   * already-removed connection (DC[i].index < 0): drop it from the rebuilt
+                   * DC[] below instead of sending it to a bogus task. The later loop that
+                   * actually populates the send buffer also reads DC[i].next as a task without
+                   * re-validating it, so this guard must run before that loop, not just here. */
+                  printf(
+                      "WARNING: DOMAIN_DC: Task=%d DC[%d] has out-of-range .next=%d (not a valid task in [0,%d)) -- "
+                      "dropping this stale connection instead of sending it\n",
+                      ThisTask, i, task, NTask);
+                  myflush(stdout);
+                  DC[i].index = -1;
+                }
+              else if(DC[i].index >= 0)
                 Send_count[task]++;
             }
         }
@@ -598,7 +659,23 @@ void domain_exchange_and_update_DC(void)
         }
       else
         {
-          terminate("strange");
+          /* DC[j] claims an ID that doesn't match any local particle -- a merge-join desync
+           * between the sorted local-particle list and the sorted, rebuilt DC[] connections.
+           * This can be downstream fallout from the corrupted-chain skip in
+           * domain_mark_in_trans_table(): when that walk breaks out early, the unvisited
+           * remainder of a cell's chain keeps whatever stale linkage it had, which can
+           * eventually surface here as a connection claiming an ID nothing local matches.
+           * Drop it (advance j only, retry the same local particle against the next j)
+           * instead of crashing the whole run -- an orphaned slot simply isn't attached to
+           * any SphP[].first/last_connection, so skipping it here is enough to drop it from
+           * the rebuilt connectivity. */
+          printf(
+              "WARNING: DOMAIN_DC: Task=%d orphaned connection DC[%d] (ID=%llu) does not match any local particle -- "
+              "dropping it\n",
+              ThisTask, j, (unsigned long long)DC[j].ID);
+          myflush(stdout);
+          j++;
+          i--; /* compensate for the for-loop's i++ so this local particle is retried */
         }
     }
 

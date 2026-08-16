@@ -44,6 +44,9 @@
 
 #include "../main/allvars.h"
 #include "../main/proto.h"
+#ifdef SIDM
+#include "../sidm/sidm.h"
+#endif /* #ifdef SIDM */
 
 #include "../mesh/voronoi/voronoi.h"
 #include "domain.h"
@@ -165,6 +168,13 @@ void domain_exchange(void)
   Star_Particle_Data *sBuf;
 #endif
 
+#ifdef SIDM
+  int count_togo_dm = 0, count_get_dm = 0;
+  int *count_dm, *offset_dm;
+  int *count_recv_dm, *offset_recv_dm;
+  DM_Particle_Data *dmBuf;
+#endif
+
 #ifdef BLACKHOLES
   int count_togo_bhs = 0, count_get_bhs = 0;
   int *count_bhs, *offset_bhs;
@@ -197,6 +207,13 @@ void domain_exchange(void)
   offset_recv_stars  = (int *)mymalloc_movable(&offset_recv_stars, "offset_recv_stars", NTask * sizeof(int));
 #endif
 
+#ifdef SIDM
+  count_dm        = (int *)mymalloc_movable(&count_dm, "count_dm", NTask * sizeof(int));
+  offset_dm       = (int *)mymalloc_movable(&offset_dm, "offset_dm", NTask * sizeof(int));
+  count_recv_dm   = (int *)mymalloc_movable(&count_recv_dm, "count_recv_dm", NTask * sizeof(int));
+  offset_recv_dm  = (int *)mymalloc_movable(&offset_recv_dm, "offset_recv_dm", NTask * sizeof(int));
+#endif
+
 #ifdef BLACKHOLES
   count_bhs        = (int *)mymalloc_movable(&count_bhs, "count_bhs", NTask * sizeof(int));
   offset_bhs       = (int *)mymalloc_movable(&offset_bhs, "offset_bhs", NTask * sizeof(int));
@@ -219,6 +236,13 @@ void domain_exchange(void)
   for(i = 1, offset_stars[0] = 0; i < NTask; i++)
     {
       offset_stars[i] = offset_stars[i - 1] + toGoStars[i - 1];
+    }
+#endif
+
+#ifdef SIDM
+  for(i = 1, offset_dm[0] = 0; i < NTask; i++)
+    {
+      offset_dm[i] = offset_dm[i - 1] + toGoDM[i - 1];
     }
 #endif
 
@@ -249,6 +273,11 @@ void domain_exchange(void)
       count_get_stars += toGetStars[i];
 #endif
 
+#ifdef SIDM
+      count_togo_dm += toGoDM[i];
+      count_get_dm += toGetDM[i];
+#endif
+
 #ifdef BLACKHOLES
       count_togo_bhs += toGoBhs[i];
       count_get_bhs += toGetBhs[i];
@@ -260,6 +289,10 @@ void domain_exchange(void)
 
 #ifdef STARS
   sBuf = (Star_Particle_Data *)mymalloc_movable(&sBuf, "sBuf", count_togo_stars * sizeof(Star_Particle_Data));
+#endif
+
+#ifdef SIDM
+  dmBuf = (DM_Particle_Data *)mymalloc_movable(&dmBuf, "dmBuf", count_togo_dm * sizeof(DM_Particle_Data));
 #endif
 
 #ifdef BLACKHOLES
@@ -274,6 +307,10 @@ void domain_exchange(void)
 
 #ifdef STARS
       count_stars[i] = 0;
+#endif
+
+#ifdef SIDM
+      count_dm[i] = 0;
 #endif
 
 #ifdef BLACKHOLES
@@ -322,6 +359,18 @@ void domain_exchange(void)
             }
 #endif
 
+#ifdef SIDM
+          else if(P[n].Type == 1)
+            {
+              dmBuf[offset_dm[target] + count_dm[target]] = DMPS(n);
+              partBuf[offset[target] + count[target]] = P[n];
+              keyBuf[offset[target] + count[target]]  = Key[n];
+
+              count_dm[target]++;
+              count[target]++;
+            }
+#endif
+
 #ifdef BLACKHOLES
           else if(P[n].Type == 5)
             {
@@ -349,6 +398,11 @@ void domain_exchange(void)
 #ifdef STARS
               if(P[NumPart-1].Type==4)
                 SPP(NumPart-1).PID = NumGas - 1;
+#endif
+
+#ifdef SIDM
+              if(P[NumPart-1].Type==1)
+                DMPS(NumPart-1).PIndex = NumGas - 1;
 #endif
 
 #ifdef BLACKHOLES
@@ -381,12 +435,48 @@ void domain_exchange(void)
               P[n] = P[NumPart-1];
               if(P[NumPart-1].Type == 4)
                 SPP(NumPart-1).PID = n;
+#ifdef SIDM
+              if(P[NumPart-1].Type == 1)
+                DMPS(NumPart-1).PIndex = n;
+#endif
 
               Key[n] = Key[NumPart - 1];
               
               NumStars--;
             }
 #endif
+
+#ifdef SIDM
+          else if(P[n].Type == 1)
+            {
+              DMPS(n) = DMSP[NumDM-1];
+              PDMS(NumDM-1).SIDMID = P[n].SIDMID;
+
+              if(n == NumPart-1)
+                {
+                  NumDM--;
+                  NumPart--;
+                  n--;
+                  continue;
+                }
+
+              P[n] = P[NumPart-1];
+              if(P[NumPart-1].Type == 1)
+                DMPS(NumPart-1).PIndex = n;
+#ifdef STARS
+              if(P[NumPart-1].Type == 4)
+                SPP(NumPart-1).PID = n;
+#endif
+#ifdef BLACKHOLES
+              if(P[NumPart-1].Type == 5)
+                BPP(NumPart-1).PID = n;
+#endif
+
+              Key[n] = Key[NumPart - 1];
+
+              NumDM--;
+            }
+#endif /* #ifdef SIDM */
 
 #ifdef BLACKHOLES
           else if(P[n].Type == 5)
@@ -405,6 +495,10 @@ void domain_exchange(void)
               P[n] = P[NumPart-1];
               if(P[NumPart-1].Type == 5)
                 BPP(NumPart-1).PID = n;
+#ifdef SIDM
+              if(P[NumPart-1].Type == 1)
+                DMPS(NumPart-1).PIndex = n;
+#endif
 
               Key[n] = Key[NumPart - 1];
               
@@ -461,6 +555,11 @@ void domain_exchange(void)
         SP[i].PID+=count_totget;
 #endif  
 
+#ifdef SIDM
+      for(i=0; i<NumDM; i++)
+        DMSP[i].PIndex+=count_totget;
+#endif /* #ifdef SIDM */
+
 #ifdef BLACKHOLES
       for(i=0; i<NumBhs; i++)
         BhP[i].PID+=count_totget;
@@ -476,6 +575,10 @@ void domain_exchange(void)
       count_recv_stars[i]  = toGetStars[i];
 #endif
 
+#ifdef SIDM
+      count_recv_dm[i]  = toGetDM[i];
+#endif
+
 #ifdef BLACKHOLES
       count_recv_bhs[i]  = toGetBhs[i];
 #endif
@@ -488,6 +591,11 @@ void domain_exchange(void)
 #ifdef STARS
   for(i = 1, offset_recv_stars[0] = NumStars; i < NTask; i++)
     offset_recv_stars[i] = offset_recv_stars[i - 1] + count_recv_stars[i - 1];
+#endif
+
+#ifdef SIDM
+  for(i = 1, offset_recv_dm[0] = NumDM; i < NTask; i++)
+    offset_recv_dm[i] = offset_recv_dm[i - 1] + count_recv_dm[i - 1];
 #endif
 
 #ifdef BLACKHOLES
@@ -533,6 +641,15 @@ if(count_stars[target] > 0 || count_recv_stars[target] > 0)
               MPI_Sendrecv(sBuf + offset_stars[target], count_stars[target] * sizeof(Star_Particle_Data), MPI_BYTE, target,
                            TAG_BHDATA, SP + offset_recv_stars[target], count_recv_stars[target] * sizeof(Star_Particle_Data),
                            MPI_BYTE, target, TAG_STARDATA, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            }
+#endif
+
+#ifdef SIDM
+if(count_dm[target] > 0 || count_recv_dm[target] > 0)
+            {
+              MPI_Sendrecv(dmBuf + offset_dm[target], count_dm[target] * sizeof(DM_Particle_Data), MPI_BYTE, target,
+                           TAG_DMDATA, DMSP + offset_recv_dm[target], count_recv_dm[target] * sizeof(DM_Particle_Data),
+                           MPI_BYTE, target, TAG_DMDATA, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
             }
 #endif
 
@@ -590,6 +707,14 @@ if(count_bhs[target] > 0 || count_recv_bhs[target] > 0)
             }
 #endif
 
+#ifdef SIDM
+          if(count_recv_dm[target] > 0)
+            {
+              MPI_Irecv(DMSP + offset_recv_dm[target], count_recv_dm[target] * sizeof(DM_Particle_Data), MPI_BYTE, target,
+                        TAG_DMDATA, MPI_COMM_WORLD, &requests[n_requests++]);
+            }
+#endif
+
 #ifdef BLACKHOLES
           if(count_recv_bhs[target] > 0)
             {
@@ -639,6 +764,14 @@ if(count_bhs[target] > 0 || count_recv_bhs[target] > 0)
             }
 #endif
 
+#ifdef SIDM
+          if(count_dm[target] > 0)
+            {
+              MPI_Isend(dmBuf + offset_dm[target], count_dm[target] * sizeof(DM_Particle_Data), MPI_BYTE, target,
+                        TAG_DMDATA, MPI_COMM_WORLD, &requests[n_requests++]);
+            }
+#endif
+
 #ifdef BLACKHOLES
           if(count_bhs[target] > 0)
             {
@@ -677,6 +810,11 @@ if(count_bhs[target] > 0 || count_recv_bhs[target] > 0)
                   MPI_COMM_WORLD);
 #endif
 
+#ifdef SIDM
+ myMPI_Alltoallv(dmBuf, count_dm, offset_dm, DMSP, count_recv_dm, offset_recv_dm, sizeof(DM_Particle_Data), 0,
+                  MPI_COMM_WORLD);
+#endif
+
 #ifdef BLACKHOLES
  myMPI_Alltoallv(bhBuf, count_bhs, offset_bhs, BhP, count_recv_bhs, offset_recv_bhs, sizeof(struct Bh_Particle_Data), 0,
                   MPI_COMM_WORLD);
@@ -703,6 +841,20 @@ if(count_bhs[target] > 0 || count_recv_bhs[target] > 0)
   NumStars += count_get_stars;
 #endif
 
+#ifdef SIDM
+  for(int i = NumPart + count_get_sph, j=NumDM; i < NumPart + count_get; i++)
+    {
+      if(P[i].Type == 1)
+        {
+          P[i].SIDMID = j;
+          DMSP[j].PIndex = i;
+          j++;
+        }
+    }
+
+  NumDM += count_get_dm;
+#endif /* #ifdef SIDM */
+
 #ifdef BLACKHOLES
   for(int i = NumPart + count_get_sph, j=NumBhs; i < NumPart + count_get; i++)
     { 
@@ -726,6 +878,10 @@ if(count_bhs[target] > 0 || count_recv_bhs[target] > 0)
   myfree(bhBuf);
 #endif
 
+#ifdef SIDM
+  myfree(dmBuf);
+#endif
+
 #ifdef STARS
   myfree(sBuf);
 #endif
@@ -738,6 +894,13 @@ if(count_bhs[target] > 0 || count_recv_bhs[target] > 0)
   myfree(count_recv_bhs);
   myfree(offset_bhs);
   myfree(count_bhs);
+#endif
+
+#ifdef SIDM
+  myfree(offset_recv_dm);
+  myfree(count_recv_dm);
+  myfree(offset_dm);
+  myfree(count_dm);
 #endif
 
 #ifdef STARS

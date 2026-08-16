@@ -591,6 +591,7 @@ static int fof_treefind_fof_primary(MyDouble searchcenter[3], MyFloat hsml, int 
             }
           else if(no >= Tree_ImportedNodeOffset) /* point from imported nodelist */
             {
+//                mpi_printf("CRASH: task=%d, no=%d, Tree_ImportedNodeOffset=%d, mode=%d\n", ThisTask, no, Tree_ImportedNodeOffset, mode);
               terminate("do not expect imported points here");
             }
           else

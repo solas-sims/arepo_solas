@@ -192,6 +192,15 @@ FILE *FdInfo,   /*!< file handle for info.txt log-file. */
 FILE *FdDetailed;
 #endif /* #ifdef DETAILEDTIMINGS */
 
+#ifdef SIDM_LOG_COLLISIONS
+FILE *FdSidmCollisions;
+#endif /* #ifdef SIDM_LOG_COLLISIONS */
+
+#ifdef SIDM
+long long SidmTimestepChecks  = 0;
+long long SidmTimestepBinding = 0;
+#endif /* #ifdef SIDM */
+
 #ifdef OUTPUT_CPU_CSV
 FILE *FdCPUCSV;
 #endif /* #ifdef OUTPUT_CPU_CSV */

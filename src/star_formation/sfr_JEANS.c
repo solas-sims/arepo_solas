@@ -46,6 +46,7 @@
 
 #include "../gravity/forcetree.h"
 
+#ifdef JEANS_SF
 
 /*! \brief Return the Jeans length of the cell.
  *
@@ -84,24 +85,44 @@ double get_jeans_mass(int i)
 /* Function that checks whether a cell i satisfies star formation criteria*/
 static int sf_criteria(int i)
 {
+  /* comoving-overdensity floor, shared with EEOS_SF/AGORA_SF (see set_overdens_thresh() in
+   * starformation.c) -- applies to both JEANS_MASS_BASED and the plain Jeans-length variant
+   * below, since it's an independent gate rather than a modulation of either criterion's own
+   * threshold quantity */
+  if(All.ComovingIntegrationOn)
+    if(SphP[i].Density < All.OverDensThresh)
+      return 0;
 
-#if defined(POPIII_SF) && defined(USE_GRACKLE)
-#if (GRACKLE_CHEMISTRY >= 2)
+#if defined(POPIII_SF) && defined(USE_GRACKLE) && (GRACKLE_CHEMISTRY >= 2)
   if(SphP[i].GasMetallicity < All.PopIIIMetallicityThreshold &&
      get_H2_fraction(i) < All.PopIIIH2FractionThreshold)
     return 0;
 #endif
-#endif
 
 #ifdef JEANS_MASS_BASED
+  double jeans_mass_threshold = All.JeansMassThreshold;
+#ifdef SF_THRESHOLD_HALO_MASS_DEPENDENT
+  /* raising the *effective* SF threshold here means requiring a smaller Jeans mass (relative
+   * to cell mass) before a cell qualifies -- the inequality below is oriented the opposite way
+   * from AGORA_SF/EEOS_SF's density gates, so achieving the same "factor > 1 means harder to
+   * form stars" semantics means dividing the threshold constant here, not multiplying it. See
+   * documentation/source/sf_threshold_halo_mass.md. */
+  jeans_mass_threshold /= sf_threshold_halo_mass_factor(i);
+#endif /* #ifdef SF_THRESHOLD_HALO_MASS_DEPENDENT */
+
   /* SF if Jeans mass is smaller than threshold x cell mass */
-  if(get_jeans_mass(i) < All.JeansMassThreshold * P[i].Mass)
+  if(get_jeans_mass(i) < jeans_mass_threshold * P[i].Mass)
     return 1;
-#else
+#else /* #ifdef JEANS_MASS_BASED */
+#ifdef SF_THRESHOLD_HALO_MASS_DEPENDENT
+#error \
+    "SF_THRESHOLD_HALO_MASS_DEPENDENT with JEANS_SF requires JEANS_MASS_BASED -- the plain Jeans-length criterion has no threshold quantity to modulate"
+#endif /* #ifdef SF_THRESHOLD_HALO_MASS_DEPENDENT */
+
   /* SF if Jeans length is smaller than cell size (unresolved) */
   if(get_jeans_length(i) < 2.0 * get_cell_radius(i))
     return 1;
-#endif
+#endif /* #ifdef JEANS_MASS_BASED #else */
 
   return 0;
 }
@@ -190,3 +211,5 @@ double get_starformation_rate(int i)
 
   return rateOfSF;
 }
+
+#endif /* #ifdef JEANS_SF */

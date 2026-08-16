@@ -72,16 +72,24 @@
 #include <unistd.h>
 
 #include "../main/allvars.h"
+#ifdef SIDM
+#include "../sidm/sidm.h"
+#endif /* #ifdef SIDM */
 #include "../main/proto.h"
 
 #include "../debug_md5/Md5.h"
 #include "../domain/domain.h"
 #include "../mesh/voronoi/voronoi.h"
+#include "../fof/fof_seeding.h"
 
 #define MODUS_WRITE 0
 #define MODUS_READ 1
 #define MODUS_READCHECK 2
 #define MODUS_CHECK 3
+
+#ifdef HALO_SEEDING
+void fof_seeding_registry_io(HaloSeedRegistry *r, int modus);
+#endif
 
 /*! \brief Data for scheduling restart file IO.
  */
@@ -1269,6 +1277,43 @@ static void contents_restart_file(int modus)
   byten(TimeBinsStar.LastInTimeBin, TIMEBINS * sizeof(int), modus);
 #endif
 
+#ifdef SIDM
+  in(&NumDM, modus);
+
+    if(NumDM > 0)
+    {
+      /* SIDM DM-Particle side-array data */
+      byten(&DMSP[0], NumDM * sizeof(DM_Particle_Data), modus);
+    }
+#endif /* #ifdef SIDM */
+
+#ifdef BLACKHOLES
+  in(&NumBhs, modus);
+
+    if(NumBhs > 0)
+    {
+      /* Bh-Particle data  */
+      byten(&BhP[0], NumBhs * sizeof(struct Bh_Particle_Data), modus);
+    }
+#endif
+
+#ifdef BH_ACTIVE
+  in(&TimeBinsBh.NActiveParticles, modus);
+  byten(TimeBinsBh.ActiveParticleList, TimeBinsBh.NActiveParticles * sizeof(int), modus);
+  byten(TimeBinsBh.NextInTimeBin, NumBhs * sizeof(int), modus);
+  byten(TimeBinsBh.PrevInTimeBin, NumBhs * sizeof(int), modus);
+  byten(TimeBinsBh.TimeBinCount, TIMEBINS * sizeof(int), modus);
+  byten(TimeBinsBh.FirstInTimeBin, TIMEBINS * sizeof(int), modus);
+  byten(TimeBinsBh.LastInTimeBin, TIMEBINS * sizeof(int), modus);
+#endif
+
+#ifdef HALO_SEEDING
+#ifndef FOF
+#error "HALO_SEEDING requires FOF to be enabled."
+#endif /* #ifdef FOF */
+fof_seeding_registry_io(&HaloSeeds, modus);
+#endif
+
 #ifdef BLACKHOLES 
   in(&NumBhs, modus);
   
@@ -1591,3 +1636,38 @@ void deallocate_iobuf(int modus)
 
   free(io_buf);
 }
+
+#ifdef HALO_SEEDING
+/*! \brief Manages reading/writing of halo seeding registry data 
+ *  in the restart-files.
+ *
+ *  \param[in] modus Read or write.
+ *
+ *  \return void
+ */
+void fof_seeding_registry_io(HaloSeedRegistry *r, int modus)
+{
+    if(modus == MODUS_WRITE)
+    {
+        /* write directly from the registry's own storage; nothing to free */
+        in(&r->n, modus);
+        byten(r->ids, r->n * sizeof(MyIDType), modus);
+    }
+    else
+    {
+        int n;
+
+        in(&n, modus);
+
+        /* (re)allocate the registry's movable storage and read directly into it */
+        if(r->ids)
+            myfree_movable(r->ids);
+
+        r->n   = n;
+        r->max = (n > 0) ? n : 128;
+        r->ids = (MyIDType *)mymalloc_movable(&r->ids, "HaloSeedIDs", r->max * sizeof(MyIDType));
+
+        byten(r->ids, n * sizeof(MyIDType), modus);
+    }
+}
+#endif /* #ifdef HALO_SEEDING */

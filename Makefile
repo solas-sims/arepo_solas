@@ -15,6 +15,12 @@ endif
 include config-makefile
 -include Makefile.systype
 
+# Normalize SYSTYPE: Makefile.systype conventionally sets it quoted
+# (SYSTYPE="MACOSX"), but the platform blocks below match on the bare
+# word (via $(filter ...)). Strip any quote characters here so both
+# quoted and unquoted values from Makefile.systype work.
+SYSTYPE := $(strip $(subst ",,$(SYSTYPE)))
+
 $(info Build configuration:)
 $(info SYSTYPE: $(SYSTYPE))
 $(info CONFIG: $(CONFIG))
@@ -59,23 +65,28 @@ HWLOC_INCL =
 HWLOC_LIB =
 endif
 
+# GRACKLE_DIR points at a Grackle install (containing include/ and lib{,64}/); override
+# per-machine by setting it in Makefile.systype (e.g. GRACKLE_DIR = $(HOME)/software/grackle_solas)
+# or on the command line (make GRACKLE_DIR=...), same convention as SYSTYPE above.
+GRACKLE_DIR ?= $(HOME)/software/grackle_solas/
+GRACKLE_LIBDIR := $(or $(firstword $(wildcard $(GRACKLE_DIR)/lib64 $(GRACKLE_DIR)/lib)),$(GRACKLE_DIR)/lib)
+
 ifeq (USE_GRACKLE,$(findstring USE_GRACKLE,$(CONFIGVARS)))
 OPTIONS += -DCONFIG_BFLOAT_8
-GRACKLE_INCL = -I$(HOME)/Codes/grackle/include
-GRACKLE_LIB = -L$(HOME)/Codes/grackle/lib -lgrackle -Wl,-rpath,$(HOME)/Codes/grackle/lib
-ifeq ($(SYSTYPE),"MACOSX")
-LDFLAGS += -L$(shell BREW --prefix gcc)/lib/gcc/current -lgfortran -lquadmath
+GRACKLE_INCL = -I$(GRACKLE_DIR)/include
+GRACKLE_LIB = -L$(GRACKLE_LIBDIR) -lgrackle -Wl,-rpath,$(GRACKLE_LIBDIR)
+ifeq ($(SYSTYPE),MACOSX)
+LDFLAGS += -L$(shell brew --prefix gcc)/lib/gcc/current -lgfortran -lquadmath
 else
 LDFLAGS += -lgfortran -lquadmath
 endif
 else
 GRACKLE_INCL =
 GRACKLE_LIB =
-LDFLAGS +=
 endif
 
 #Mac OS using MacPorts modules for openmpi, fftw, gsl, hdf5 and hwloc
-ifeq ($(SYSTYPE),"Darwin")
+ifeq ($(filter Darwin,$(SYSTYPE)),Darwin)
 # compiler and its optimization options
 CC        = mpicc   # sets the C-compiler
 OPTIMIZE  = -std=c11 -ggdb -g -O0 -fno-omit-frame-pointer -Wall -Wno-format-security -Wno-unknown-pragmas -Wno-unused-function
@@ -95,7 +106,7 @@ endif
 # end of Darwin
 
 #Mac OS using MacPorts modules for openmpi, fftw, gsl, hdf5 and hwloc
-ifeq ($(SYSTYPE),"MACOSX")
+ifeq ($(filter MACOSX,$(SYSTYPE)),MACOSX)
 BREW := /opt/homebrew/bin/brew
 $(info BREW: $(BREW))
 
@@ -117,10 +128,10 @@ HDF5_LIB  = -L$(shell $(BREW) --prefix hdf5)/lib
 HWLOC_INCL= -I$(shell $(BREW) --prefix hwloc)/include
 HWLOC_LIB = -L$(shell $(BREW) --prefix hwloc)/lib -lhwloc
 endif
-# end of Darwin
+# end of MACOSX
 
 #Linux
-ifeq ($(SYSTYPE),"LINUX")
+ifeq ($(filter LINUX,$(SYSTYPE)),LINUX)
 # compiler and its optimization options
 CC        = mpicc
 OPTIMIZE  = -std=c11 -ggdb -g -O0 -fno-omit-frame-pointer -Wall -Wno-format-security -Wno-unknown-pragmas -Wno-unused-function
@@ -139,6 +150,56 @@ HDF5_LIB  = -L/usr/lib/x86_64-linux-gnu/hdf5/serial/
 HWLOC_INCL=
 endif
 # end of Linux
+
+#Ngarrgu Tindebeek
+ifeq ($(filter NT,$(SYSTYPE)),NT)
+# compiler and its optimization options
+CC        =  mpicc
+OPTIMIZE  =  -std=c11 -ggdb -O3 -Wall -Wno-format-security -Wno-unknown-pragmas -Wno-unused-function
+
+MPICH_INCL=
+MPICH_LIB = -lmpi
+GSL_INCL  = -I$(EBROOTGSL)/include
+GSL_LIB   = -L$(EBROOTGSL)/lib -lgsl -lgslcblas
+HWLOC_LIB =
+
+# libraries that are included on demand, depending on Config.sh options
+FFTW_INCL = -I$(EBROOTFFTW)/include
+FFTW_LIBS = -L$(EBROOTFFTW)/lib
+HDF5_INCL = -I$(EBROOTHDF5)/include -DH5_USE_16_API
+HDF5_LIB  = -L$(EBROOTHDF5)/lib -lhdf5 -lz
+HWLOC_INCL=
+endif
+# end of NT
+
+# Pawsey Setonix (Cray: PrgEnv-cray + cray-mpich; load gsl, fftw, hdf5 modules)
+ifneq ($(filter Setonix "Setonix",$(SYSTYPE)),)
+# the Cray compiler wrapper 'cc' provides MPI includes and libraries itself
+CC        = cc
+OPTIMIZE  = -std=c11 -ggdb -g -O0 -fno-omit-frame-pointer -Wall -Wno-format-security -Wno-unknown-pragmas -Wno-unused-function
+#OPTIMIZE = -std=c11 -g -O2 -Wall -Wno-format-security -Wno-unknown-pragmas -Wno-unused-function  # production
+
+MPICH_INCL=
+MPICH_LIB = #-lmpi provided by the cc wrapper
+
+GSL_INCL  = -I$(PAWSEY_GSL_HOME)/include
+GSL_LIB   = -L$(PAWSEY_GSL_HOME)/lib -lgsl -lgslcblas
+
+# NOTE: keep gmp in its own prefix. A shared prefix (e.g. ~/software) whose
+# include/ also contains another MPI's mpi.h will shadow cray-mpich's mpi.h
+# and break the link with undefined ompi_* symbols.
+GMP_INCL  = -I$(HOME)/software/gmp-6.3.0/include
+GMP_LIB   = -L$(HOME)/software/gmp-6.3.0/lib64 -lgmp
+
+# libraries that are included on demand, depending on Config.sh options
+FFTW_INCL = -I$(PAWSEY_FFTW_HOME)/include
+FFTW_LIBS = -L$(PAWSEY_FFTW_HOME)/lib
+HDF5_INCL = -I$(PAWSEY_HDF5_HOME)/include -DH5_USE_16_API
+HDF5_LIB  = -L$(PAWSEY_HDF5_HOME)/lib -lhdf5 -lz
+HWLOC_INCL=
+HWLOC_LIB =
+endif
+# end of Setonix
 
 ifndef LINKER
 LINKER = $(CC)
@@ -297,14 +358,34 @@ INCL += cooling/cooling_vars.h \
 SUBDIRS += cooling
 endif
 
+ifneq (,$(filter USE_GRACKLE,$(CONFIGVARS)))
+ifeq (,$(filter COOLING,$(CONFIGVARS)))
+$(error USE_GRACKLE requires COOLING)
+endif
+endif
+
+ifneq (,$(filter GRACKLE_CHEMISTRY,$(CONFIGVARS)))
+ifeq (,$(filter USE_GRACKLE,$(CONFIGVARS)))
+$(error GRACKLE_CHEMISTRY requires USE_GRACKLE)
+endif
+endif
+
 ifeq (USE_GRACKLE,$(findstring USE_GRACKLE,$(CONFIGVARS)))
 OBJS += cooling/grackle.o
 endif
 
-#SFR
+# Enforce at least one SF model at a time
 ifneq (,$(filter USE_SFR,$(CONFIGVARS)))
-OBJS += star_formation/starformation.o 
-SUBDIRS += star_formation 
+ifeq (,$(filter EEOS_SF AGORA_SF JEANS_SF,$(CONFIGVARS)))
+$(error USE_SFR requires one of EEOS_SF, AGORA_SF, or JEANS_SF)
+endif
+endif
+
+# Enforce at most one SF model at a time
+SF_MODELS := $(filter EEOS_SF AGORA_SF JEANS_SF,$(CONFIGVARS))
+ifneq ($(word 2,$(SF_MODELS)),)
+$(error Only one SF model may be active at a time. Currently enabled: $(SF_MODELS))
+endif
 
 ifneq (,$(filter EEOS_SF AGORA_SF JEANS_SF,$(CONFIGVARS)))
 ifeq (,$(filter USE_SFR,$(CONFIGVARS)))
@@ -312,11 +393,16 @@ $(error EEOS_SF, AGORA_SF, and JEANS_SF all require USE_SFR)
 endif
 endif
 
-# Enforce only one SF model at a time
-SF_MODELS := $(filter EEOS_SF AGORA_SF JEANS_SF,$(CONFIGVARS))
-ifneq ($(word 2,$(SF_MODELS)),)
-$(error Only one SF model may be active at a time. Currently enabled: $(SF_MODELS))
+ifneq (,$(filter SF_THRESHOLD_HALO_MASS_DEPENDENT,$(CONFIGVARS)))
+ifeq (,$(filter USE_SFR,$(CONFIGVARS)))
+$(error SF_THRESHOLD_HALO_MASS_DEPENDENT requires USE_SFR (and one of EEOS_SF/AGORA_SF/JEANS_SF))
 endif
+endif
+
+#SFR
+ifneq (,$(filter USE_SFR,$(CONFIGVARS)))
+OBJS += star_formation/starformation.o 
+SUBDIRS += star_formation 
 
 ifneq (,$(filter EEOS_SF,$(CONFIGVARS)))
 OBJS  += star_formation/sfr_eEOS.o
@@ -479,6 +565,12 @@ CONFIGVARS += BH_ACTIVE
 $(shell $(call add_define,BH_ACTIVE))
 endif
 
+ifneq (,$(filter BH_FEEDBACK_ACTIVE,$(CONFIGVARS)))
+ifeq (,$(filter BH_ACCRETION_ACTIVE,$(CONFIGVARS)))
+$(error BH_FEEDBACK_ACTIVE requires BH_ACCRETION_ACTIVE)
+endif
+endif
+
 ifneq (,$(filter BH_ACTIVE,$(CONFIGVARS)))
 ifeq (,$(filter BLACKHOLES,$(CONFIGVARS)))
 $(error BH_ACTIVE requires BLACKHOLES)
@@ -510,7 +602,15 @@ OBJS += blackholes/bh_accretion.o \
 endif
 
 ifneq (,$(filter BH_FEEDBACK_ACTIVE,$(CONFIGVARS)))
-OBJS += blackholes/bh_feedback.o   
+OBJS += blackholes/bh_feedback.o
+endif
+
+ifneq (,$(filter BH_MERGER,$(CONFIGVARS)))
+ifeq (,$(filter BH_ACTIVE,$(CONFIGVARS)))
+$(error BH_MERGER requires BH_ACTIVE)
+endif
+OBJS += blackholes/bh_merger.o
+INCL += blackholes/bh_proto.h
 endif
 
 ifeq (FOF,$(findstring FOF,$(CONFIGVARS)))
@@ -524,9 +624,10 @@ OBJS += fof/fof.o \
 INCL += fof/fof.h
 SUBDIRS += fof
 
-ifeq (FIND_HALOS,$(findstring FIND_HALOS,$(CONFIGVARS)))
-OBJS += fof/fof_seeding.o 
-endif
+ifeq (HALO_SEEDING,$(findstring HALO_SEEDING,$(CONFIGVARS)))
+OBJS    += fof/fof_seeding.o \
+		   fof/fof_seeding_registry.o
+INCL    += fof/fof_seeding.h
 endif
 
 ifeq (SUBFIND,$(findstring SUBFIND,$(CONFIGVARS)))
@@ -552,6 +653,19 @@ INCL += subfind/subfind.h
 SUBDIRS += subfind
 endif
 
+ifeq (BLACKHOLE_SEEDING,$(findstring BLACKHOLE_SEEDING,$(CONFIGVARS)))
+OBJS    += blackholes/bh_seed.o
+INCL    += blackholes/bh_proto.h
+SUBDIRS += blackholes
+endif
+endif # FOF
+
+# SIDM
+ifeq (SIDM,$(findstring SIDM,$(CONFIGVARS)))
+OBJS += sidm/sidm_density.o sidm/sidm_tree.o sidm/sidm_scatter.o
+INCL += sidm/sidm.h sidm/sidm_tree.h
+SUBDIRS += sidm
+endif
 
 ##########################
 #combine compiler options#

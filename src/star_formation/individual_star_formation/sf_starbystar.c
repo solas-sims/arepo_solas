@@ -7,6 +7,8 @@
 
 #include "../../domain/domain.h"
 
+#ifdef INDIVIDUAL_STAR_BY_STAR_FORMATION
+
 static int sf_starbystar_evaluate(int target, int mode, int threadid);
 static int sf_starbystar_isactive(int n);
 
@@ -75,7 +77,6 @@ static void out2particle(data_out *out, int i, int mode)
       SP[i].NgbsMass += out->NgbsMass;
     }
 }
-
 
 #include "../../utils/generic_comm_helpers2.h"
 
@@ -344,7 +345,13 @@ static int sf_starbystar_evaluate(int target, int mode, int threadid)
 
       if(r2 < h2)
         {
-          double mu = compute_mu(i); 
+#ifdef USE_GRACKLE
+          double mu = compute_mu(i);
+#else /* #ifdef USE_GRACKLE */
+          /* assume full ionization -- same fallback as sfr_AGORA.c/sfr_eEOS.c use when
+           * Grackle isn't tracking species abundances to compute an actual mu */
+          double mu = 4 / (8 - 5 * (1 - HYDROGEN_MASSFRAC));
+#endif /* #ifdef USE_GRACKLE #else */
 
           double number_dens = (SphP[i].Density * All.cf_UnitDensity_in_cgs) / mu / PROTONMASS;
           double temp = (SphP[i].Utherm * All.cf_UnitVelocity_in_cm_per_s * All.cf_UnitVelocity_in_cm_per_s) 
@@ -388,3 +395,5 @@ int sf_starbystar_isactive(int n)
 
   return 1;
 }
+
+#endif /* #ifdef INDIVIDUAL_STAR_BY_STAR_FORMATION */

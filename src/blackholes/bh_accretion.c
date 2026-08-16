@@ -8,6 +8,7 @@
 
 #include "../domain/domain.h"
 
+#ifdef BH_ACCRETION_ACTIVE
 
 static int bh_accretion_evaluate(int target, int mode, int threadid);
 static void bh_accretion_rate(void);
@@ -154,7 +155,6 @@ static void out2particle(data_out *out, int i, int mode)
 //#endif
     }
 }
-
 
 #include "../utils/generic_comm_helpers2.h"
 
@@ -497,7 +497,21 @@ static void bh_accretion_rate(void)
               * denominator_inv*denominator_inv*denominator_inv;
             }
           else
-            terminate("Invalid denominator in Bondi Accretion Rate!");
+            {
+              /* denominator = c_s^2 + |v_gas|^2 can only be <= 0 (or NaN, which also fails
+               * "> 0") when both the local sound speed and gas velocity are exactly zero, or
+               * GasInternalEnergy is corrupted (e.g. negative, making c_s = sqrt(negative) =
+               * NaN) -- there's no meaningful gas environment to accrete from here, matching
+               * the GasDensity<=0 branch above which already treats that case as "no
+               * accretion" rather than fatal. Do the same instead of crashing the run. */
+              printf(
+                  "WARNING: BH_ACCRETION: BhP[%d] (ID=%llu) has non-positive/NaN Bondi denominator "
+                  "(GasDensity=%g GasInternalEnergy=%g GasVelocity=[%g,%g,%g]) -- treating as no accretion\n",
+                  i, (unsigned long long)PPB(i).ID, gas_density, BhP[i].GasInternalEnergy, BhP[i].GasVelocity[0],
+                  BhP[i].GasVelocity[1], BhP[i].GasVelocity[2]);
+              myflush(stdout);
+              BondiRate = 0;
+            }
         }
       else
         BondiRate = 0;
@@ -729,3 +743,5 @@ static void bh_accretion_rate(void)
   mpi_printf("BLACKHOLES: Number of active blackholes = %lld, Black hole max ADP accretion rate = %e (code units)\n", bh_active, acc_rate_for_print);
 }
 #endif
+
+#endif /* #ifdef BH_ACCRETION_ACTIVE */

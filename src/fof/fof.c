@@ -754,6 +754,36 @@ void fof_compute_group_properties(int gr, int start, int len)
       gr_MassType[k]       = 0;
     }
 
+#ifdef HALO_SEEDING
+  Group[gr].MaxGasDens      = -1;
+  Group[gr].MaxGasDensID    = 0;
+  Group[gr].MaxGasDensTask  = -1;
+  Group[gr].MaxGasDensIndex = -1;
+#ifdef BH_SEED_ON_ZERO_METALLICITY
+  Group[gr].MaxGasMetallicity = -1;
+#endif /* #ifdef BH_SEED_ON_ZERO_METALLICITY */
+
+#ifdef BH_SEED_ON_VELDISP
+  Group[gr].VelDispDM = 0;
+  for(k = 0; k < 3; k++)
+    Group[gr].VelDM[k] = 0;
+#endif /* #ifdef BH_SEED_ON_VELDISP */
+
+#ifdef BH_SEED_ON_POTENTIAL_POSITION
+  Group[gr].MinPotential      = MAX_REAL_NUMBER;
+  Group[gr].MinPotentialID    = 0;
+  Group[gr].MinPotentialTask  = -1;
+  Group[gr].MinPotentialIndex = -1;
+  for(k = 0; k < 3; k++)
+    Group[gr].MinPotentialPos[k] = 0;
+
+  Group[gr].MaxGasDensNearPotential      = -1;
+  Group[gr].MaxGasDensNearPotentialID    = 0;
+  Group[gr].MaxGasDensNearPotentialTask  = -1;
+  Group[gr].MaxGasDensNearPotentialIndex = -1;
+#endif /* #ifdef BH_SEED_ON_POTENTIAL_POSITION */
+#endif /* #ifdef HALO_SEEDING */
+
   // calculate
   for(k = 0; k < len; k++)
     {
@@ -772,6 +802,41 @@ void fof_compute_group_properties(int gr, int start, int len)
         gr_Sfr += SphP[index].Sfr;
 #endif /* #ifdef USE_SFR */
 
+#ifdef HALO_SEEDING
+      /* track the densest gas cell of the group as potential seeding donor */
+      if(type == 0 && P[index].Mass > 0 && SphP[index].Density > Group[gr].MaxGasDens)
+        {
+          Group[gr].MaxGasDens      = SphP[index].Density;
+          Group[gr].MaxGasDensID    = P[index].ID;
+          Group[gr].MaxGasDensTask  = ThisTask;
+          Group[gr].MaxGasDensIndex = index;
+        }
+
+#ifdef BH_SEED_ON_ZERO_METALLICITY
+      /* track the most metal-enriched gas cell of the group; a halo is only
+       * "pristine" (eligible for zero-metallicity seeding) if even this cell
+       * is below All.ZeroMetallicityThresholdForFOFSeeding */
+      if(type == 0 && P[index].Mass > 0)
+        {
+          double Z = SphP[index].GasMetals / P[index].Mass;
+          if(Z > Group[gr].MaxGasMetallicity)
+            Group[gr].MaxGasMetallicity = Z;
+        }
+#endif /* #ifdef BH_SEED_ON_ZERO_METALLICITY */
+
+#ifdef BH_SEED_ON_VELDISP
+      /* DM-only mass-weighted velocity and |v|^2 sums; converted to the DM
+       * bulk velocity and 3D velocity dispersion in fof_finish_group_properties() */
+      if(type == 1)
+        {
+          double v2 = P[index].Vel[0] * P[index].Vel[0] + P[index].Vel[1] * P[index].Vel[1] + P[index].Vel[2] * P[index].Vel[2];
+          Group[gr].VelDispDM += P[index].Mass * v2;
+          for(j = 0; j < 3; j++)
+            Group[gr].VelDM[j] += P[index].Mass * P[index].Vel[j];
+        }
+#endif /* #ifdef BH_SEED_ON_VELDISP */
+#endif /* #ifdef HALO_SEEDING */
+
       for(j = 0; j < 3; j++)
         {
           xyz[j] = P[index].Pos[j];
@@ -779,6 +844,23 @@ void fof_compute_group_properties(int gr, int start, int len)
           gr_CM[j] += P[index].Mass * xyz[j];
           gr_Vel[j] += P[index].Mass * P[index].Vel[j];
         }
+
+#if defined(HALO_SEEDING) && defined(BH_SEED_ON_POTENTIAL_POSITION)
+      /* track the group's potential minimum across ALL particle types (not
+       * DM-only -- gas/stars undergo dissipative collapse and sit deeper in
+       * the well than DM's collisionless dynamics allow); xyz[] here is the
+       * FirstPos-relative position already computed just above for CM, reused
+       * rather than recomputed */
+      if(P[index].Potential < Group[gr].MinPotential)
+        {
+          Group[gr].MinPotential      = P[index].Potential;
+          Group[gr].MinPotentialID    = P[index].ID;
+          Group[gr].MinPotentialTask  = ThisTask;
+          Group[gr].MinPotentialIndex = index;
+          for(j = 0; j < 3; j++)
+            Group[gr].MinPotentialPos[j] = xyz[j];
+        }
+#endif /* #if defined(HALO_SEEDING) && defined(BH_SEED_ON_POTENTIAL_POSITION) */
     }
 
   // put values into group struct
@@ -876,6 +958,48 @@ void fof_exchange_group_data(void)
       Group[start].Sfr += get_Group[i].Sfr;
 #endif /* #ifdef USE_SFR */
 
+#ifdef HALO_SEEDING
+      /* keep the globally densest gas cell across group fragments */
+      if(get_Group[i].MaxGasDens > Group[start].MaxGasDens)
+        {
+          Group[start].MaxGasDens      = get_Group[i].MaxGasDens;
+          Group[start].MaxGasDensID    = get_Group[i].MaxGasDensID;
+          Group[start].MaxGasDensTask  = get_Group[i].MaxGasDensTask;
+          Group[start].MaxGasDensIndex = get_Group[i].MaxGasDensIndex;
+        }
+
+#ifdef BH_SEED_ON_ZERO_METALLICITY
+      /* keep the highest gas metallicity across group fragments, so a halo is
+       * only judged pristine once every fragment's gas has been accounted for */
+      if(get_Group[i].MaxGasMetallicity > Group[start].MaxGasMetallicity)
+        Group[start].MaxGasMetallicity = get_Group[i].MaxGasMetallicity;
+#endif /* #ifdef BH_SEED_ON_ZERO_METALLICITY */
+
+#ifdef BH_SEED_ON_VELDISP
+      Group[start].VelDispDM += get_Group[i].VelDispDM;
+      for(j = 0; j < 3; j++)
+        Group[start].VelDM[j] += get_Group[i].VelDM[j];
+#endif /* #ifdef BH_SEED_ON_VELDISP */
+
+#ifdef BH_SEED_ON_POTENTIAL_POSITION
+      if(get_Group[i].MinPotential < Group[start].MinPotential)
+        {
+          Group[start].MinPotential      = get_Group[i].MinPotential;
+          Group[start].MinPotentialID    = get_Group[i].MinPotentialID;
+          Group[start].MinPotentialTask  = get_Group[i].MinPotentialTask;
+          Group[start].MinPotentialIndex = get_Group[i].MinPotentialIndex;
+          /* re-express the incoming fragment's candidate position in the RECEIVING
+           * group's own FirstPos frame before it can be compared/stored -- the same
+           * correction CM already applies, needed here for exactly the same reason:
+           * different tasks holding different fragments of a group spanning a
+           * periodic boundary each chose their own FirstPos */
+          for(j = 0; j < 3; j++)
+            Group[start].MinPotentialPos[j] =
+                fof_periodic(get_Group[i].MinPotentialPos[j] + get_Group[i].FirstPos[j] - Group[start].FirstPos[j]);
+        }
+#endif /* #ifdef BH_SEED_ON_POTENTIAL_POSITION */
+#endif /* #ifdef HALO_SEEDING */
+
       for(j = 0; j < 3; j++)
         {
           xyz[j] = get_Group[i].CM[j] / get_Group[i].Mass;
@@ -910,6 +1034,34 @@ void fof_finish_group_properties(void)
               cm[j]          = fof_periodic_wrap(cm[j] + Group[i].FirstPos[j]);
               Group[i].CM[j] = cm[j];
             }
+
+#ifdef BH_SEED_ON_VELDISP
+          if(Group[i].MassType[1] > 0)
+            {
+              double mean_v2 = Group[i].VelDispDM / Group[i].MassType[1];
+              double vbar2   = 0;
+
+              for(j = 0; j < 3; j++)
+                {
+                  double vbar_j = Group[i].VelDM[j] / Group[i].MassType[1];
+                  vbar2 += vbar_j * vbar_j;
+                  Group[i].VelDM[j] = vbar_j;
+                }
+
+              double sigma2 = mean_v2 - vbar2;
+              /* mean(v^2) - mean(v)^2 can go slightly negative from roundoff when
+               * peculiar velocity dominates internal dispersion (most likely right
+               * at threshold-mass halos); guard rather than let it produce NaN */
+              Group[i].VelDispDM = (sigma2 > 0) ? sqrt(sigma2) : 0;
+            }
+          else
+            Group[i].VelDispDM = -1;
+#endif /* #ifdef BH_SEED_ON_VELDISP */
+
+#ifdef BH_SEED_ON_POTENTIAL_POSITION
+          for(j = 0; j < 3; j++)
+            Group[i].MinPotentialPos[j] = fof_periodic_wrap(Group[i].MinPotentialPos[j] + Group[i].FirstPos[j]);
+#endif /* #ifdef BH_SEED_ON_POTENTIAL_POSITION */
         }
     }
 

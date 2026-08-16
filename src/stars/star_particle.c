@@ -15,7 +15,6 @@ double IntegralTrapezoidal(double a, double b, int N, double (*f)(double))
 
   return sum * h;
 }
-
 /* Unnormalized Kroupa IMF */
 double imf_kroupa(double m) 
 {

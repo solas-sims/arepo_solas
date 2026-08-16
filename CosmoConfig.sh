@@ -13,14 +13,14 @@ REGULARIZE_MESH_FACE_ANGLE              # Use maximum face angle as roundness cr
 #--------------------------------------- Refinement and derefinement
 REFINEMENT_SPLIT_CELLS 			 # Refinement
 REFINEMENT_MERGE_CELLS                   # Derefinement
-#REFINEMENT_VOLUME_LIMIT    		 # Limit the volume of cells and the maximum volume difference between neighboring cels
-#NODEREFINE_BACKGROUND_GRID 		 # Do not de-refine low-res gas cells in zoom simulations
+REFINEMENT_VOLUME_LIMIT
 
 #--------------------------------------- Time integration options
+
 TREE_BASED_TIMESTEPS 			 # non-local timestep criterion (take 'signal speed' into account)
 
 #------------------------------------------------ TreePM Options
-PMGRID=256                                       # Enables particle mesh; numberof cells used for grid in each dimension
+PMGRID=64                                       # Enables particle mesh; numberof cells used for grid in each dimension
 RCUT=5.0                                         # This can be used to override the maximum radius in which the short-range tree-force is evaluated (in case the TreePM algorithm is used). The default value is 4.5, given in mesh-cells.
 
 #--------------------------------------- Gravity treatment
@@ -31,7 +31,7 @@ ALLOW_DIRECT_SUMMATION         # Performed direct summation instead of tree-base
 DIRECT_SUMMATION_THRESHOLD=500 # Overrides maximum number of active particles for which direct summation is performed instead of tree based calculation
 
 #--------------------------------------- Gravity softening
-NSOFTTYPES=4                    # Number of different softening values to which particle types can be mapped.
+NSOFTTYPES=6                    # Number of different softening values to which particle types can be mapped.
 MULTIPLE_NODE_SOFTENING         # If a tree node is to be used which is softened, this is done with the softenings of its different mass components
 #INDIVIDUAL_GRAVITY_SOFTENING=32 # bitmask with particle types where the softenig type should be chosen with that of parttype 1 as a reference type
 ADAPTIVE_HYDRO_SOFTENING        # Adaptive softening of gas cells depending on their size
@@ -46,7 +46,7 @@ OVERRIDE_PEANOGRID_WARNING  # don't stop if peanogrid is not fine enough
 
 #--------------------------------------- Output/Input options
 HAVE_HDF5 # needed when HDF5 I/O support is desired (recommended)
-INPUT_IN_DOUBLEPRECISION
+#INPUT_IN_DOUBLEPRECISION
 GENERATE_GAS_IN_ICS
 
 #------------------------------------------------ On the fly FOF groupfinder
@@ -64,21 +64,46 @@ SUBFIND                                          # enables substructure finder
 DEBUG # enables core-dumps
 
 #--------------------------------------- non-standard phyiscs
-ENFORCE_JEANS_STABILITY_OF_CELLS # this imposes an adaptive floor for the temperature
+#ENFORCE_JEANS_STABILITY_OF_CELLS # this imposes an adaptive floor for the temperature
 COOLING                          # Simple primordial cooling
 USE_GRACKLE			 # Use Grackle library for cooling
-GRACKLE_CHEMISTRY=0
+GRACKLE_CHEMISTRY=3
 #NOUVBACKGROUND			 # Switches off UV background
 USE_SFR                          # Activate star formation
 #EEOS_SF			 # AGORA star formation scheme
-JEANS_SF
+#JEANS_SF
 #JEANS_MASS_BASED
-USE_CELIB
+AGORA_SF
+#SF_THRESHOLD_HALO_MASS_DEPENDENT # raises the SF density threshold in low-mass halos; see Template-Config.sh and
+                                   # documentation/source/sf_threshold_halo_mass.md -- new/untested, off by default
+#USE_CELIB
 STARS
+STAR_PARTICLES=0
+WINDS
 SUPERNOVAE
 #PASSIVE_SCALARS=1
-#METALS
+METALS
 
 #REFINEMENT_AROUND_BH
-#BLACKHOLES
-#BONDI_ACCRETION
+BLACKHOLES
+BONDI_ACCRETION
+BH_MERGER                       # merges gravitationally-bound black hole pairs closer than BhMergerRadiusFactor (param.txt)
+                                 # x <length scale> of each other; requires BH_ACTIVE (see src/blackholes/bh_merger.c).
+                                 # <length scale> is chosen by BhMergerRadiusCriterion (param.txt): HSML (default, legacy
+                                 # behaviour, max(Hsml_i,Hsml_j)), SOFTENING (max gravitational softening of the pair),
+                                 # MAX_HSML_SOFTENING, or MIN_HSML_SOFTENING. Pairs are matched greedily by ascending
+                                 # separation (not mutual-nearest-neighbour, which can deadlock 3+ body subsystems).
+
+EVALPOTENTIAL                   # computes gravitational potential; required by BH_SEED_ON_POTENTIAL_POSITION below
+
+HALO_SEEDING
+BLACKHOLE_SEEDING
+BH_SEED_ON_MASS                 # seed once halo mass exceeds MinHaloMassForFOFSeeding (param.txt); the literature-standard channel
+#BH_SEED_ON_ZERO_METALLICITY     # seed pristine halos (max gas-cell metallicity <= ZeroMetallicityThresholdForFOFSeeding, param.txt);
+                                 # requires METALS above to be enabled. Channels OR together if more than one is active, and a halo
+                                 # already hosting a black hole (Type 5) is never reseeded regardless of channel.
+#BH_SEED_ON_VELDISP               # seed once a halo's DM-only 3D velocity dispersion exceeds MinVelDispForFOFSeeding (param.txt)
+BH_SEED_ON_POTENTIAL_POSITION    # donor cell is the densest gas cell (all particle types) within PotentialDonorSearchNSoft x the
+                                 # DM softening length of the halo's potential minimum, instead of the unrestricted densest gas
+                                 # cell; defers seeding (rather than falling back) if no gas cell qualifies. Requires EVALPOTENTIAL.
+#OUTPUT_EVERY_STEP

@@ -39,6 +39,9 @@
 #ifdef BLACKHOLES
 #define TAG_BHDATA 16
 #endif
+#ifdef SIDM
+#define TAG_DMDATA 17
+#endif
 #define TAG_GRAV_B 19
 #define TAG_HYDRO_A 22
 #define TAG_HYDRO_B 23
@@ -50,6 +53,9 @@
 #define TAG_DENS_B 36
 #define TAG_LOCALN 37
 #define TAG_FOF_A 45
+#define TAG_FOF_SEEDING_DONOR_POS 46
+#define TAG_FOF_SEEDING_DONOR_POS_B 47
+#define TAG_FOF_SEEDING_DONOR_CAND 48
 #define TAG_PDATA_SPH 70
 #define TAG_KEY_SPH 71
 #define TAG_BARRIER 85

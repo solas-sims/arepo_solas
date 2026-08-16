@@ -3,11 +3,7 @@
 #include "../main/allvars.h"
 #include "../main/proto.h"
 
-
-static inline int rt_node_inverted(int no)
-{
-  return RtNgb_Nodes[no].rt_range_min[0] >= RtNgb_Nodes[no].rt_range_max[0];
-}
+#ifdef STAR_RADIATION_ACTIVE
 
 static inline int ray_box_intersect(const double *ray_pos, const double *ray_dir,
                                     const MyNgbTreeFloat *rmin, const MyNgbTreeFloat *rmax,
@@ -25,7 +21,6 @@ static inline int ray_box_intersect(const double *ray_pos, const double *ray_dir
   d[2] = NEAREST_Z(center[2] - ray_pos[2]);
 
   double halfextent[3] = {0.5 * (rmax[0] - rmin[0]), 0.5 * (rmax[1] - rmin[1]), 0.5 * (rmax[2] - rmin[2])};
-
   double halfdomain[3] = {boxHalf_X, boxHalf_Y, boxHalf_Z};
 
   double tmin = -MAX_REAL_NUMBER, tmax = MAX_REAL_NUMBER;
@@ -34,12 +29,7 @@ static inline int ray_box_intersect(const double *ray_pos, const double *ray_dir
     {
       /* Box too wide along this axis for a single minimum-image shift to be trustworthy */
       if(halfextent[i] >= halfdomain[i])
-        { 
-          /* Conservative hit */ 
-          *t_enter = 0.0;
-          *t_exit = MAX_REAL_NUMBER;
-          return 1;
-        }
+        continue;
 
       double shifted_min = ray_pos[i] + d[i] - halfextent[i];
       double shifted_max = ray_pos[i] + d[i] + halfextent[i];
@@ -221,6 +211,9 @@ void raytrace_treewalk(RayPacket *ray, RayWorkStack *work, RayExportBuffer *expo
           if(P[no].Type != 0 || P[no].Mass == 0 || P[no].ID == 0)
             continue;
 
+          if(P[no].Ti_Current != All.Ti_Current)
+            drift_particle(no, All.Ti_Current);
+
           double length = cur.t_exit - cur.t_enter;
               
           double Dtau_E[WAVEBANDS];
@@ -315,18 +308,20 @@ void raytrace_treewalk(RayPacket *ray, RayWorkStack *work, RayExportBuffer *expo
       else if(no < Ngb_MaxPart + Ngb_MaxNodes)
         {
           struct NgbNODE *nop = &Ngb_Nodes[no];
-          struct RtNgbNODE *rt_nop = &RtNgb_Nodes[no];
+     
+          if(nop->Ti_Current != All.Ti_Current)
+            drift_node(nop, All.Ti_Current);
 
           /* Node geometry */
           /* Node center */
-          double cx = 0.5 * (rt_nop->rt_range_max[0] + rt_nop->rt_range_min[0]);
-          double cy = 0.5 * (rt_nop->rt_range_max[1] + rt_nop->rt_range_min[1]);
-          double cz = 0.5 * (rt_nop->rt_range_max[2] + rt_nop->rt_range_min[2]);
+          double cx = 0.5 * (nop->u.d.range_max[0] + nop->u.d.range_min[0]);
+          double cy = 0.5 * (nop->u.d.range_max[1] + nop->u.d.range_min[1]);
+          double cz = 0.5 * (nop->u.d.range_max[2] + nop->u.d.range_min[2]);
                             
           /* Node extent */ 
-          double dx = rt_nop->rt_range_max[0] - rt_nop->rt_range_min[0];
-          double dy = rt_nop->rt_range_max[1] - rt_nop->rt_range_min[1];
-          double dz = rt_nop->rt_range_max[2] - rt_nop->rt_range_min[2];
+          double dx = nop->u.d.range_max[0] - nop->u.d.range_min[0];
+          double dy = nop->u.d.range_max[1] - nop->u.d.range_min[1];
+          double dz = nop->u.d.range_max[2] - nop->u.d.range_min[2];
 
           /* Node silhouette */
           double ax = fabs(ray->dir[0]), ay = fabs(ray->dir[1]), az = fabs(ray->dir[2]);
@@ -422,9 +417,9 @@ void raytrace_treewalk(RayPacket *ray, RayWorkStack *work, RayExportBuffer *expo
                   if(dist2 > 0.0 && A_proj / dist2 < f_eff * 4.0 * M_PI / (12 * (double)(ray->nside * ray->nside)))
                     {
                       /* Pack pending */
-                      if(stack_top > RAY_PENDING_SIZE)
+                      if(stack_top >= RAY_STACK_SIZE - 1) 
                         terminate("Too many pending entries to split!");
-                      
+
                       ray->n_pending = stack_top;
                       memcpy(ray->pending, stack, stack_top * sizeof(StackEntry));
 
@@ -439,7 +434,8 @@ void raytrace_treewalk(RayPacket *ray, RayWorkStack *work, RayExportBuffer *expo
                     
                       for(int k = 0; k < 4; k++)                      
                         append_ray(work, &children[k]);
-                   
+                
+                      
                       /* Parent ray is consumed */
                       return;   
                                   
@@ -459,19 +455,24 @@ void raytrace_treewalk(RayPacket *ray, RayWorkStack *work, RayExportBuffer *expo
 
               /* Cell */
               if(child < Ngb_MaxPart) 
-                {             
+                {
+                  if(P[child].Ti_Current != All.Ti_Current)
+                    drift_particle(child, All.Ti_Current);
+                  
                   double r = get_cell_radius(child);
                   double r2 = r * r;
                       
-                  double cpos[3] = {P[child].Pos[0], P[child].Pos[1], P[child].Pos[2]};
-                  
-                  hit = ray_sphere_intersect(ray->pos, ray->dir, cpos, r2, &t_enter, &t_exit);            
+                  hit = ray_sphere_intersect(ray->pos, ray->dir, (double *)P[child].Pos, r2, &t_enter, &t_exit);            
                 }
               /* Internal node */  
               else if(child < Ngb_MaxPart + Ngb_MaxNodes) 
                 {   
-                  if(!rt_node_inverted(child))
-                    hit = ray_box_intersect(ray->pos, ray->dir, RtNgb_Nodes[child].rt_range_min, RtNgb_Nodes[child].rt_range_max, &t_enter, &t_exit);
+                  struct NgbNODE *child_nop = &Ngb_Nodes[child];
+
+                  if(child_nop->Ti_Current != All.Ti_Current)
+                    drift_node(child_nop, All.Ti_Current);
+
+                  hit = ray_box_intersect(ray->pos, ray->dir, child_nop->u.d.range_min, child_nop->u.d.range_max, &t_enter, &t_exit);
                 }
               /* Pseudo-particle: remote domain */
               else 
@@ -479,13 +480,20 @@ void raytrace_treewalk(RayPacket *ray, RayWorkStack *work, RayExportBuffer *expo
                   int pseudo_idx = child - (Ngb_MaxPart + Ngb_MaxNodes);
                   int top_node = Ngb_DomainNodeIndex[pseudo_idx];
 
-                  if(!rt_node_inverted(top_node))
-                    hit = ray_box_intersect(ray->pos, ray->dir, RtNgb_Nodes[top_node].rt_range_min, RtNgb_Nodes[top_node].rt_range_max, &t_enter, &t_exit);
+                  struct NgbNODE *pseudo_nop = &Ngb_Nodes[top_node];
+
+                  if(pseudo_nop->Ti_Current != All.Ti_Current)
+                    drift_node(pseudo_nop, All.Ti_Current);
+
+                  hit = ray_box_intersect(ray->pos, ray->dir, pseudo_nop->u.d.range_min, pseudo_nop->u.d.range_max, &t_enter, &t_exit);
                 }
 
               if(hit)
                 {
-                  if(t_enter < ray->t_maximum)
+                  if(t_enter > ray->t_maximum)
+                  /* Child is beyond max travel distance - skip entirely */
+                    continue;
+                  else
                     {
                       /* Limit traversal distance */
                       t_exit = fmin(t_exit, ray->t_maximum);  
@@ -536,7 +544,7 @@ void raytrace_treewalk(RayPacket *ray, RayWorkStack *work, RayExportBuffer *expo
           int remote_node = Ngb_DomainNodeIndex[no - (Ngb_MaxPart + Ngb_MaxNodes)];
 
           /* Pack pending */
-          if(stack_top > RAY_PENDING_SIZE) 
+          if(stack_top >= RAY_STACK_SIZE - 1) 
             terminate("Too many pending entries to export!");
 
           ray->n_pending = stack_top;
@@ -563,3 +571,5 @@ void raytrace_treewalk(RayPacket *ray, RayWorkStack *work, RayExportBuffer *expo
           }
     }
 }
+
+#endif /* #ifdef STAR_RADIATION_ACTIVE */

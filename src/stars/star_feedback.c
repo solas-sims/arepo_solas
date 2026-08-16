@@ -7,6 +7,8 @@
 #include "../main/allvars.h"
 #include "../main/proto.h"
 
+#if defined(WINDS) || defined(SUPERNOVAE)
+
 /* SN host-injection modes, returned by SN_feedback_radius() */
 #define MESH 0 /* Couple across Voronoi faces */
 #define HOST 1 /* Thermal dump into host  */
@@ -538,7 +540,6 @@ void star_feedback(void)
           /* Directed momentum magnitude and thermal budget for this event */
           double p_SN = 0.0;
           double dU_SN_th = 0.0;
-          
           /* Ejecta mass */
           double m_ej = MechanicalFeedback->SN_MassLoss;
 
@@ -547,23 +548,22 @@ void star_feedback(void)
 
           /* Approximate SN shell mass */
           double E_SN = MechanicalFeedback->SN_EnergyInject;
- 
           double E51 = E_SN * All.cf_UnitEnergy_in_cgs / SN_ENERGY;
 
           double rho = (P[i].Mass + SphP[i].StarMassFeed) / SphP[i].Volume;
           double rho_cgs = rho * All.cf_UnitDensity_in_cgs;
 
           double n_cgs = rho_cgs / (1.4 * PROTONMASS);
-          
+
           /* Shell mass from Kim & Ostriker (2015) */
-          double Msh = (1680.0 / All.cf_UnitMass_in_Msun) * pow(E51, 0.87) * pow(n_cgs, -0.26);   
+          double Msh = (1680.0 / All.cf_UnitMass_in_Msun) * pow(E51, 0.87) * pow(n_cgs, -0.26);
 
           /* Host swept mass and internal energy */
           double m_h = P[i].Mass + SphP[i].StarMassFeed;
-          
+
           double shell_sweep_frac = fmin(All.SN_HostShellSweepFrac, 0.9);
           double dm_h = shell_sweep_frac * fmin(Msh, m_h);
-          dm_h = fmin(dm_h, m_h - 0.1 * P[i].Mass); 
+          dm_h = fmin(dm_h, m_h - 0.1 * P[i].Mass);
           dm_h = fmax(dm_h, 0.0);
 
 #if GRACKLE_CHEMISTRY >= 1
@@ -581,7 +581,7 @@ void star_feedback(void)
             {
               p_h[k] = (SphP[i].Momentum[k] + SphP[i].StarMomentumFeed[k]);
               v_h[k] = (SphP[i].Momentum[k] + SphP[i].StarMomentumFeed[k]) / m_h;
-            } 
+            }
 
           double K_h = (p_h[0]*p_h[0] + p_h[1]*p_h[1] + p_h[2]*p_h[2]) / (2 * m_h);
           double U_h = SphP[i].Energy + SphP[i].StarEnergyFeed - K_h;
@@ -913,3 +913,5 @@ void star_feedback(void)
  
   TIMER_STOP(CPU_STARS_FEEDBACK);
 }
+
+#endif /* #if defined(WINDS) || defined(SUPERNOVAE) */

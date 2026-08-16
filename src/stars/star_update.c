@@ -5,6 +5,7 @@
 #include "../main/allvars.h"
 #include "../main/proto.h"
 
+#ifdef STAR_FEEDBACK_ACTIVE
 
 static int int_compare(const void *a, const void *b)
 {
@@ -241,9 +242,6 @@ void star_prep(void)
           SP[i].Birthtime = All.Time;
         }
 
-      /* Clean up */
-      memset(&SP[i].MechanicalFeedback, 0, sizeof(Mechanical_Feedback));
-      
       /* Advance timestep and age */
       MyDouble star_timestep = (SP[i].TimeBinStar ? (((integertime)1) << SP[i].TimeBinStar) : 0) * All.Timebase_interval;
       SP[i].Age = All.Time - SP[i].Birthtime;
@@ -385,10 +383,28 @@ void star_perform_end_of_step_physics(void)
         continue;
 
 #if defined(WINDS) || defined(SUPERNOVAE)
-      /* Add mass */ 
+      /* Add mass */
+      double old_mass_before_feed = P[i].Mass;
       P[i].Mass += SphP[i].StarMassFeed;
+
+      if(P[i].Mass <= 0)
+        {
+          double floor_mass = fmax(1.0e-3 * All.TargetGasMass, 1.0e-3 * old_mass_before_feed);
+          if(floor_mass <= 0)
+            floor_mass = 1.0e-3 * All.TargetGasMass;
+
+          printf(
+              "WARNING: STAR_FEEDBACK: cell ID=%lld (task=%d, pos=%g|%g|%g) driven to non-positive mass by "
+              "feedback deposition (old Mass=%g, StarMassFeed=%g, resulting Mass=%g) -- clamping to %g\n",
+              (long long)P[i].ID, ThisTask, P[i].Pos[0], P[i].Pos[1], P[i].Pos[2], old_mass_before_feed,
+              SphP[i].StarMassFeed, P[i].Mass, floor_mass);
+          myflush(stdout);
+
+          P[i].Mass = floor_mass;
+        }
+
       All.StarFeedbackLocal[3] += SphP[i].StarMassFeed;
-      
+
       SphP[i].StarMassFeed = 0;
 #if GRACKLE_CHEMISTRY >= 1
       for(int s = 0; s < GRACKLE_SPECIES_NUMBER; s++)
@@ -448,3 +464,5 @@ void star_perform_end_of_step_physics(void)
     mpi_printf("STARS: Energy given by StarParts = %e, Energy taken up by gas particles = %e \n",
     All.StarFeedbackGlobal[2], All.StarFeedbackGlobal[5]);
 } 
+
+#endif /* #ifdef STAR_FEEDBACK_ACTIVE */

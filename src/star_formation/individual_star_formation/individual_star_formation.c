@@ -46,13 +46,14 @@
 #include "../../main/allvars.h"
 #include "../../main/proto.h"
 
+#ifdef INDIVIDUAL_STAR_BY_STAR_FORMATION
+
 static void spawn_heavy(int igas, double birthtime, int istar, MyDouble mass_of_star);
 static void spawn_light(int igas, double birthtime, int istar, MyDouble mass_of_star);
 static void make_individual_star(int i, MyDouble mass_of_star, double *local_stars_mass);
 
 static int stars_spawned;      /*!< local number of star particles spawned in the time step */
 static int tot_stars_spawned;  /*!< global number of star paricles spawned in the time step */
-
 
 /*! \brief This routine creates star particles according to their
  *         respective rates.
@@ -448,3 +449,5 @@ static void make_individual_star(int i, MyDouble mass_of_star, double *local_sta
   else 
     spawn_heavy(i, All.Time, j, mass_of_star);
 }
+
+#endif /* #ifdef INDIVIDUAL_STAR_BY_STAR_FORMATION */

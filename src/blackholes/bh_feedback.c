@@ -8,6 +8,7 @@
 
 #include "../domain/domain.h"
 
+#ifdef BH_FEEDBACK_ACTIVE
 
 static int bh_feedback_evaluate(int target, int mode, int threadid);
 
@@ -147,7 +148,7 @@ static int bh_feedback_evaluate(int target, int mode, int threadid)
 {
   int i, n, numnodes, *firstnode; 
   MyDouble xtmp, ytmp, ztmp;   
-  MyDouble h, h2, dx, dy, dz, r, r2, wk; 
+  MyDouble h, h2, dx, dy, dz, r2; 
   MyDouble *pos, ngbsvolume, accretion, mass_feed, energy_feed, factor;
 
   data_in local, *target_data;
@@ -178,7 +179,7 @@ static int bh_feedback_evaluate(int target, int mode, int threadid)
 
   //MyDouble hinv, hinv3, hinv4, u, dwk;
 
-  //h2   = h * h;
+  h2 = h * h;
   //hinv = 1.0 / h;
 //#ifndef TWODIMS
 //  hinv3 = hinv * hinv * hinv;
@@ -213,8 +214,8 @@ static int bh_feedback_evaluate(int target, int mode, int threadid)
       if(r2 < h2)
 #endif
         {
-          r = sqrt(r2);
-          u = r * hinv;
+          //r = sqrt(r2);
+          //u = r * hinv;
 
           //bh_kernel(u, hinv3, hinv4, &wk, &dwk);
 
@@ -236,3 +237,5 @@ static int bh_feedback_evaluate(int target, int mode, int threadid)
 
   return 0;
 }
+
+#endif /* #ifdef BH_FEEDBACK_ACTIVE */

@@ -8,6 +8,7 @@
 
 #include "../domain/domain.h"
 
+#ifdef STAR_FEEDBACK_ACTIVE
 
 /* Pass counter: 1 = find host cell, 2 = gather feedback properties */
 static int pass;
@@ -53,8 +54,6 @@ static MyFloat *StarHostDistance;
 
 struct Data 
 {
-  MyIDType StarID;
-
   int StarIndex; 
   int StarTask; 
   int HostIndex; 
@@ -100,8 +99,6 @@ static void particle2in(data_in *in, int i, int firstnode)
   
   if(pass == 1)
     {
-      in->Data.StarID = -1;
-
       in->Data.StarIndex = -1;
       in->Data.StarTask = -1;
       in->Data.HostIndex = -1;
@@ -109,8 +106,6 @@ static void particle2in(data_in *in, int i, int firstnode)
     }
   if(pass == 2)
     {
-      in->Data.StarID = PPS(i).ID;
-
       in->Data.StarIndex = i;
       in->Data.StarTask = ThisTask;
       in->Data.HostIndex = StarHostIndex[i];
@@ -200,7 +195,6 @@ static void out2particle(data_out *out, int i, int mode)
         }
     }
 }
-
 
 #include "../utils/generic_comm_helpers2.h"
 
@@ -375,6 +369,14 @@ void star_density(void)
 
   generic_comm_pattern(TimeBinsStar.NActiveParticles, kernel_local, kernel_imported);
 
+  /* Clean up */
+  for(idx = 0; idx < TimeBinsStar.NActiveParticles; idx++)
+    {
+      i = TimeBinsStar.ActiveParticleList[idx];
+
+      memset(&SP[i].MechanicalFeedback, 0, sizeof(Mechanical_Feedback));
+    }
+
   /* Sort the hosts list */
   mysort(MechanicalFeedbackEvents.MechanicalFeedbackData, MechanicalFeedbackEvents.NumEvents, 
   sizeof(Mechanical_Feedback_Data), feedback_compare);
@@ -489,7 +491,7 @@ static int star_density_evaluate2(int target, int mode, int threadid)
   MyDouble *pos;
 
   int hosthydrobin = 0; 
-  int star_id, star_index, star_task, host_index, host_task;
+  int star_index, star_task, host_index, host_task;
 
   data_in local, *target_data;
   data_out out = {0};
@@ -513,7 +515,6 @@ static int star_density_evaluate2(int target, int mode, int threadid)
   h = target_data->Hsml;
   h2 = h * h;
 
-  star_id = target_data->Data.StarID;
   star_index = target_data->Data.StarIndex;
   star_task = target_data->Data.StarTask;
   host_index = target_data->Data.HostIndex;
@@ -572,7 +573,6 @@ static int star_density_evaluate2(int target, int mode, int threadid)
 
               Mechanical_Feedback_Data *data = &MechanicalFeedbackEvents.MechanicalFeedbackData[MechanicalFeedbackEvents.NumEvents++];
 
-              data->StarID = star_id;
               data->StarIndex = star_index;
               data->StarTask = star_task; 
               data->HostIndex = host_index;
@@ -609,3 +609,5 @@ int star_density_isactive(int n)
 
   return 1;
 }
+
+#endif /* #ifdef STAR_FEEDBACK_ACTIVE */

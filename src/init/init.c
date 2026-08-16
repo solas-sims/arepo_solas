@@ -49,6 +49,14 @@
 #include "../domain/domain.h"
 #include "../mesh/voronoi/voronoi.h"
 
+#ifdef HALO_SEEDING
+#include "../fof/fof_seeding.h"
+#endif
+
+#ifdef USE_CELIB
+#include "../../celib/src/config.h"
+#endif
+
 /*! \brief Prepares the loaded initial conditions for the run.
  *
  *  It is only called if RestartFlag !=1. Various counters and variables are
@@ -58,7 +66,7 @@
  *  are determined.
  *
  *  \return status code: <0 if finished without errors and run can start,
- *          0 code ends after calling init()  > 0 an error occurred, terminate.
+ *          0 code ends after calling init()   0 an error occurred, terminate.
  */
 int init(void)
 {
@@ -308,6 +316,12 @@ int init(void)
 
   for(i = 0; i < NumGas; i++) /* initialize sph_properties */
     {
+#ifdef HALO_SEEDING
+      /* always reset: refreshed at the first on-the-fly FOF pass, and older
+         snapshots may not contain the HostHaloMass block */
+      SphP[i].HostHaloMass = 0;
+#endif /* #ifdef HALO_SEEDING */
+
       if(RestartFlag == 2 || RestartFlag == 3)
         for(j = 0; j < 3; j++)
           SphP[i].Center[j] = P[i].Pos[j];
@@ -399,6 +413,14 @@ int init(void)
   /* will build tree */
   ngb_treeallocate();
   ngb_treebuild(NumGas);
+
+#ifdef HALO_SEEDING
+#ifndef FOF
+#error "HALO_SEEDING is only implemented for FOF."
+#endif /* #ifndef FOF */
+  if(RestartFlag != 1) /* when restarting from restart files, the halo seed registry is restored from them by loadrestart() */
+    fof_seeding_init(RestartFlag);
+#endif
  
   if(RestartFlag == 3)
     {
@@ -537,56 +559,21 @@ int init(void)
 
   free_mesh();
 
-#ifdef STAR_PARTICLES
-if(ThisTask == 0)
-  {
-    build_imf_cdf(POPII);
-#ifdef POPIII_SF
-    build_imf_cdf(POPIII);
-#endif
+  /* IMF tables and the star-particle RNG are now set up unconditionally in
+   * begrun1(), since it (unlike this function) also runs on restart. */
 
 #if defined(STAR_PARTICLES) && STAR_PARTICLES < 2
-    setup_mass_bins(POPII);
-#ifdef POPIII_SF
-    setup_mass_bins(POPIII);
-#endif
-#endif
-
-#if STAR_PARTICLES == 0
-    setup_imf_integrals(POPII);
-#ifdef POPIII_SF
-    setup_imf_integrals(POPIII);
-#endif
-#endif
-  }
-MPI_Bcast(cdf_masses, N_IMF_TYPES*(N_CDF_BINS + 1), MPI_DOUBLE, 0, MPI_COMM_WORLD);
-MPI_Bcast(cdf_values, N_IMF_TYPES*(N_CDF_BINS + 1), MPI_DOUBLE, 0, MPI_COMM_WORLD);
-
-#if defined(STAR_PARTICLES) && STAR_PARTICLES < 2
-MPI_Bcast(StarMeanMassInBins, N_IMF_TYPES*NBINS, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-#endif
-
-#if STAR_PARTICLES == 0
-  MPI_Bcast(&norm, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-  MPI_Bcast(bin_imf, N_IMF_TYPES*NBINS, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-
-#include <gsl/gsl_rng.h>
-
-  rng = gsl_rng_alloc(gsl_rng_mt19937);
-  gsl_rng_set(rng, ThisTask + 1);
-#endif
-
-#if defined(STAR_PARTICLES) && STAR_PARTICLES < 2
+  /* initial IMF-bin sampling for star particles already present in the ICs (newly formed
+   * stars get this from sample_star_particle() in starformation.c instead); needs
+   * NumStars/SP[] to be populated, so unlike the setup above this must stay here rather
+   * than move to begrun1() */
   for(i = 0; i < NumStars; i++)
-    sample_star_particle(SP[i].PopulationType, PPS(i).Mass * All.cf_UnitMass_in_Msun, SP[i].NumOfStarsInBins);
+    sample_star_particle(PPS(i).Mass * All.cf_UnitMass_in_Msun, SP[i].NumOfStarsInBins);
 #endif
 
-#endif
-
-#ifdef STAR_FEEDBACK_ACTIVE  
-  mpi_printf("Loading star evolution tables\n");
-  load_star_tables(All.StarTablesFile);
-
+#ifdef STAR_FEEDBACK_ACTIVE
+  /* load_star_tables() is now called unconditionally in begrun1(), since it
+   * (unlike this function) also runs on restart. */
   feedback_init(&MechanicalFeedbackEvents);
 
   for(i = 0; i < NumStars; i++)
@@ -595,25 +582,12 @@ MPI_Bcast(StarMeanMassInBins, N_IMF_TYPES*NBINS, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
 #ifdef STAR_RADIATION_ACTIVE
   init_h2shield();
+  start_healpix();
 #endif
-
-#ifdef BH_ACCRETION_ACTIVE 
-  for(i=0; i < 2; i++)
-    All.BhAccretionLocal[i] = 0;
-  
-  double *bag = All.BhAccretionGlobal;
-  bag = malloc(2 * sizeof(double));
-#endif 
 
 #ifdef BH_FEEDBACK_ACTIVE 
   srand((unsigned int)time(NULL));
   All.FeedbackFlag = 1;
-
-  for(i=0; i < 2; i++)
-    All.BhFeedbackLocal[i] = 0;
-  
-  double *bfg = All.BhFeedbackGlobal;
-  bfg = malloc(2 * sizeof(double));
 #endif 
 
   return -1;  // return -1 means we ran to completion, i.e. not an endrun code

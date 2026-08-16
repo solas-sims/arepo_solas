@@ -37,10 +37,12 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "../main/allvars.h"
-#include "../main/proto.h"
+#include "../../main/allvars.h"
+#include "../../main/proto.h"
 
-#include "../gravity/forcetree.h"
+#include "../../gravity/forcetree.h"
+
+#ifdef INDIVIDUAL_STAR_BY_STAR_FORMATION
 
 /* Function that checks whether a cell i satisfies star formation criteria*/
 static int sf_criteria(int i)
@@ -52,10 +54,12 @@ static int sf_criteria(int i)
     return 0;
 #endif
   double mu = compute_mu(i);
-#else
+#else /* #ifdef USE_GRACKLE */
+  /* assume full ionization -- same fallback as sfr_AGORA.c/sfr_eEOS.c use when
+   * Grackle isn't tracking species abundances to compute an actual mu */
   double mu = 4 / (8 - 5 * (1 - HYDROGEN_MASSFRAC));
-#endif
-  
+#endif /* #ifdef USE_GRACKLE #else */
+
   double number_dens = (SphP[i].Density * All.cf_UnitDensity_in_cgs) / mu / PROTONMASS;
   double temp = (SphP[i].Utherm * All.cf_UnitVelocity_in_cm_per_s * All.cf_UnitVelocity_in_cm_per_s) 
   * mu * PROTONMASS * GAMMA_MINUS1 / BOLTZMANN;
@@ -148,3 +152,5 @@ double get_starformation_rate(int i)
 
   return 1;
 }
+
+#endif /* #ifdef INDIVIDUAL_STAR_BY_STAR_FORMATION */
