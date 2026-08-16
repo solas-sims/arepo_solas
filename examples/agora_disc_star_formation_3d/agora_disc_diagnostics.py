@@ -273,12 +273,100 @@ except ImportError:
                 np.add.at(grid, (ii % nx, jj % ny, kk % nz), values * w)
             return grid
 
+        @staticmethod
+        def _cubic_spline_kernel(q):
+            """Normalized 3D cubic spline shape function (Monaghan &
+            Lattanzio 1985), compact support q<2. `q` may be an array."""
+            q = np.asarray(q)
+            w = np.where(
+                q < 1.0, 1.0 - 1.5 * q ** 2 + 0.75 * q ** 3,
+                np.where(q < 2.0, 0.25 * (2.0 - q) ** 3, 0.0),
+            )
+            return w
+
+        def sph_assign(self, grid, positions, values, smoothing_lengths, grid_limits, grid_size):
+            """Per-particle SPH-kernel (cubic spline) deposition -- a
+            dependency-light (non-numba) port of
+            analysistools.gridding_tools.GriddingTools.sph_assign. Uses each
+            particle's own smoothing length rather than a single global
+            smoothing scale; mass-conserving per particle (weights
+            renormalized to sum to `values[p]` over that particle's own
+            affected cells); non-periodic (kernel support is clipped to the
+            grid, not wrapped); correct for anisotropic grid spacing (works
+            in physical coordinates throughout). Each particle's local
+            bounding box (~(4h/spacing)**3 cells) is handled with a small
+            vectorized numpy computation -- there's no global grid-cells
+            array (infeasible at typical --ngrid resolutions), so this is
+            still a Python-level loop over particles, just a cheap one per
+            particle rather than a full triple-nested loop.
+            """
+            nx, ny, nz = grid_size
+            xmin, xmax, ymin, ymax, zmin, zmax = grid_limits
+            dx, dy, dz = (xmax - xmin) / nx, (ymax - ymin) / ny, (zmax - zmin) / nz
+
+            for p in range(len(values)):
+                h = smoothing_lengths[p]
+                x, y, z = positions[p]
+
+                if h <= 0:
+                    i, j, k = (int(np.floor((x - xmin) / dx)),
+                               int(np.floor((y - ymin) / dy)),
+                               int(np.floor((z - zmin) / dz)))
+                    if 0 <= i < nx and 0 <= j < ny and 0 <= k < nz:
+                        grid[i, j, k] += values[p]
+                    continue
+
+                rmax = 2.0 * h
+                imin = max(int(np.floor((x - xmin - rmax) / dx)), 0)
+                imax = min(int(np.ceil((x - xmin + rmax) / dx)), nx - 1)
+                jmin = max(int(np.floor((y - ymin - rmax) / dy)), 0)
+                jmax = min(int(np.ceil((y - ymin + rmax) / dy)), ny - 1)
+                kmin = max(int(np.floor((z - zmin - rmax) / dz)), 0)
+                kmax = min(int(np.ceil((z - zmin + rmax) / dz)), nz - 1)
+                if imin > imax or jmin > jmax or kmin > kmax:
+                    continue
+
+                cx = xmin + (np.arange(imin, imax + 1) + 0.5) * dx
+                cy = ymin + (np.arange(jmin, jmax + 1) + 0.5) * dy
+                cz = zmin + (np.arange(kmin, kmax + 1) + 0.5) * dz
+                ddx, ddy, ddz = np.meshgrid(cx - x, cy - y, cz - z, indexing="ij")
+                r = np.sqrt(ddx ** 2 + ddy ** 2 + ddz ** 2)
+                w = self._cubic_spline_kernel(r / h)
+                wsum = w.sum()
+
+                if wsum <= 0:
+                    i, j, k = (int(np.floor((x - xmin) / dx)),
+                               int(np.floor((y - ymin) / dy)),
+                               int(np.floor((z - zmin) / dz)))
+                    if 0 <= i < nx and 0 <= j < ny and 0 <= k < nz:
+                        grid[i, j, k] += values[p]
+                    continue
+
+                grid[imin:imax + 1, jmin:jmax + 1, kmin:kmax + 1] += values[p] * (w / wsum)
+
+            return grid
+
         def smooth_to_grid(self, positions, values, grid_size, grid_limits,
-                            method="NGP", sigma=1.0, filter_sigma=None):
-            """Assign particle values to a 3D grid. method: 'NGP', 'CIC', or
-            'Gaussian' (CIC + Gaussian smoothing)."""
+                            method="NGP", sigma=1.0, filter_sigma=None,
+                            smoothing_lengths=None):
+            """Assign particle values to a 3D grid. method: 'NGP', 'CIC',
+            'Gaussian' (CIC + Gaussian smoothing), or 'SPH' (per-particle
+            kernel deposition, requires smoothing_lengths)."""
             dim = len(grid_size)
             grid = np.zeros(grid_size, dtype=float)
+
+            method = method.upper()
+
+            if method == "SPH":
+                if smoothing_lengths is None:
+                    raise ValueError("method='SPH' requires smoothing_lengths")
+                if dim != 3:
+                    raise ValueError("method='SPH' only supports 3D grids")
+                self.sph_assign(grid, positions, values, smoothing_lengths, grid_limits, grid_size)
+                if filter_sigma is not None:
+                    from scipy.ndimage import gaussian_filter
+                    grid = gaussian_filter(grid, sigma=filter_sigma)
+                return grid
 
             spacing = [
                 (grid_limits[2 * i + 1] - grid_limits[2 * i]) / grid_size[i]
@@ -287,7 +375,6 @@ except ImportError:
             coords = [(positions[:, i] - grid_limits[2 * i]) / spacing[i] for i in range(dim)]
             coords = np.stack(coords, axis=1)
 
-            method = method.upper()
             if method == "NGP":
                 self.ngp_assign(grid, coords, values)
             elif method == "CIC":
@@ -459,13 +546,21 @@ def read_snapshot_h5py(path, ptype):
 
 
 def read_gas_scalars_h5py(path):
-    """Read gas (PartType0) positions, mass, metal mass, and dust mass (if
-    present) directly from an Arepo HDF5 snapshot. Always reads via h5py,
-    even when analysistools is available, since PassiveScalars/DustMass are
-    Arepo-specific fields not exposed by a generic snapshot reader.
+    """Read gas (PartType0) positions, mass, metal mass, dust mass (if
+    present), and each cell's smoothing length directly from an Arepo HDF5
+    snapshot. Always reads via h5py, even when analysistools is available,
+    since PassiveScalars/DustMass are Arepo-specific fields not exposed by
+    a generic snapshot reader.
 
-    Returns (pos, mass, metal_mass, dust_mass); dust_mass is None if the
-    run wasn't built with DUST.
+    Smoothing length is each Voronoi cell's effective (equal-volume-sphere)
+    radius, (3*Volume/(4*pi))**(1/3), computed from Density (not a native
+    SPH kernel length -- Arepo is a moving-mesh code -- but the natural
+    per-cell analogue used for SPH-kernel-style grid deposition, see
+    GriddingTools.sph_assign in analysistools). None if the snapshot has no
+    Density field (e.g. an IC file with ADDBACKGROUNDGRID but no run yet).
+
+    Returns (pos, mass, metal_mass, dust_mass, smoothing_length); dust_mass
+    is None if the run wasn't built with DUST.
     """
     import h5py
 
@@ -485,7 +580,12 @@ def read_gas_scalars_h5py(path):
 
         dust_mass = grp["DustMass"][()] if "DustMass" in grp else None
 
-    return pos, mass, metal_mass, dust_mass
+        smoothing_length = None
+        if "Density" in grp:
+            volume = mass / grp["Density"][()]
+            smoothing_length = (3.0 * volume / (4.0 * np.pi)) ** (1.0 / 3.0)
+
+    return pos, mass, metal_mass, dust_mass, smoothing_length
 
 
 def parse_args():
@@ -521,8 +621,12 @@ def parse_args():
     parser.add_argument("--ngrid", type=int, default=512, help="Grid resolution per axis")
     parser.add_argument(
         "--smooth-sigma", type=float, default=2.0,
-        help="Gaussian smoothing width [grid cells] applied to the CIC-deposited "
-             "grid before plotting. Default: 2.0",
+        help="Gaussian smoothing width [grid cells] for the CIC+Gaussian "
+             "grid-projection fallback -- only used when a snapshot has no "
+             "Density field (e.g. an unrun IC) or --ptype isn't gas, so "
+             "per-cell smoothing lengths aren't available. Otherwise each "
+             "gas cell's own effective radius is used (SPH-kernel "
+             "deposition), and this option has no effect. Default: 2.0",
     )
     parser.add_argument("--lgrid", type=float, default=10.0, help="Grid half-extent in x/y [kpc]")
     parser.add_argument(
@@ -726,11 +830,21 @@ def plot_metals_dust_profiles(results, output):
     log.info("Saved %s", output)
 
 
-def plot_grid(pos, values, centre, args, output_path, title=None):
+def plot_grid(pos, values, centre, args, output_path, title=None, smoothing_lengths=None):
     """Smoothed-grid projection plot for a single quantity/snapshot. Always
     run on the full particle set (regardless of --mask-radius), like the
     source notebook. `values` is whatever per-particle quantity is being
-    projected (mass, metal mass, or dust mass)."""
+    projected (mass, metal mass, or dust mass).
+
+    With `smoothing_lengths` (each cell's own effective radius, see
+    read_gas_scalars_h5py), uses GriddingTools' per-particle SPH-kernel
+    deposition instead of a single global Gaussian sigma applied to a
+    CIC-binned grid -- a fixed sigma either over-smooths the dense inner
+    disc or leaves particle-scale gaps in the sparser outer disc, since
+    the AGORA IC's cell size varies by orders of magnitude across the box.
+    Falls back to the old CIC+Gaussian path if smoothing_lengths is None
+    (e.g. no Density field, or a particle type other than gas).
+    """
     gridding = GriddingTools()
 
     lzgrid = args.lzgrid if args.lzgrid is not None else args.lgrid / 4
@@ -747,14 +861,24 @@ def plot_grid(pos, values, centre, args, output_path, title=None):
         (pos[:, 2] >= grid_limits[4]) & (pos[:, 2] < grid_limits[5])
     )
 
-    smoothed_grid = gridding.smooth_to_grid(
-        positions=pos[box_mask],
-        values=values[box_mask],
-        grid_size=grid_size,
-        grid_limits=grid_limits,
-        method="Gaussian",
-        sigma=args.smooth_sigma,
-    )
+    if smoothing_lengths is not None:
+        smoothed_grid = gridding.smooth_to_grid(
+            positions=pos[box_mask],
+            values=values[box_mask],
+            grid_size=grid_size,
+            grid_limits=grid_limits,
+            method="SPH",
+            smoothing_lengths=smoothing_lengths[box_mask],
+        )
+    else:
+        smoothed_grid = gridding.smooth_to_grid(
+            positions=pos[box_mask],
+            values=values[box_mask],
+            grid_size=grid_size,
+            grid_limits=grid_limits,
+            method="Gaussian",
+            sigma=args.smooth_sigma,
+        )
 
     try:
         fig, _ = gridding.plot_3d_projections(smoothed_grid, grid_limits, projection="mean", title=title)
@@ -803,30 +927,41 @@ def main():
 
         pos, vel, mass, centre = load_particles(snapshot_path, args)
 
-        grid_out = format_output_path(args.grid_output, name, index)
-        plot_grid(pos, mass, centre, args, grid_out, title=f"Gas mass ({name})")
-
-        # Gas-only metal/dust scalars, independent of --ptype (metals/dust
-        # only exist on PartType0). Reused for both the grid projections
-        # (unmasked, mirroring the gas mass grid) and the radial surface
-        # density profiles (masked, mirroring the gas sigma profile).
+        # Gas-only metal/dust scalars and per-cell smoothing length,
+        # independent of --ptype (metals/dust/Density only exist on
+        # PartType0). Read before the gas-mass grid below so its own
+        # smoothing_lengths are available too. Reused for the grid
+        # projections (unmasked, mirroring the gas mass grid) and the
+        # radial surface density profiles (masked, mirroring the gas sigma
+        # profile).
         try:
-            gas_pos, gas_mass, metal_mass, dust_mass = read_gas_scalars_h5py(snapshot_path)
+            gas_pos, gas_mass, metal_mass, dust_mass, gas_h = read_gas_scalars_h5py(snapshot_path)
         except (OSError, IOError, KeyError) as exc:
             log.error("Could not read gas scalars from '%s': %s", snapshot_path, exc)
             sys.exit(1)
+
+        # gas_h aligns 1:1 with `pos` only when --ptype is gas (both read
+        # PartType0/Coordinates in the same order); smoothing length has no
+        # meaning for other particle types.
+        mass_smoothing_lengths = gas_h if args.ptype == 0 else None
+
+        grid_out = format_output_path(args.grid_output, name, index)
+        plot_grid(pos, mass, centre, args, grid_out, title=f"Gas mass ({name})",
+                  smoothing_lengths=mass_smoothing_lengths)
 
         sigma_metals = sigma_dust = None
 
         if metal_mass is not None:
             metals_grid_out = format_output_path(args.metals_grid_output, name, index)
-            plot_grid(gas_pos, metal_mass, centre, args, metals_grid_out, title=f"Metal mass ({name})")
+            plot_grid(gas_pos, metal_mass, centre, args, metals_grid_out, title=f"Metal mass ({name})",
+                      smoothing_lengths=gas_h)
         else:
             log.warning("No PassiveScalars field in %s -- skipping metals grid/profile", snapshot_path)
 
         if dust_mass is not None:
             dust_grid_out = format_output_path(args.dust_grid_output, name, index)
-            plot_grid(gas_pos, dust_mass, centre, args, dust_grid_out, title=f"Dust mass ({name})")
+            plot_grid(gas_pos, dust_mass, centre, args, dust_grid_out, title=f"Dust mass ({name})",
+                      smoothing_lengths=gas_h)
         else:
             log.info("No DustMass field in %s -- skipping dust grid/profile (run not built with DUST?)", snapshot_path)
 
