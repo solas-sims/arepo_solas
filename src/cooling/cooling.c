@@ -59,6 +59,8 @@
 #include "../main/allvars.h"
 #include "../main/proto.h"
 
+#ifdef COOLING
+
 static double Tmin = 0.0;     /*!< min temperature in log10 */
 static double Tmax = 9.0;     /*!< max temperature in log10 */
 static double deltaT;         /*!< log10 of temperature spacing in the interpolation tables */
@@ -947,3 +949,5 @@ void cool_cell(int i)
 
   set_pressure_of_cell(i);
 }
+
+#endif /* #ifdef COOLING */

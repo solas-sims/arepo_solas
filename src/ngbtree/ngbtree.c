@@ -525,25 +525,8 @@ void ngb_update_node_recursive(int no, int sib, int father, int *last, int mode)
   MyNgbTreeFloat vertex_vmin[3];
   MyNgbTreeFloat vertex_vmax[3];
 
-  for(k = 0; k < 3; k++)
-    {
-      range_min[k] = MAX_NGBRANGE_NUMBER;
-      range_max[k] = -MAX_NGBRANGE_NUMBER;
-
-      vertex_vmin[k] = MAX_NGBRANGE_NUMBER;
-      vertex_vmax[k] = -MAX_NGBRANGE_NUMBER;
-    }
-
 #ifdef TREE_BASED_TIMESTEPS
-  MyNgbTreeFloat maxcsnd, vmin[3], vmax[3];
-  
-  maxcsnd = 0;
-
-  for(k = 0; k < 3; k++)
-    {
-      vmin[k] = MAX_NGBRANGE_NUMBER;
-      vmax[k] = -MAX_NGBRANGE_NUMBER;
-    }
+  MyNgbTreeFloat vmin[3], vmax[3], maxcsnd;
 #endif /* #ifdef TREE_BASED_TIMESTEPS */
 
 #ifdef RAD_OPENING_ANGLE
@@ -614,6 +597,23 @@ void ngb_update_node_recursive(int no, int sib, int father, int *last, int mode)
           for(j = 0; j < 8; j++)
             suns[j] = Ngb_Nodes[no].u.suns[j]; /* this "backup" is necessary because the nextnode entry will
                                                   overwrite one element (union!) */
+
+#ifdef TREE_BASED_TIMESTEPS
+          maxcsnd = 0;
+#endif /* #ifdef TREE_BASED_TIMESTEPS */
+          for(k = 0; k < 3; k++)
+            {
+              range_min[k] = MAX_NGBRANGE_NUMBER;
+              range_max[k] = -MAX_NGBRANGE_NUMBER;
+
+              vertex_vmin[k] = MAX_NGBRANGE_NUMBER;
+              vertex_vmax[k] = -MAX_NGBRANGE_NUMBER;
+
+#ifdef TREE_BASED_TIMESTEPS
+              vmin[k] = MAX_NGBRANGE_NUMBER;
+              vmax[k] = -MAX_NGBRANGE_NUMBER;
+#endif /* #ifdef TREE_BASED_TIMESTEPS */
+            }
 
           for(j = 0; j < 8; j++)
             {

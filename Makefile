@@ -5,7 +5,7 @@ CONFIG = Config.sh
 BUILD_DIR = build
 SRC_DIR = src
 
-SYSTYPE ?= "LINUX"
+SYSTYPE ?= LINUX
 
 MAKEFILES = Makefile config-makefile
 ifeq ($(wildcard Makefile.systype), Makefile.systype)

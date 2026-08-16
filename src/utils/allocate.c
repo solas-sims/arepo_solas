@@ -45,7 +45,6 @@
 
 
 
-
 /*! \brief Allocates memory for global arrays.
  *
  *  This routine allocates memory for

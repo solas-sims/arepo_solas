@@ -163,10 +163,6 @@ void read_ic(const char *fname, int readTypes)
       NumDM  = 0;
 #endif
 
-#ifdef BLACKHOLES
-      NumBhs  = 0;
-#endif
-
 #if defined(RECOMPUTE_POTENTIAL_IN_SNAPSHOT)
       if(rep == 1)
         MPI_Allreduce(MPI_IN_PLACE, ntype_in_files, num_files * NTYPES, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
@@ -556,19 +552,6 @@ void read_ic(const char *fname, int readTypes)
         }
     }
 #endif /* #ifdef SIDM */
-
-#ifdef BLACKHOLES
-  int jb=0;
-  for(int ib = 0; ib<NumPart; ib++)
-    {
-      if(P[ib].Type == 5)
-        {
-          P[ib].BhID = jb;
-          BhP[jb].PID = ib;
-          jb++;
-        }
-    }
-#endif /* BLACKHOLES */
 
   MPI_Barrier(MPI_COMM_WORLD);
 

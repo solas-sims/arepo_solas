@@ -1088,9 +1088,6 @@ extern struct global_data_all_processes
   /* some SPH parameters */
 
   int DesNumNgb; /*!< Desired number of SPH neighbours */
-<<<<<<< HEAD
-    
-=======
 #ifdef HALO_SEEDING
 #ifndef FOF
 #error "HALO_SEEDING requires FOF to be defined"
@@ -1132,7 +1129,6 @@ extern struct global_data_all_processes
   int BhMergerRadiusCriterion; /*!< resolved enum value; set by check_parameters(), do not set directly */
 #endif /* #ifdef BH_MERGER */
 
->>>>>>> origin/main
   double TotCountReducedFluxes;
   double TotCountFluxes;
 
@@ -1421,11 +1417,7 @@ extern struct global_data_all_processes
 #endif            /* #ifdef MHD_SEEDFIELD */
 
 #ifdef METALS
-<<<<<<< HEAD
-  double InitMetallicityinSolar; 
-=======
 double InitMetallicityinSolar; 
->>>>>>> origin/main
 #endif 
 
 #ifdef COOLING
@@ -1438,12 +1430,6 @@ double InitMetallicityinSolar;
   char GrackleDataFile[100];
 #endif
 
-<<<<<<< HEAD
-/* enable Springel & Hernquist model */
-#ifdef EEOS_SF
-  double OverDensThresh;
-  double CritOverDensity;
-=======
 #if defined(EEOS_SF) || defined(AGORA_SF) || defined(JEANS_SF)
   /* shared by all three SF schemes: a comoving-overdensity floor below which star formation
    * is never allowed, regardless of whether the local density/temperature (or Jeans) gate is
@@ -1454,7 +1440,6 @@ double InitMetallicityinSolar;
 
 /* enable Springel & Hernquist model */
 #ifdef EEOS_SF
->>>>>>> origin/main
   double TemperatureThresh;
   double CritPhysDensity;
   double PhysDensThresh;
@@ -1465,23 +1450,14 @@ double InitMetallicityinSolar;
   double TempClouds;
   double MaxSfrTimescale;
   double FactorSN;
-<<<<<<< HEAD
-#endif 
-
-#ifdef AGORA_SF
-  double NumberDensThreshold;  
-=======
 #endif
 
 #ifdef AGORA_SF
   double NumberDensThreshold;
->>>>>>> origin/main
   double TemperatureThreshold;
   double StarFormationEfficiency;
 #endif
 
-<<<<<<< HEAD
-=======
 #ifdef SF_THRESHOLD_HALO_MASS_DEPENDENT
   /* scheme-agnostic: applies as a multiplicative factor on whichever SF scheme's own
    * threshold quantity is active (EEOS_SF's PhysDensThresh, AGORA_SF's NumberDensThreshold,
@@ -1492,7 +1468,6 @@ double InitMetallicityinSolar;
                                                     cells whose host halo mass is below MinHaloMassForNormalSF */
 #endif /* #ifdef SF_THRESHOLD_HALO_MASS_DEPENDENT */
 
->>>>>>> origin/main
 #ifdef JEANS_SF
 #ifdef JEANS_MASS_BASED
   double JeansMassThreshold;
@@ -1508,15 +1483,12 @@ double InitMetallicityinSolar;
 
 #ifdef STAR_PARTICLES
   int IMF;
-<<<<<<< HEAD
 #ifdef POPIII_SF
   int IMFPopIII;
   double PopIIIMetallicityThresholdinSolar;
   double PopIIIMetallicityThreshold;
   double PopIIIH2FractionThreshold;
 #endif
-=======
->>>>>>> origin/main
 #endif
 
 #if defined(TREE_BASED_TIMESTEPS) && defined(SUPERNOVAE)
@@ -1526,29 +1498,20 @@ double InitMetallicityinSolar;
 #ifdef STAR_FEEDBACK_ACTIVE
   double StarFeedbackLocal[6];
   double StarFeedbackGlobal[6];
-<<<<<<< HEAD
-  
-  char StarTablesFile[MAXLEN_PATH];
-#endif 
-=======
 
   char StarTablesFile[MAXLEN_PATH];
 #endif
->>>>>>> origin/main
 
 #ifdef SUPERNOVAE
   double SN_HostShellSweepFrac;
 #endif
 
-<<<<<<< HEAD
-=======
 #ifdef SIDM
   double SidmDesNumNgb;
   double SidmDesNumNgbDev;
   double SidmCrossSection; /*!< sigma/m, constant elastic cross section for v1, in code units (length^2/mass) */
 #endif /* #ifdef SIDM */
 
->>>>>>> origin/main
 #ifdef STAR_RADIATION_ACTIVE
   double RaySplitFactor;
 #endif
@@ -1609,15 +1572,6 @@ double InitMetallicityinSolar;
   int DesLinkNgb;
   double ErrTolThetaSubfind;
 #endif /* #ifdef SUBFIND */
-<<<<<<< HEAD
-
-#ifdef FIND_HALOS
-  double TimeOfFirstHaloFinding;
-  double NextTimeOfHaloFinding;
-  double TimeBetweenHaloFinding;
-#endif
-=======
->>>>>>> origin/main
 } All;
 
 /*****************************************************************************
@@ -1693,8 +1647,6 @@ extern struct particle_data
 #ifdef BLACKHOLES
   MyIDType BhID;
 #endif
-<<<<<<< HEAD
-=======
 
 #ifdef SIDM
   /* Forward reference into the DMSP[] side array (src/sidm/sidm.h),
@@ -1705,7 +1657,6 @@ extern struct particle_data
    * -- see sidm.h for the struct and the PDMS/DMPS access macros. */
   MyIDType SIDMID;
 #endif /* #ifdef SIDM */
->>>>>>> origin/main
 } * P,              /*!< holds particle data on local processor */
     *DomainPartBuf; /*!< buffer for particle data used in domain decomposition */
 
@@ -1782,14 +1733,11 @@ extern struct sph_particle_data
   
   MySingle ActiveArea;
 
-<<<<<<< HEAD
-=======
 #ifdef HALO_SEEDING
   MyFloat HostHaloMass; /*!< FOF mass of the host halo, refreshed at each on-the-fly FOF pass (0 if not in a halo);
                              can be used e.g. to select the mode of star formation by halo mass */
 #endif /* #ifdef HALO_SEEDING */
 
->>>>>>> origin/main
 #ifdef OUTPUT_SURFACE_AREA
   int CountFaces;
 #endif 
@@ -2269,8 +2217,6 @@ enum iofields
 #ifdef OUTPUT_TIMEBIN_BH
   IO_TIMEBIN_BH,
 #endif
-<<<<<<< HEAD
-=======
 #ifdef SIDM
   IO_SIDM_DENSITY,
   IO_SIDM_HSML,
@@ -2284,7 +2230,6 @@ enum iofields
   IO_BH_FORMATION_CHANNEL,
   IO_BH_DONOR_VELOCITY,
 #endif
->>>>>>> origin/main
   IO_LASTENTRY /* This should be kept - it signals the end of the list */
 };
 
@@ -2295,15 +2240,12 @@ enum arrays
   A_P,
 #ifdef STARS
   A_S,
-<<<<<<< HEAD
-=======
 #endif
 #ifdef BLACKHOLES
   A_BH,
 #endif
 #ifdef SIDM
   A_DMSP,
->>>>>>> origin/main
 #endif
 #ifdef BLACKHOLES
   A_BH,
