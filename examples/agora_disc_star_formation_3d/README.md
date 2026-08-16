@@ -130,6 +130,7 @@ python agora_disc_diagnostics.py --snapshot output/snap_000.hdf5 output/snap_010
     --output disc_profiles.png --grid-output "disc_grid_{name}.png" \
     --metals-grid-output "disc_grid_metals_{name}.png" \
     --dust-grid-output "disc_grid_dust_{name}.png" \
+    --dtg-grid-output "disc_grid_dust_to_gas_{name}.png" \
     --metals-dust-output "disc_metals_dust_profiles.png"
 ```
 
@@ -140,15 +141,32 @@ package if installed, otherwise falls back to a self-contained `h5py`-based
 reader — see the script's docstring for the full set of options
 (`--mask-radius`, `--ngrid`, `--save-data`, etc).
 
+Grid projections use each gas cell's own smoothing length (effective radius
+derived from `Density`/`Masses`, i.e. an SPH-kernel-style deposition) rather
+than a single fixed smoothing scale for the whole box — the AGORA IC's cell
+size varies by orders of magnitude across the disc, so one global scale either
+over-smooths the dense inner region or leaves particle-scale gaps in the
+sparse outer disc. Falls back to a fixed `--smooth-sigma` (CIC + Gaussian)
+only when a snapshot has no `Density` field, or `--ptype` isn't gas. The
+colourbar is a proper column density (Σ, summed along the projection axis and
+divided by pixel area — not a mean of raw per-cell values), converted to
+M☉ pc⁻² using each snapshot's own `UnitMass_in_g`. All three panels (XY/XZ/YZ)
+of a given plot share one colour scale by default (computed from that plot's
+own combined data range); pass `--grid-vmin`/`--grid-vmax` to fix it
+explicitly, e.g. for comparing the same panel across multiple snapshots.
+
 Also reads each snapshot's gas-cell metal mass (`PassiveScalars`) and, if
 present, dust mass (`DustMass`, only written when `Config.sh` has `DUST`
 enabled) directly from `PartType0`. This produces the same smoothed-grid
 XY/XZ/YZ projection as gas mass gets (`disc_grid_metals_*`/
-`disc_grid_dust_*`), plus a second overlaid-profile figure
+`disc_grid_dust_*`), plus a dust-to-gas mass ratio grid
+(`disc_grid_dust_to_gas_*` — gas and dust mass deposited and projected
+independently, then divided; dimensionless, so unaffected by the M☉ pc⁻²
+conversion) and a second overlaid-profile figure
 (`disc_metals_dust_profiles.png`) of metal and dust surface density vs.
-radius, mirroring the gas surface-density panel. The dust grid/profile is
-skipped (with a log message, not an error) if the run has no `DustMass`
-field.
+radius, mirroring the gas surface-density panel. The dust/dust-to-gas
+grids and profile are skipped (with a log message, not an error) if the
+run has no `DustMass` field.
 
 ## 6. Sanity checks
 

@@ -392,78 +392,118 @@ except ImportError:
 
             return grid
 
-        def plot_3d_slice(self, grid_3d, grid_limits,
-                           slice_axis='z', slice_index=None,
-                           slice_width=None, slice_average=True,
-                           mode='slice', projection='mean',
-                           title="3D Grid Slice", cmap='viridis', figsize=(12, 4)):
+        @staticmethod
+        def _collapse(grid_3d, grid_limits, slice_axis='z', slice_index=None,
+                      slice_width=None, slice_average=True, mode='projection',
+                      projection='mean', normalize_by_area=False):
+            """Local port of analysistools.GriddingTools._collapse -- see
+            its docstring for normalize_by_area's units caveats."""
             nx, ny, nz = grid_3d.shape
 
             if mode == 'slice':
                 if slice_axis == 'z':
+                    n = nz
                     if slice_index is None:
-                        slice_index = nz // 2
+                        slice_index = n // 2
                     if slice_width is None:
                         slice_width = 1
                     start_idx = max(slice_index - slice_width // 2, 0)
-                    end_idx = min(slice_index + slice_width // 2 + 1, nz)
-                    data = (grid_3d[:, :, start_idx:end_idx].mean(axis=2) if slice_average
-                            else grid_3d[:, :, start_idx:end_idx].sum(axis=2))
+                    end_idx = min(slice_index + slice_width // 2 + 1, n)
+                    sub = grid_3d[:, :, start_idx:end_idx]
+                    data = sub.mean(axis=2) if slice_average else sub.sum(axis=2)
                     extent = [grid_limits[0], grid_limits[1], grid_limits[2], grid_limits[3]]
                     xlabel, ylabel, title_str = 'X', 'Y', f'XY slice (Z={slice_index})'
-
                 elif slice_axis == 'y':
+                    n = ny
                     if slice_index is None:
-                        slice_index = ny // 2
+                        slice_index = n // 2
                     if slice_width is None:
                         slice_width = 1
                     start_idx = max(slice_index - slice_width // 2, 0)
-                    end_idx = min(slice_index + slice_width // 2 + 1, ny)
-                    data = (grid_3d[:, start_idx:end_idx, :].mean(axis=1) if slice_average
-                            else grid_3d[:, start_idx:end_idx, :].sum(axis=1))
+                    end_idx = min(slice_index + slice_width // 2 + 1, n)
+                    sub = grid_3d[:, start_idx:end_idx, :]
+                    data = sub.mean(axis=1) if slice_average else sub.sum(axis=1)
                     extent = [grid_limits[0], grid_limits[1], grid_limits[4], grid_limits[5]]
                     xlabel, ylabel, title_str = 'X', 'Z', f'XZ slice (Y={slice_index})'
-
                 elif slice_axis == 'x':
+                    n = nx
                     if slice_index is None:
-                        slice_index = nx // 2
+                        slice_index = n // 2
                     if slice_width is None:
                         slice_width = 1
                     start_idx = max(slice_index - slice_width // 2, 0)
-                    end_idx = min(slice_index + slice_width // 2 + 1, nx)
-                    data = (grid_3d[start_idx:end_idx, :, :].mean(axis=0) if slice_average
-                            else grid_3d[start_idx:end_idx, :, :].sum(axis=0))
+                    end_idx = min(slice_index + slice_width // 2 + 1, n)
+                    sub = grid_3d[start_idx:end_idx, :, :]
+                    data = sub.mean(axis=0) if slice_average else sub.sum(axis=0)
                     extent = [grid_limits[2], grid_limits[3], grid_limits[4], grid_limits[5]]
                     xlabel, ylabel, title_str = 'Y', 'Z', f'YZ slice (X={slice_index})'
                 else:
                     raise ValueError("slice_axis must be 'x', 'y', or 'z'")
 
             elif mode == 'projection':
+                collapse_axis = {'z': 2, 'y': 1, 'x': 0}.get(slice_axis)
+                if collapse_axis is None:
+                    raise ValueError("slice_axis must be 'x', 'y', or 'z'")
+                data = {'mean': grid_3d.mean, 'sum': grid_3d.sum, 'max': grid_3d.max}[projection](axis=collapse_axis)
+
                 if slice_axis == 'z':
-                    data = {'mean': grid_3d.mean, 'sum': grid_3d.sum, 'max': grid_3d.max}[projection](axis=2)
                     extent = [grid_limits[0], grid_limits[1], grid_limits[2], grid_limits[3]]
                     xlabel, ylabel, title_str = 'X', 'Y', f'XY projection ({projection} along Z)'
                 elif slice_axis == 'y':
-                    data = {'mean': grid_3d.mean, 'sum': grid_3d.sum, 'max': grid_3d.max}[projection](axis=1)
                     extent = [grid_limits[0], grid_limits[1], grid_limits[4], grid_limits[5]]
                     xlabel, ylabel, title_str = 'X', 'Z', f'XZ projection ({projection} along Y)'
-                elif slice_axis == 'x':
-                    data = {'mean': grid_3d.mean, 'sum': grid_3d.sum, 'max': grid_3d.max}[projection](axis=0)
+                else:
                     extent = [grid_limits[2], grid_limits[3], grid_limits[4], grid_limits[5]]
                     xlabel, ylabel, title_str = 'Y', 'Z', f'YZ projection ({projection} along X)'
-                else:
-                    raise ValueError("slice_axis must be 'x', 'y', or 'z'")
+
+                if normalize_by_area:
+                    pixel_area = ((extent[1] - extent[0]) / data.shape[0]) * \
+                                 ((extent[3] - extent[2]) / data.shape[1])
+                    data = data / pixel_area
             else:
                 raise ValueError("mode must be 'slice' or 'projection'")
 
-            fig, ax = plt.subplots(figsize=figsize)
-            with np.errstate(divide="ignore"):
-                im = ax.imshow(np.log10(data.T), origin='lower', extent=extent, cmap=cmap, aspect='auto')
+            return data, extent, xlabel, ylabel, title_str
+
+        @staticmethod
+        def _plot_panel(ax, data, extent, xlabel, ylabel, title_str, cmap='viridis',
+                         vmin=None, vmax=None):
+            with np.errstate(divide='ignore', invalid='ignore'):
+                plotted = np.log10(data.T)
+            im = ax.imshow(plotted, origin='lower', extent=extent, cmap=cmap,
+                            aspect='auto', vmin=vmin, vmax=vmax)
             ax.set_xlabel(xlabel)
             ax.set_ylabel(ylabel)
             ax.set_title(title_str)
+            return im
+
+        @staticmethod
+        def _shared_clim(data_list):
+            with np.errstate(divide='ignore', invalid='ignore'):
+                all_vals = np.concatenate([np.log10(d).ravel() for d in data_list])
+            finite = all_vals[np.isfinite(all_vals)]
+            if finite.size == 0:
+                return None, None
+            return float(finite.min()), float(finite.max())
+
+        def plot_3d_slice(self, grid_3d, grid_limits,
+                           slice_axis='z', slice_index=None,
+                           slice_width=None, slice_average=True,
+                           mode='slice', projection='mean',
+                           title="3D Grid Slice", cmap='viridis', figsize=(12, 4),
+                           vmin=None, vmax=None, normalize_by_area=False, cbar_label=None):
+            data, extent, xlabel, ylabel, title_str = self._collapse(
+                grid_3d, grid_limits, slice_axis=slice_axis, slice_index=slice_index,
+                slice_width=slice_width, slice_average=slice_average, mode=mode,
+                projection=projection, normalize_by_area=normalize_by_area,
+            )
+            fig, ax = plt.subplots(figsize=figsize)
+            im = self._plot_panel(ax, data, extent, xlabel, ylabel, title_str,
+                                   cmap=cmap, vmin=vmin, vmax=vmax)
             fig.suptitle(title, fontsize=14)
-            plt.colorbar(im, ax=ax)
+            cbar = plt.colorbar(im, ax=ax)
+            if cbar_label is not None:
+                cbar.set_label(cbar_label)
             plt.tight_layout()
             return fig, ax
 
@@ -471,31 +511,74 @@ except ImportError:
                                  mode='projection', projection='sum',
                                  cmap='viridis', figsize=(12, 4), title=None,
                                  slice_axis='z', slice_index=None,
-                                 slice_width=None, slice_average=True):
+                                 slice_width=None, slice_average=True,
+                                 vmin=None, vmax=None, normalize_by_area=False,
+                                 cbar_label=None):
             fig, axes = plt.subplots(1, 3, figsize=figsize)
 
-            for ax, axis, lbl in zip(axes, ['z', 'y', 'x'], ['XY', 'XZ', 'YZ']):
-                idx = None
-                if mode == 'slice' and slice_index is not None:
-                    idx = slice_index.get(axis, None) if isinstance(slice_index, dict) else slice_index
+            panels = []
+            for axis in ['z', 'y', 'x']:
+                idx = slice_index
+                if mode == 'slice' and isinstance(slice_index, dict):
+                    idx = slice_index.get(axis, None)
+                panels.append(self._collapse(
+                    grid_3d, grid_limits, slice_axis=axis, slice_index=idx,
+                    slice_width=slice_width, slice_average=slice_average, mode=mode,
+                    projection=projection, normalize_by_area=normalize_by_area,
+                ))
 
-                _, single_ax = self.plot_3d_slice(
-                    grid_3d, grid_limits,
-                    slice_axis=axis,
-                    mode=mode,
+            if vmin is None or vmax is None:
+                auto_vmin, auto_vmax = self._shared_clim([p[0] for p in panels])
+                vmin = auto_vmin if vmin is None else vmin
+                vmax = auto_vmax if vmax is None else vmax
+
+            for ax, lbl, (data, extent, xlabel, ylabel, _) in zip(axes, ['XY', 'XZ', 'YZ'], panels):
+                im = self._plot_panel(ax, data, extent, xlabel, ylabel, lbl,
+                                       cmap=cmap, vmin=vmin, vmax=vmax)
+                cbar = plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+                if cbar_label is not None:
+                    cbar.set_label(cbar_label)
+
+            if title:
+                fig.suptitle(title, fontsize=14)
+
+            plt.tight_layout()
+            return fig, axes
+
+        def plot_ratio_projections(self, numerator_3d, denominator_3d, grid_limits,
+                                   projection='sum', cmap='viridis', figsize=(12, 4),
+                                   title=None, vmin=None, vmax=None,
+                                   min_denominator=0.0, cbar_label=None):
+            if numerator_3d.shape != denominator_3d.shape:
+                raise ValueError("numerator_3d and denominator_3d must have the same shape")
+
+            fig, axes = plt.subplots(1, 3, figsize=figsize)
+
+            panels = []
+            for axis in ['z', 'y', 'x']:
+                num, extent, xlabel, ylabel, _ = self._collapse(
+                    numerator_3d, grid_limits, slice_axis=axis, mode='projection',
                     projection=projection,
-                    cmap=cmap,
-                    figsize=(5, 5),
                 )
+                den, _, _, _, _ = self._collapse(
+                    denominator_3d, grid_limits, slice_axis=axis, mode='projection',
+                    projection=projection,
+                )
+                with np.errstate(divide='ignore', invalid='ignore'):
+                    ratio = np.where(den > min_denominator, num / den, np.nan)
+                panels.append((ratio, extent, xlabel, ylabel))
 
-                im = single_ax.images[0]
-                ax.imshow(im.get_array(), origin='lower', extent=im.get_extent(),
-                          cmap=im.get_cmap() if hasattr(im, 'get_cmap') else cmap, aspect='auto')
-                ax.set_title(lbl)
-                ax.set_xlabel(single_ax.get_xlabel())
-                ax.set_ylabel(single_ax.get_ylabel())
-                plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
-                plt.close(single_ax.figure)
+            if vmin is None or vmax is None:
+                auto_vmin, auto_vmax = self._shared_clim([p[0] for p in panels])
+                vmin = auto_vmin if vmin is None else vmin
+                vmax = auto_vmax if vmax is None else vmax
+
+            for ax, lbl, (data, extent, xlabel, ylabel) in zip(axes, ['XY', 'XZ', 'YZ'], panels):
+                im = self._plot_panel(ax, data, extent, xlabel, ylabel, lbl,
+                                       cmap=cmap, vmin=vmin, vmax=vmax)
+                cbar = plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+                if cbar_label is not None:
+                    cbar.set_label(cbar_label)
 
             if title:
                 fig.suptitle(title, fontsize=14)
@@ -588,6 +671,32 @@ def read_gas_scalars_h5py(path):
     return pos, mass, metal_mass, dust_mass, smoothing_length
 
 
+SOLAR_MASS_G = 1.989e33
+PC_PER_KPC = 1.0e3
+PC2_PER_KPC2 = PC_PER_KPC ** 2
+
+
+def surface_density_value_scale(path):
+    """Factor to pre-multiply a mass-like `values` array (gas/metal/dust
+    mass, in code mass units) by before SPH-depositing it and area-
+    normalizing (see plot_grid), so the resulting column density comes out
+    directly in Msun/pc^2 -- rather than in [code mass unit] / [grid_limits
+    unit]^2, which GriddingTools' normalize_by_area has no way to know is
+    physically meaningful. Assumes grid_limits/positions are in kpc (true
+    for this example's snapshots, UnitLength_in_cm = 1 kpc).
+
+    Reads UnitMass_in_g from the snapshot's own /Header (written by every
+    Arepo run, not just this fork) rather than assuming a fixed value, so
+    this keeps working if the example's units ever change.
+    """
+    import h5py
+
+    with h5py.File(path, "r") as f:
+        unit_mass_in_g = f["/Header"].attrs["UnitMass_in_g"]
+
+    return (unit_mass_in_g / SOLAR_MASS_G) / PC2_PER_KPC2
+
+
 def parse_args():
     parser = argparse.ArgumentParser(
         description="Compute AGORA disc diagnostics from one or more Arepo snapshots"
@@ -652,10 +761,27 @@ def parse_args():
              "Skipped if the snapshot has no DustMass field.",
     )
     parser.add_argument(
+        "--dtg-grid-output", default="disc_grid_dust_to_gas_{name}.png",
+        help="Output figure template for the per-snapshot dust-to-gas mass "
+             "ratio grid projection. Same {name}/{index} substitution as "
+             "--grid-output. Skipped if the snapshot has no DustMass field.",
+    )
+    parser.add_argument(
         "--metals-dust-output", default="disc_metals_dust_profiles.png",
         help="Output figure for overlaid metal and dust surface-density radial "
              "profiles (mirrors --output for gas). Dust panel is omitted if no "
              "snapshot has a DustMass field.",
+    )
+    parser.add_argument(
+        "--grid-vmin", type=float, default=None,
+        help="Fixed lower colour limit (log10 scale) shared across all three "
+             "panels of every grid projection (gas/metal/dust mass, and "
+             "dust-to-gas ratio). Default: computed per-plot from that "
+             "plot's own data range.",
+    )
+    parser.add_argument(
+        "--grid-vmax", type=float, default=None,
+        help="Fixed upper colour limit (log10 scale), see --grid-vmin.",
     )
     parser.add_argument("--save-data", default=None, help="Optional .npz path to save the computed profiles (all snapshots, one file)")
     parser.add_argument("-v", "--verbose", action="store_true", help="Verbose logging")
@@ -830,11 +956,12 @@ def plot_metals_dust_profiles(results, output):
     log.info("Saved %s", output)
 
 
-def plot_grid(pos, values, centre, args, output_path, title=None, smoothing_lengths=None):
+def plot_grid(pos, values, centre, args, output_path, title=None, smoothing_lengths=None,
+              value_scale=1.0, cbar_label=None, vmin=None, vmax=None):
     """Smoothed-grid projection plot for a single quantity/snapshot. Always
     run on the full particle set (regardless of --mask-radius), like the
     source notebook. `values` is whatever per-particle quantity is being
-    projected (mass, metal mass, or dust mass).
+    projected (mass, metal mass, or dust mass), in code mass units.
 
     With `smoothing_lengths` (each cell's own effective radius, see
     read_gas_scalars_h5py), uses GriddingTools' per-particle SPH-kernel
@@ -844,6 +971,74 @@ def plot_grid(pos, values, centre, args, output_path, title=None, smoothing_leng
     the AGORA IC's cell size varies by orders of magnitude across the box.
     Falls back to the old CIC+Gaussian path if smoothing_lengths is None
     (e.g. no Density field, or a particle type other than gas).
+
+    Plots a proper column density (sum along the projection axis, divided
+    by pixel area -- not a bare mean of raw code-unit values, which isn't
+    a meaningful physical quantity). `value_scale` (see
+    surface_density_value_scale) converts `values` from code mass units to
+    Msun/pc^2 once area-normalized; pass 1.0 (default) to leave the
+    colourbar in code units instead.
+    """
+    gridding = GriddingTools()
+
+    lzgrid = args.lzgrid if args.lzgrid is not None else args.lgrid / 4
+    grid_size = args.ngrid * np.ones(3, dtype=np.int64)
+    grid_limits = np.array([
+        centre[0] - args.lgrid, centre[0] + args.lgrid,
+        centre[1] - args.lgrid, centre[1] + args.lgrid,
+        centre[2] - lzgrid, centre[2] + lzgrid,
+    ])
+
+    box_mask = (
+        (pos[:, 0] >= grid_limits[0]) & (pos[:, 0] < grid_limits[1]) &
+        (pos[:, 1] >= grid_limits[2]) & (pos[:, 1] < grid_limits[3]) &
+        (pos[:, 2] >= grid_limits[4]) & (pos[:, 2] < grid_limits[5])
+    )
+    scaled_values = values[box_mask] * value_scale
+
+    if smoothing_lengths is not None:
+        smoothed_grid = gridding.smooth_to_grid(
+            positions=pos[box_mask],
+            values=scaled_values,
+            grid_size=grid_size,
+            grid_limits=grid_limits,
+            method="SPH",
+            smoothing_lengths=smoothing_lengths[box_mask],
+        )
+    else:
+        smoothed_grid = gridding.smooth_to_grid(
+            positions=pos[box_mask],
+            values=scaled_values,
+            grid_size=grid_size,
+            grid_limits=grid_limits,
+            method="Gaussian",
+            sigma=args.smooth_sigma,
+        )
+
+    try:
+        fig, _ = gridding.plot_3d_projections(
+            smoothed_grid, grid_limits, projection="sum", normalize_by_area=True,
+            title=title, vmin=vmin, vmax=vmax, cbar_label=cbar_label,
+        )
+    except TypeError:
+        # the installed analysistools.GriddingTools.plot_3d_projections may
+        # be an older version without vmin/vmax/normalize_by_area/cbar_label
+        # -- degrade gracefully rather than failing the run
+        fig, _ = gridding.plot_3d_projections(smoothed_grid, grid_limits, projection="sum", title=title)
+    fig.savefig(output_path, dpi=200)
+    plt.close(fig)
+    log.info("Saved %s", output_path)
+
+
+def plot_dust_to_gas_ratio_grid(pos, gas_mass, dust_mass, smoothing_lengths, centre, args,
+                                output_path, title=None, vmin=None, vmax=None):
+    """Dust-to-gas mass ratio grid projection: gas mass and dust mass are
+    each SPH-deposited and projected (summed) independently, then divided
+    -- not divided cell-by-cell before deposition/projection, which would
+    incorrectly weight the ratio by wherever gas happens to be sparse. No
+    value_scale/area normalization needed: it cancels in the ratio (see
+    GriddingTools.plot_ratio_projections), so this is dimensionless
+    regardless of the mass unit gas_mass/dust_mass are given in.
     """
     gridding = GriddingTools()
 
@@ -861,31 +1056,22 @@ def plot_grid(pos, values, centre, args, output_path, title=None, smoothing_leng
         (pos[:, 2] >= grid_limits[4]) & (pos[:, 2] < grid_limits[5])
     )
 
-    if smoothing_lengths is not None:
-        smoothed_grid = gridding.smooth_to_grid(
-            positions=pos[box_mask],
-            values=values[box_mask],
-            grid_size=grid_size,
-            grid_limits=grid_limits,
-            method="SPH",
-            smoothing_lengths=smoothing_lengths[box_mask],
-        )
-    else:
-        smoothed_grid = gridding.smooth_to_grid(
-            positions=pos[box_mask],
-            values=values[box_mask],
-            grid_size=grid_size,
-            grid_limits=grid_limits,
-            method="Gaussian",
-            sigma=args.smooth_sigma,
-        )
+    gas_grid = gridding.smooth_to_grid(
+        positions=pos[box_mask], values=gas_mass[box_mask], grid_size=grid_size,
+        grid_limits=grid_limits, method="SPH", smoothing_lengths=smoothing_lengths[box_mask],
+    )
+    dust_grid = gridding.smooth_to_grid(
+        positions=pos[box_mask], values=dust_mass[box_mask], grid_size=grid_size,
+        grid_limits=grid_limits, method="SPH", smoothing_lengths=smoothing_lengths[box_mask],
+    )
 
     try:
-        fig, _ = gridding.plot_3d_projections(smoothed_grid, grid_limits, projection="mean", title=title)
+        fig, _ = gridding.plot_ratio_projections(
+            dust_grid, gas_grid, grid_limits, projection="sum", title=title,
+            vmin=vmin, vmax=vmax, cbar_label="log$_{10}$ Dust-to-gas ratio",
+        )
     except TypeError:
-        # the installed analysistools.GriddingTools.plot_3d_projections may not
-        # accept `title` -- degrade gracefully rather than failing the run
-        fig, _ = gridding.plot_3d_projections(smoothed_grid, grid_limits, projection="mean")
+        fig, _ = gridding.plot_ratio_projections(dust_grid, gas_grid, grid_limits, projection="sum", title=title)
     fig.savefig(output_path, dpi=200)
     plt.close(fig)
     log.info("Saved %s", output_path)
@@ -945,25 +1131,37 @@ def main():
         # meaning for other particle types.
         mass_smoothing_lengths = gas_h if args.ptype == 0 else None
 
+        value_scale = surface_density_value_scale(snapshot_path)
+        sigma_label = r"$\Sigma$ [M$_\odot$ pc$^{-2}$]"
+
         grid_out = format_output_path(args.grid_output, name, index)
         plot_grid(pos, mass, centre, args, grid_out, title=f"Gas mass ({name})",
-                  smoothing_lengths=mass_smoothing_lengths)
+                  smoothing_lengths=mass_smoothing_lengths, value_scale=value_scale,
+                  cbar_label=sigma_label, vmin=args.grid_vmin, vmax=args.grid_vmax)
 
         sigma_metals = sigma_dust = None
 
         if metal_mass is not None:
             metals_grid_out = format_output_path(args.metals_grid_output, name, index)
             plot_grid(gas_pos, metal_mass, centre, args, metals_grid_out, title=f"Metal mass ({name})",
-                      smoothing_lengths=gas_h)
+                      smoothing_lengths=gas_h, value_scale=value_scale,
+                      cbar_label=sigma_label, vmin=args.grid_vmin, vmax=args.grid_vmax)
         else:
             log.warning("No PassiveScalars field in %s -- skipping metals grid/profile", snapshot_path)
 
         if dust_mass is not None:
             dust_grid_out = format_output_path(args.dust_grid_output, name, index)
             plot_grid(gas_pos, dust_mass, centre, args, dust_grid_out, title=f"Dust mass ({name})",
-                      smoothing_lengths=gas_h)
+                      smoothing_lengths=gas_h, value_scale=value_scale,
+                      cbar_label=sigma_label, vmin=args.grid_vmin, vmax=args.grid_vmax)
+
+            dtg_grid_out = format_output_path(args.dtg_grid_output, name, index)
+            plot_dust_to_gas_ratio_grid(
+                gas_pos, gas_mass, dust_mass, gas_h, centre, args, dtg_grid_out,
+                title=f"Dust-to-gas ratio ({name})", vmin=args.grid_vmin, vmax=args.grid_vmax,
+            )
         else:
-            log.info("No DustMass field in %s -- skipping dust grid/profile (run not built with DUST?)", snapshot_path)
+            log.info("No DustMass field in %s -- skipping dust/dust-to-gas grid/profile (run not built with DUST?)", snapshot_path)
 
         if metal_mass is not None:
             gas_mask = compute_mask(gas_pos, centre, args)
