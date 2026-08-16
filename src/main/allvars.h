@@ -2129,6 +2129,9 @@ enum iofields
   IO_CURLVEL,
   IO_COOLHEAT,
   IO_PASS,
+#ifdef METALS
+  IO_GAS_METALS,
+#endif
 
   IO_SUBFINDHSML,
   IO_SUBFINDDENSITY,
