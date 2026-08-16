@@ -535,6 +535,25 @@ $(warning SUPERNOVAE without TREE_BASED_TIMESTEPS does not limit timesteps)
 endif
 endif
 
+#DUST
+ifneq (,$(filter DUST,$(CONFIGVARS)))
+ifeq (,$(filter METALS,$(CONFIGVARS)))
+$(error DUST requires METALS)
+endif
+ifeq (,$(filter SUPERNOVAE,$(CONFIGVARS)))
+$(error DUST requires SUPERNOVAE (Phase 1 dust production/destruction is SN-channel only))
+endif
+OBJS += dust/dust_production_sn.o \
+        dust/dust_destruction_sn.o \
+        dust/dust_growth.o \
+        dust/dust_sputtering.o \
+        dust/dust_update.o \
+        dust/dust_io.o
+INCL += dust/dust.h \
+        dust/dust_proto.h
+SUBDIRS += dust
+endif
+
 #BLACKHOLES
 ifneq (,$(filter BLACKHOLES,$(CONFIGVARS)))
 OBJS += blackholes/bh.o

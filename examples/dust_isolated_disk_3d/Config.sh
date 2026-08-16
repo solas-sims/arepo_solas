@@ -2,36 +2,39 @@
 
 #########################################################
 #  Enable/Disable compile-time options as needed        #
-#  examples/agora_disc_star_formation_3d/Config.sh      #
+#  examples/dust_isolated_disk_3d/Config.sh              #
 #########################################################
+#
+# Flag combination mirrors Config_AGORA.sh (the only config in this repo
+# that already enables METALS + STARS + WINDS + SUPERNOVAE together) plus
+# DUST. This example has NO paired initial-conditions file -- see README.md
+# in this directory. Config.sh scaffolding only, per the Phase 1
+# implementation plan.
 
 #--------------------------------------- SOLAS additions
 
 #--------------------------------------- Metal parameters
 METALS                 # Advect all metals, ie metal mass fraction, as a PASSIVE_SCALARS
+# Do NOT also set PASSIVE_SCALARS=N here: it is computed automatically from
+# METALS_NUMBER + DUST_NUMBER (see src/main/allvars.h) once DUST is enabled.
 
 #--------------------------------------- Dust parameters
-DUST                   # Phase 1: single-species dust mass (SN-channel production/destruction, growth, sputtering)
+DUST                    # Phase 1: single-species dust mass (SN-channel production/destruction, growth, sputtering)
 
 #--------------------------------------- Cooling parameters
 USE_GRACKLE
 GRACKLE_CHEMISTRY=3
 
 #--------------------------------------- Star Formation options
-AGORA_SF               # Agora based SF
+AGORA_SF                # Agora based SF
 
 #--------------------------------------- Star options
-STARS                  # General stars framework flag
+STARS                   # General stars framework flag
 
-STAR_PARTICLES=1       # Star particles model flag: set to 0, 1 for massive star particles, set to 2 for resolved individual stars
+STAR_PARTICLES=1        # Star particles model flag: set to 0, 1 for massive star particles, set to 2 for resolved individual stars
 
-#STAR_FEEDBACK          # Include full star feedback (winds + full radiation + supernovae)
-WINDS                  # Only winds
-#RADIATION              # Full radiation
-SUPERNOVAE             # Only supernovae
-
-#STAR_HOST_REFINEMENT
-
+WINDS                   # Only winds
+SUPERNOVAE               # Only supernovae -- required by DUST (Phase 1 production/destruction is SN-channel only)
 
 #--------------------------------------- Arepo public
 
@@ -68,7 +71,6 @@ TREE_BASED_TIMESTEPS          # non-local timestep criterion (take 'signal speed
 
 #--------------------------------------- Single/Double Precision
 DOUBLEPRECISION=1             # Mode of double precision: not defined: single; 1: full double precision 2: mixed, 3: mixed, fewer single precisions; unless short of memory, use 1.
-NGB_TREE_DOUBLEPRECISION      # if this is enabled, double precision is used for the neighbor node extension
 
 #--------------------------------------- output options
 PROCESS_TIMES_OF_OUTPUTLIST   # goes through times of output list prior to starting the simulaiton to ensure that outputs are written as close to the desired time as possible (as opposed to at next possible time if this flag is not active)
@@ -77,4 +79,4 @@ HAVE_HDF5                     # needed when HDF5 I/O support is desired (recomme
 #--------------------------------------- Testing and Debugging options
 DEBUG                         # enables core-dumps
 
-OVERRIDE_PEANOGRID_WARNING  # don't stop if peanogrid is not fine enough
+OVERRIDE_PEANOGRID_WARNING    # don't stop if peanogrid is not fine enough
