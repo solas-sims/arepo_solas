@@ -152,8 +152,12 @@ colourbar is a proper column density (Σ, summed along the projection axis and
 divided by pixel area — not a mean of raw per-cell values), converted to
 M☉ pc⁻² using each snapshot's own `UnitMass_in_g`. All three panels (XY/XZ/YZ)
 of a given plot share one colour scale by default (computed from that plot's
-own combined data range); pass `--grid-vmin`/`--grid-vmax` to fix it
-explicitly, e.g. for comparing the same panel across multiple snapshots.
+own combined data range); pass `--gas-grid-vmin`/`--gas-grid-vmax`,
+`--metals-grid-vmin`/`--metals-grid-vmax`, `--dust-grid-vmin`/`--dust-grid-vmax`,
+or `--dtg-grid-vmin`/`--dtg-grid-vmax` to fix a given plot's range explicitly
+— each quantity gets its own pair rather than sharing one, since gas/metal/dust
+mass and the (dimensionless) dust-to-gas ratio have independently very
+different natural ranges.
 
 Also reads each snapshot's gas-cell metal mass (`PassiveScalars`) and, if
 present, dust mass (`DustMass`, only written when `Config.sh` has `DUST`

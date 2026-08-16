@@ -773,15 +773,44 @@ def parse_args():
              "snapshot has a DustMass field.",
     )
     parser.add_argument(
-        "--grid-vmin", type=float, default=None,
-        help="Fixed lower colour limit (log10 scale) shared across all three "
-             "panels of every grid projection (gas/metal/dust mass, and "
-             "dust-to-gas ratio). Default: computed per-plot from that "
-             "plot's own data range.",
+        "--gas-grid-vmin", type=float, default=None,
+        help="Fixed lower colour limit (log10 Msun/pc^2) shared across all "
+             "three panels of the gas mass grid projection. Default: "
+             "computed from that plot's own data range. Gas/metal/dust mass "
+             "and the dust-to-gas ratio have independently very different "
+             "value ranges, so each gets its own --*-grid-vmin/vmax rather "
+             "than sharing one.",
     )
     parser.add_argument(
-        "--grid-vmax", type=float, default=None,
-        help="Fixed upper colour limit (log10 scale), see --grid-vmin.",
+        "--gas-grid-vmax", type=float, default=None,
+        help="Fixed upper colour limit, see --gas-grid-vmin.",
+    )
+    parser.add_argument(
+        "--metals-grid-vmin", type=float, default=None,
+        help="Fixed lower colour limit (log10 Msun/pc^2) for the metal mass "
+             "grid projection. See --gas-grid-vmin.",
+    )
+    parser.add_argument(
+        "--metals-grid-vmax", type=float, default=None,
+        help="Fixed upper colour limit, see --metals-grid-vmin.",
+    )
+    parser.add_argument(
+        "--dust-grid-vmin", type=float, default=None,
+        help="Fixed lower colour limit (log10 Msun/pc^2) for the dust mass "
+             "grid projection. See --gas-grid-vmin.",
+    )
+    parser.add_argument(
+        "--dust-grid-vmax", type=float, default=None,
+        help="Fixed upper colour limit, see --dust-grid-vmin.",
+    )
+    parser.add_argument(
+        "--dtg-grid-vmin", type=float, default=None,
+        help="Fixed lower colour limit (log10, dimensionless ratio) for the "
+             "dust-to-gas ratio grid projection. See --gas-grid-vmin.",
+    )
+    parser.add_argument(
+        "--dtg-grid-vmax", type=float, default=None,
+        help="Fixed upper colour limit, see --dtg-grid-vmin.",
     )
     parser.add_argument("--save-data", default=None, help="Optional .npz path to save the computed profiles (all snapshots, one file)")
     parser.add_argument("-v", "--verbose", action="store_true", help="Verbose logging")
@@ -1137,7 +1166,7 @@ def main():
         grid_out = format_output_path(args.grid_output, name, index)
         plot_grid(pos, mass, centre, args, grid_out, title=f"Gas mass ({name})",
                   smoothing_lengths=mass_smoothing_lengths, value_scale=value_scale,
-                  cbar_label=sigma_label, vmin=args.grid_vmin, vmax=args.grid_vmax)
+                  cbar_label=sigma_label, vmin=args.gas_grid_vmin, vmax=args.gas_grid_vmax)
 
         sigma_metals = sigma_dust = None
 
@@ -1145,7 +1174,7 @@ def main():
             metals_grid_out = format_output_path(args.metals_grid_output, name, index)
             plot_grid(gas_pos, metal_mass, centre, args, metals_grid_out, title=f"Metal mass ({name})",
                       smoothing_lengths=gas_h, value_scale=value_scale,
-                      cbar_label=sigma_label, vmin=args.grid_vmin, vmax=args.grid_vmax)
+                      cbar_label=sigma_label, vmin=args.metals_grid_vmin, vmax=args.metals_grid_vmax)
         else:
             log.warning("No PassiveScalars field in %s -- skipping metals grid/profile", snapshot_path)
 
@@ -1153,12 +1182,12 @@ def main():
             dust_grid_out = format_output_path(args.dust_grid_output, name, index)
             plot_grid(gas_pos, dust_mass, centre, args, dust_grid_out, title=f"Dust mass ({name})",
                       smoothing_lengths=gas_h, value_scale=value_scale,
-                      cbar_label=sigma_label, vmin=args.grid_vmin, vmax=args.grid_vmax)
+                      cbar_label=sigma_label, vmin=args.dust_grid_vmin, vmax=args.dust_grid_vmax)
 
             dtg_grid_out = format_output_path(args.dtg_grid_output, name, index)
             plot_dust_to_gas_ratio_grid(
                 gas_pos, gas_mass, dust_mass, gas_h, centre, args, dtg_grid_out,
-                title=f"Dust-to-gas ratio ({name})", vmin=args.grid_vmin, vmax=args.grid_vmax,
+                title=f"Dust-to-gas ratio ({name})", vmin=args.dtg_grid_vmin, vmax=args.dtg_grid_vmax,
             )
         else:
             log.info("No DustMass field in %s -- skipping dust/dust-to-gas grid/profile (run not built with DUST?)", snapshot_path)
