@@ -2247,9 +2247,6 @@ enum arrays
 #ifdef SIDM
   A_DMSP,
 #endif
-#ifdef BLACKHOLES
-  A_BH,
-#endif
   A_PS
 };
 

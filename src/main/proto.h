@@ -699,12 +699,9 @@ void set_overdens_thresh(void);
 
 #ifdef USE_GRACKLE
 double compute_mu(int i);
-<<<<<<< HEAD
 #if defined(POPIII_SF) && (GRACKLE_CHEMISTRY >= 2)
 double get_H2_fraction(int i);
 #endif
-=======
->>>>>>> origin/main
 #endif
 
 #endif /* #ifndef PROTO_H */
