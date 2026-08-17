@@ -189,6 +189,7 @@ void begrun1(void)
 
   rng = gsl_rng_alloc(gsl_rng_mt19937);
   gsl_rng_set(rng, ThisTask + 1);
+#endif
 #endif /* #ifdef STAR_PARTICLES */
 
   timebins_init(&TimeBinsHydro, "Hydro", &All.MaxPartSph);

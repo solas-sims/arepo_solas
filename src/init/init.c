@@ -568,7 +568,12 @@ int init(void)
    * NumStars/SP[] to be populated, so unlike the setup above this must stay here rather
    * than move to begrun1() */
   for(i = 0; i < NumStars; i++)
-    sample_star_particle(PPS(i).Mass * All.cf_UnitMass_in_Msun, SP[i].NumOfStarsInBins);
+#ifdef POPIII_SF
+    SP[i].PopulationType = (SP[i].Metallicity < All.PopIIIMetallicityThreshold) ? POPIII : POPII;
+#else
+    SP[i].PopulationType = POPII;
+#endif 
+    sample_star_particle(SP[i].PopulationType, PPS(i).Mass * All.cf_UnitMass_in_Msun, SP[i].NumOfStarsInBins);
 #endif
 
 #ifdef STAR_FEEDBACK_ACTIVE
