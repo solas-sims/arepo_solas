@@ -8,9 +8,10 @@ name: AGORA disc smoke test
 # get_tables.sh (see that example's README.md for details).
 #
 # Runs a short, CI-sized slice of the simulation (not the full ~500 Myr
-# science run) by overriding TimeLimitCPU to a few wall-clock minutes;
-# Arepo checks that periodically and exits cleanly (exit code 0) once
-# it's past ~85% of the budget, writing a restart file on the way out.
+# science run) by overriding TimeLimitCPU to well under a minute of
+# wall-clock time (enough for ~10-20 sync-points); Arepo checks that
+# periodically and exits cleanly (exit code 0) once it's past ~85% of
+# the budget, writing a restart file on the way out.
 # A fixed number-of-steps cutoff (e.g. a small TimeMax) doesn't work here
 # because hierarchical/individual timestepping means the number of
 # sync-points per unit of simulated time isn't predictable up front - an
@@ -35,10 +36,10 @@ on:
     - cron: '17 3 * * 1'
   workflow_dispatch:
     inputs:
-      run_minutes:
-        description: 'Wall-clock minutes to let the run advance before stopping it cleanly'
+      run_seconds:
+        description: 'Wall-clock seconds to let the run advance before stopping it cleanly'
         required: false
-        default: '30'
+        default: '1800'
 
 env:
   # solas-sims/grackle has no tags yet, so pin to a commit on main for
@@ -112,18 +113,18 @@ jobs:
       - name: Prepare short-run param file
         working-directory: ${{ env.EXAMPLE_DIR }}
         run: |
-          run_minutes="${{ github.event.inputs.run_minutes }}"
-          if [ -z "$run_minutes" ]; then
-            # Keep pull_request/push runs quick; only the weekly schedule
-            # and manual runs default to a deeper 30-minute slice.
-            if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-              run_minutes=30
+          time_limit_cpu="${{ github.event.inputs.run_seconds }}"
+          if [ -z "$time_limit_cpu" ]; then
+            # ~17-18 sync-points/minute observed on this example, so a
+            # minute comfortably covers the 10-20 sync-points a PR/push
+            # run needs; the weekly schedule defaults to a deeper slice.
+            if [ "${{ github.event_name }}" = "schedule" ]; then
+              time_limit_cpu=1800
             else
-              run_minutes=5
+              time_limit_cpu=60
             fi
           fi
-          time_limit_cpu=$((run_minutes * 60))
-          echo "Running with TimeLimitCPU=${time_limit_cpu}s (~${run_minutes} wall-clock minutes)"
+          echo "Running with TimeLimitCPU=${time_limit_cpu}s"
           cp param.txt param_ci.txt
           sed -i "s/^TimeLimitCPU .*/TimeLimitCPU                            ${time_limit_cpu}/" param_ci.txt
           mkdir -p output
@@ -139,8 +140,8 @@ jobs:
         run: |
           sync_points=$(grep -c '^Sync-Point' run.log || true)
           echo "Logged ${sync_points} sync-point(s)."
-          if [ "$sync_points" -lt 2 ]; then
-            echo "::error::Fewer than 2 sync-points logged - the run barely started."
+          if [ "$sync_points" -lt 5 ]; then
+            echo "::error::Fewer than 5 sync-points logged - the run barely started."
             exit 1
           fi
 
