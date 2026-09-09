@@ -61,3 +61,22 @@ jobs:
             CONFIG="$config" \
             BUILD_DIR="build/${{ matrix.example }}" \
             EXEC="build/${{ matrix.example }}/Arepo"
+
+  # The matrix above produces one check per example ("compile (wave_1d)",
+  # etc.), which shifts every time an example is added or removed from
+  # test.sh. This job gives branch protection a single, stable check to
+  # require instead of needing its list of required checks updated
+  # whenever the matrix changes.
+  build-summary:
+    name: Build (all examples)
+    needs: compile
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check matrix result
+        run: |
+          if [ "${{ needs.compile.result }}" != "success" ]; then
+            echo "::error::One or more example compiles failed - see the compile (*) checks."
+            exit 1
+          fi
+          echo "All example compiles passed."
