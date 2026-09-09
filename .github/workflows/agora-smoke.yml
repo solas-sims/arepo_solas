@@ -8,17 +8,26 @@ name: AGORA disc smoke test
 # get_tables.sh (see that example's README.md for details).
 #
 # Runs a short, CI-sized slice of the simulation (not the full ~500 Myr
-# science run) by overriding TimeLimitCPU to well under a minute of
-# wall-clock time (enough for ~10-20 sync-points); Arepo checks that
-# periodically and exits cleanly (exit code 0) once it's past ~85% of
-# the budget, writing a restart file on the way out.
-# A fixed number-of-steps cutoff (e.g. a small TimeMax) doesn't work here
-# because hierarchical/individual timestepping means the number of
-# sync-points per unit of simulated time isn't predictable up front - an
-# earlier version of this workflow tried that and still racked up 700+
-# sync-points before anyone noticed it wasn't going to finish.
-# This only checks that the run starts, advances for a while, and exits
-# cleanly - it is not a physics regression test.
+# science run) by launching Arepo in the background, tailing its log for
+# a target number of sync-points, then dropping a "stop" file in the
+# output directory - Arepo checks for that at every sync-point
+# (check_for_interruption_of_run() in src/main/run.c) and exits cleanly
+# (exit code 0), writing a restart file on the way out.
+#
+# Two earlier approaches to bounding this run didn't work:
+#   - A small TimeMax derived from a target step count times
+#     MaxSizeTimestep: hierarchical/individual timestepping means the
+#     number of sync-points per unit of simulated time isn't predictable
+#     up front, so this raced through 700+ sync-points in 43 minutes
+#     without approaching TimeMax.
+#   - A fixed TimeLimitCPU (e.g. 60s): startup (reading the ICs, domain
+#     decomposition, building the mesh/gravity tree) eats a large,
+#     variable chunk of any fixed wall-clock budget, so a 60s budget
+#     produced only 2 sync-points on one run.
+# Watching the log for an actual sync-point count sidesteps both
+# problems. This only checks that the run starts, advances for the
+# targeted number of sync-points, and exits cleanly - it is not a
+# physics regression test.
 #
 # Builds Grackle from the SOLAS fork (solas-sims/grackle) with CMake -
 # the classic autotools ./configure build is deprecated upstream since
@@ -36,10 +45,10 @@ on:
     - cron: '17 3 * * 1'
   workflow_dispatch:
     inputs:
-      run_seconds:
-        description: 'Wall-clock seconds to let the run advance before stopping it cleanly'
+      target_sync_points:
+        description: 'Number of sync-points to advance before stopping the run cleanly'
         required: false
-        default: '1800'
+        default: '100'
 
 env:
   # solas-sims/grackle has no tags yet, so pin to a commit on main for
@@ -110,30 +119,67 @@ jobs:
             EXEC="${EXAMPLE_DIR}/Arepo" \
             GRACKLE_DIR="${GRACKLE_DIR}"
 
-      - name: Prepare short-run param file
+      - name: Prepare run directory
         working-directory: ${{ env.EXAMPLE_DIR }}
         run: |
-          time_limit_cpu="${{ github.event.inputs.run_seconds }}"
-          if [ -z "$time_limit_cpu" ]; then
-            # ~17-18 sync-points/minute observed on this example, so a
-            # minute comfortably covers the 10-20 sync-points a PR/push
-            # run needs; the weekly schedule defaults to a deeper slice.
-            if [ "${{ github.event_name }}" = "schedule" ]; then
-              time_limit_cpu=1800
-            else
-              time_limit_cpu=60
-            fi
-          fi
-          echo "Running with TimeLimitCPU=${time_limit_cpu}s"
           cp param.txt param_ci.txt
-          sed -i "s/^TimeLimitCPU .*/TimeLimitCPU                            ${time_limit_cpu}/" param_ci.txt
           mkdir -p output
 
       - name: Run AGORA disc smoke test
         working-directory: ${{ env.EXAMPLE_DIR }}
         run: |
-          set -o pipefail
-          mpiexec --oversubscribe -np 2 ./Arepo ./param_ci.txt 2>&1 | tee run.log
+          target="${{ github.event.inputs.target_sync_points }}"
+          if [ -z "$target" ]; then
+            # Keep pull_request/push runs quick; the weekly schedule
+            # defaults to a deeper slice.
+            if [ "${{ github.event_name }}" = "schedule" ]; then
+              target=100
+            else
+              target=15
+            fi
+          fi
+          # Generous outer bound in case the polling below never sees the
+          # target (e.g. the run stalls): scale with the target so a
+          # 100-sync-point schedule run isn't cut off early, floored so a
+          # small PR target still gets a reasonable grace period. The
+          # job's own timeout-minutes is the ultimate backstop.
+          max_wait_seconds=$((target * 60))
+          if [ "$max_wait_seconds" -lt 600 ]; then
+            max_wait_seconds=600
+          fi
+          poll_interval=5
+
+          echo "Targeting ${target} sync-point(s), polling every ${poll_interval}s, max wait ${max_wait_seconds}s"
+
+          mpiexec --oversubscribe -np 2 ./Arepo ./param_ci.txt > run.log 2>&1 &
+          arepo_pid=$!
+
+          elapsed=0
+          stop_requested=false
+          while kill -0 "$arepo_pid" 2>/dev/null; do
+            sleep "$poll_interval"
+            elapsed=$((elapsed + poll_interval))
+            sync_points=$(grep -c '^Sync-Point' run.log || true)
+
+            if [ "$stop_requested" = false ] && [ "$sync_points" -ge "$target" ]; then
+              echo "Reached ${sync_points} sync-point(s) after ${elapsed}s - requesting a clean stop."
+              touch output/stop
+              stop_requested=true
+            fi
+
+            if [ "$elapsed" -ge "$max_wait_seconds" ]; then
+              echo "::error::Timed out after ${max_wait_seconds}s waiting for the run to reach ${target} sync-points (got ${sync_points})."
+              kill "$arepo_pid" 2>/dev/null || true
+              exit 1
+            fi
+          done
+
+          exit_code=0
+          wait "$arepo_pid" || exit_code=$?
+          if [ "$exit_code" -ne 0 ]; then
+            echo "::error::Arepo exited with code ${exit_code}."
+            exit "$exit_code"
+          fi
 
       - name: Check the run advanced and stopped cleanly
         working-directory: ${{ env.EXAMPLE_DIR }}
