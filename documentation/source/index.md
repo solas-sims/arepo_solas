@@ -92,3 +92,4 @@ Table of contents
   development.md
   technical-reference.md
   fof_halo_seeding.md
+  pawsey_pulse_gpu_ci.md
