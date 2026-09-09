@@ -1,0 +1,145 @@
+name: AGORA disc smoke test
+
+# Build-and-run smoke test for the AGORA isolated-disc example
+# (examples/agora_disc_star_formation_3d), which exercises the
+# STARS/STAR_PARTICLES/WINDS/SUPERNOVAE feedback path this branch's GPU
+# work will target. Unlike build.yml this actually runs the code, so it
+# needs a Grackle build plus the external ICs/tables from get_ics.sh and
+# get_tables.sh (see that example's README.md for details).
+#
+# Runs a short, CI-sized slice of the simulation (not the full ~500 Myr
+# science run) by overriding TimeMax down to roughly MAX_STEPS timesteps
+# at MaxSizeTimestep. This only checks that the run starts, advances, and
+# exits cleanly - it is not a physics regression test.
+#
+# NOTE: the Grackle build step below is a best-effort autotools build
+# against a pinned tag; if Grackle's build system has changed, this step
+# is the first thing to fix.
+
+on:
+  push:
+    branches: [pawsey-pulse-gpu]
+  pull_request:
+    branches: [pawsey-pulse-gpu]
+  schedule:
+    # Weekly full-depth run, since this job depends on external Dropbox
+    # links that aren't under our control and we don't want every PR
+    # blocked on their availability/latency.
+    - cron: '17 3 * * 1'
+  workflow_dispatch:
+    inputs:
+      max_steps:
+        description: 'Approximate number of timesteps to run'
+        required: false
+        default: '100'
+
+env:
+  GRACKLE_REF: grackle-3.3.1
+  GRACKLE_DIR: /home/runner/software/grackle_solas
+  EXAMPLE_DIR: examples/agora_disc_star_formation_3d
+
+jobs:
+  agora-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential gfortran autoconf automake libtool pkg-config \
+            libopenmpi-dev openmpi-bin \
+            libgsl-dev \
+            libhdf5-serial-dev \
+            libfftw3-dev \
+            libhwloc-dev \
+            python3
+
+      - name: Cache Grackle build
+        id: cache-grackle
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.GRACKLE_DIR }}
+          key: grackle-${{ env.GRACKLE_REF }}-${{ runner.os }}-v1
+
+      - name: Build Grackle
+        if: steps.cache-grackle.outputs.cache-hit != 'true'
+        run: |
+          git clone --depth 1 --branch "${GRACKLE_REF}" https://github.com/grackle-project/grackle.git /tmp/grackle
+          cd /tmp/grackle
+          ./configure --prefix="${GRACKLE_DIR}"
+          make -j2
+          make install
+
+      - name: Cache AGORA ICs and tables
+        id: cache-agora-data
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.EXAMPLE_DIR }}/ICs
+            ${{ env.EXAMPLE_DIR }}/grackle_data
+            ${{ env.EXAMPLE_DIR }}/star_tables
+          key: agora-disc-data-v1
+
+      - name: Download ICs and tables
+        if: steps.cache-agora-data.outputs.cache-hit != 'true'
+        working-directory: ${{ env.EXAMPLE_DIR }}
+        run: |
+          ./get_ics.sh
+          ./get_tables.sh
+
+      - name: Build Arepo (AGORA config)
+        run: |
+          make -j2 \
+            CONFIG="${EXAMPLE_DIR}/Config.sh" \
+            BUILD_DIR="${EXAMPLE_DIR}/build" \
+            EXEC="${EXAMPLE_DIR}/Arepo" \
+            GRACKLE_DIR="${GRACKLE_DIR}"
+
+      - name: Prepare short-run param file
+        working-directory: ${{ env.EXAMPLE_DIR }}
+        run: |
+          max_steps="${{ github.event.inputs.max_steps }}"
+          if [ -z "$max_steps" ]; then
+            # Keep pull_request/push runs quick; only the weekly schedule
+            # and manual runs default to the full ~100 steps.
+            if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+              max_steps=100
+            else
+              max_steps=20
+            fi
+          fi
+          max_size_timestep=$(grep -E '^MaxSizeTimestep' param.txt | awk '{print $2}')
+          time_max=$(awk -v n="$max_steps" -v dt="$max_size_timestep" 'BEGIN { printf "%.10g", n * dt }')
+          echo "Running with TimeMax=${time_max} (~${max_steps} steps at MaxSizeTimestep=${max_size_timestep})"
+          cp param.txt param_ci.txt
+          sed -i "s/^TimeMax .*/TimeMax                                 ${time_max}/" param_ci.txt
+          mkdir -p output
+
+      - name: Run AGORA disc smoke test
+        working-directory: ${{ env.EXAMPLE_DIR }}
+        run: |
+          mpiexec --oversubscribe -np 2 ./Arepo ./param_ci.txt
+
+      - name: Check a snapshot was produced
+        working-directory: ${{ env.EXAMPLE_DIR }}
+        run: |
+          shopt -s nullglob
+          snaps=(output/snap_*.hdf5)
+          if [ ${#snaps[@]} -eq 0 ]; then
+            echo "::error::No snapshots were written to output/"
+            exit 1
+          fi
+          echo "Found ${#snaps[@]} snapshot(s): ${snaps[*]}"
+
+      - name: Upload run log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agora-smoke-output
+          path: |
+            ${{ env.EXAMPLE_DIR }}/output/
+            ${{ env.EXAMPLE_DIR }}/param_ci.txt
+          retention-days: 7

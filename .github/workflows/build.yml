@@ -1,0 +1,63 @@
+name: Build
+
+# Compile-only smoke test: makes sure every committed example still builds
+# against the code in this branch. Does not run any simulations - see
+# agora-smoke.yml for a build-and-run check.
+
+on:
+  push:
+    branches: [pawsey-pulse-gpu, main]
+  pull_request:
+    branches: [pawsey-pulse-gpu, main]
+  workflow_dispatch: {}
+
+jobs:
+  discover-examples:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.list.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: list
+        run: |
+          # Pull the example names straight out of test.sh's TESTS+="..." lines
+          # (skipping commented-out ones) so this workflow can't silently drift
+          # out of sync with the examples test.sh itself exercises.
+          names=$(grep -v '^\s*#' test.sh | grep -oP '(?<=TESTS\+=")[^"]*' | xargs -n1 echo | sort -u)
+          json=$(printf '%s\n' $names | jq -R . | jq -sc .)
+          echo "matrix=$json" >> "$GITHUB_OUTPUT"
+          echo "Examples to compile: $names"
+
+  compile:
+    needs: discover-examples
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        example: ${{ fromJson(needs.discover-examples.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential gfortran \
+            libopenmpi-dev openmpi-bin \
+            libgsl-dev \
+            libhdf5-serial-dev \
+            libfftw3-dev \
+            libhwloc-dev \
+            python3
+
+      - name: Compile ${{ matrix.example }}
+        run: |
+          config="examples/${{ matrix.example }}/Config.sh"
+          if [ ! -f "$config" ]; then
+            echo "::error::No Config.sh found at $config"
+            exit 1
+          fi
+          make -j2 \
+            CONFIG="$config" \
+            BUILD_DIR="build/${{ matrix.example }}" \
+            EXEC="build/${{ matrix.example }}/Arepo"
