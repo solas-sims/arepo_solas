@@ -8,9 +8,16 @@ name: AGORA disc smoke test
 # get_tables.sh (see that example's README.md for details).
 #
 # Runs a short, CI-sized slice of the simulation (not the full ~500 Myr
-# science run) by overriding TimeMax down to roughly MAX_STEPS timesteps
-# at MaxSizeTimestep. This only checks that the run starts, advances, and
-# exits cleanly - it is not a physics regression test.
+# science run) by overriding TimeLimitCPU to a few wall-clock minutes;
+# Arepo checks that periodically and exits cleanly (exit code 0) once
+# it's past ~85% of the budget, writing a restart file on the way out.
+# A fixed number-of-steps cutoff (e.g. a small TimeMax) doesn't work here
+# because hierarchical/individual timestepping means the number of
+# sync-points per unit of simulated time isn't predictable up front - an
+# earlier version of this workflow tried that and still racked up 700+
+# sync-points before anyone noticed it wasn't going to finish.
+# This only checks that the run starts, advances for a while, and exits
+# cleanly - it is not a physics regression test.
 #
 # Builds Grackle from the SOLAS fork (solas-sims/grackle) with CMake -
 # the classic autotools ./configure build is deprecated upstream since
@@ -28,10 +35,10 @@ on:
     - cron: '17 3 * * 1'
   workflow_dispatch:
     inputs:
-      max_steps:
-        description: 'Approximate number of timesteps to run'
+      run_minutes:
+        description: 'Wall-clock minutes to let the run advance before stopping it cleanly'
         required: false
-        default: '100'
+        default: '30'
 
 env:
   # solas-sims/grackle has no tags yet, so pin to a commit on main for
@@ -105,31 +112,38 @@ jobs:
       - name: Prepare short-run param file
         working-directory: ${{ env.EXAMPLE_DIR }}
         run: |
-          max_steps="${{ github.event.inputs.max_steps }}"
-          if [ -z "$max_steps" ]; then
+          run_minutes="${{ github.event.inputs.run_minutes }}"
+          if [ -z "$run_minutes" ]; then
             # Keep pull_request/push runs quick; only the weekly schedule
-            # and manual runs default to the full ~100 steps.
+            # and manual runs default to a deeper 30-minute slice.
             if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-              max_steps=100
+              run_minutes=30
             else
-              max_steps=20
+              run_minutes=5
             fi
           fi
-          max_size_timestep=$(grep -E '^MaxSizeTimestep' param.txt | awk '{print $2}')
-          time_max=$(awk -v n="$max_steps" -v dt="$max_size_timestep" 'BEGIN { printf "%.10g", n * dt }')
-          echo "Running with TimeMax=${time_max} (~${max_steps} steps at MaxSizeTimestep=${max_size_timestep})"
+          time_limit_cpu=$((run_minutes * 60))
+          echo "Running with TimeLimitCPU=${time_limit_cpu}s (~${run_minutes} wall-clock minutes)"
           cp param.txt param_ci.txt
-          sed -i "s/^TimeMax .*/TimeMax                                 ${time_max}/" param_ci.txt
+          sed -i "s/^TimeLimitCPU .*/TimeLimitCPU                            ${time_limit_cpu}/" param_ci.txt
           mkdir -p output
 
       - name: Run AGORA disc smoke test
         working-directory: ${{ env.EXAMPLE_DIR }}
         run: |
-          mpiexec --oversubscribe -np 2 ./Arepo ./param_ci.txt
+          set -o pipefail
+          mpiexec --oversubscribe -np 2 ./Arepo ./param_ci.txt 2>&1 | tee run.log
 
-      - name: Check a snapshot was produced
+      - name: Check the run advanced and stopped cleanly
         working-directory: ${{ env.EXAMPLE_DIR }}
         run: |
+          sync_points=$(grep -c '^Sync-Point' run.log || true)
+          echo "Logged ${sync_points} sync-point(s)."
+          if [ "$sync_points" -lt 2 ]; then
+            echo "::error::Fewer than 2 sync-points logged - the run barely started."
+            exit 1
+          fi
+
           shopt -s nullglob
           snaps=(output/snap_*.hdf5)
           if [ ${#snaps[@]} -eq 0 ]; then
@@ -146,4 +160,5 @@ jobs:
           path: |
             ${{ env.EXAMPLE_DIR }}/output/
             ${{ env.EXAMPLE_DIR }}/param_ci.txt
+            ${{ env.EXAMPLE_DIR }}/run.log
           retention-days: 7
