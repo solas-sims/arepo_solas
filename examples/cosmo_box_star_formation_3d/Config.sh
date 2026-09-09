@@ -68,3 +68,4 @@ GENERATE_GAS_IN_ICS                              # Generates gas from dark matte
 #------------------------------------------------ cooling and star formation
 COOLING                                          # Simple primordial cooling
 USE_SFR                                          # Star formation model, turning dense gas into collisionless partices
+EEOS_SF                                          # Effective equation of state SF model (same SF params as galaxy_merger_star_formation_3d)

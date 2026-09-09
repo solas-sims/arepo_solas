@@ -12,9 +12,9 @@ name: AGORA disc smoke test
 # at MaxSizeTimestep. This only checks that the run starts, advances, and
 # exits cleanly - it is not a physics regression test.
 #
-# NOTE: the Grackle build step below is a best-effort autotools build
-# against a pinned tag; if Grackle's build system has changed, this step
-# is the first thing to fix.
+# Builds Grackle from the SOLAS fork (solas-sims/grackle) with CMake -
+# the classic autotools ./configure build is deprecated upstream since
+# 3.4 and scheduled for removal in 3.5.
 
 on:
   push:
@@ -34,7 +34,10 @@ on:
         default: '100'
 
 env:
-  GRACKLE_REF: grackle-3.3.1
+  # solas-sims/grackle has no tags yet, so pin to a commit on main for
+  # reproducibility. Bump deliberately, not silently, when updating.
+  GRACKLE_REPO: https://github.com/solas-sims/grackle.git
+  GRACKLE_REF: 7fbc9bbbd132a12bfa2d6630a441e871d472535e
   GRACKLE_DIR: /home/runner/software/grackle_solas
   EXAMPLE_DIR: examples/agora_disc_star_formation_3d
 
@@ -49,7 +52,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            build-essential gfortran autoconf automake libtool pkg-config \
+            build-essential gfortran cmake pkg-config \
             libopenmpi-dev openmpi-bin \
             libgsl-dev \
             libhdf5-serial-dev \
@@ -62,16 +65,17 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ env.GRACKLE_DIR }}
-          key: grackle-${{ env.GRACKLE_REF }}-${{ runner.os }}-v1
+          key: grackle-${{ env.GRACKLE_REF }}-${{ runner.os }}-v2
 
       - name: Build Grackle
         if: steps.cache-grackle.outputs.cache-hit != 'true'
         run: |
-          git clone --depth 1 --branch "${GRACKLE_REF}" https://github.com/grackle-project/grackle.git /tmp/grackle
+          git clone "${GRACKLE_REPO}" /tmp/grackle
           cd /tmp/grackle
-          ./configure --prefix="${GRACKLE_DIR}"
-          make -j2
-          make install
+          git checkout "${GRACKLE_REF}"
+          cmake -DCMAKE_INSTALL_PREFIX="${GRACKLE_DIR}" -DBUILD_SHARED_LIBS=ON -DCMAKE_BUILD_TYPE=Release -B build
+          cmake --build build -j2
+          cmake --install build
 
       - name: Cache AGORA ICs and tables
         id: cache-agora-data
