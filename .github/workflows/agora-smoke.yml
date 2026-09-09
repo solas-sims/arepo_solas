@@ -138,6 +138,12 @@ jobs:
       - name: Check the run advanced and stopped cleanly
         working-directory: ${{ env.EXAMPLE_DIR }}
         run: |
+          # Expected, benign noise in run.log: derefinement can hit degenerate
+          # slivers and print "WARNING: ... strange: fac=<tiny number>" from
+          # voronoi_derefinement.c - pre-existing upstream code (2022, commit
+          # 60bd71b) that deliberately warns and clamps rather than
+          # terminating. Not a regression, not GPU-work-related - don't treat
+          # it as a failure signal here.
           sync_points=$(grep -c '^Sync-Point' run.log || true)
           echo "Logged ${sync_points} sync-point(s)."
           if [ "$sync_points" -lt 5 ]; then
