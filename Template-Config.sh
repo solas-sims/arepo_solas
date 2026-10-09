@@ -90,6 +90,10 @@
                         # dt <= factor * R / (v_jet + c_s)).
 #BH_JET_FIXED_POWER     # Requires BH_JET_FEEDBACK; fixed power BhJetPower [erg/s] instead of the accretion rate, and the jet
                         # mass 2E/v_jet^2 is created in the cone cells (arepobh behaviour); otherwise the mass is entrained.
+#BH_JET_LAUNCH_POINT    # Requires BH_JET_FEEDBACK; arepobh / Maragkakis et al. (2026) geometry. A burst flies out along +-d (d random within
+                        # BhJetOpeningAngle of the axis, reproducible) for the flight time R/v_jet and is then deposited in the gas
+                        # sphere around BH +- R d, whose radius holds (BhJetDesNgb +- BhJetDesDev) * TargetGasMass; kick along +-d.
+                        # Params: BhJetLaunchRadius [kpc], BhJetDesNgb, BhJetDesDev. Replaces the BH-centred cone injection.
 #BH_JET_SPIN            # Requires BH_JET_FEEDBACK; jet axis follows a spin proxy J = M_BH * BhJetAxis + sum(accreted mass *
                         # unit gas angular momentum direction in the BH kernel). Without it the axis is fixed at BhJetAxisX/Y/Z.
 #BH_JET_PRESSURE_TRIGGER # Requires BH_THERMAL_FEEDBACK or BH_JET_FEEDBACK; sets BhP[].JetLaunchFlag = 1 only when the jet

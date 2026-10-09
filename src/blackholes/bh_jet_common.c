@@ -48,6 +48,77 @@ double bh_jet_step_energy_cgs(int i)
 
 #ifdef BH_JET_FEEDBACK
 
+#ifdef BH_JET_LAUNCH_POINT
+
+/* splitmix64: small, stateless-per-call generator so the draws depend only on (BH ID, burst number) and are
+ * identical across reruns, restarts and task counts */
+static double jet_uniform(unsigned long long *state)
+{
+  unsigned long long z = (*state += 0x9E3779B97F4A7C15ULL);
+
+  z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ULL;
+  z = (z ^ (z >> 27)) * 0x94D049BB133111EBULL;
+  z = z ^ (z >> 31);
+
+  return (z >> 11) * (1.0 / 9007199254740992.0);
+}
+
+/*! \brief Puts a burst of energy e (code units) on its way: random direction within BhJetOpeningAngle of the jet axis,
+ *         uniform in cos(theta), arriving at the launch radius after the flight time R / v_jet. */
+static void bh_jet_launch_packet(int i, double e)
+{
+  unsigned long long state = 0x2545F4914F6CDD1DULL ^ ((unsigned long long)PPB(i).ID * 0x9E3779B97F4A7C15ULL) ^
+                             ((unsigned long long)BhP[i].JetBurstCount * 0xBF58476D1CE4E5B9ULL);
+
+  double cos_max = cos(All.BhJetOpeningAngle * M_PI / 180.0);
+  double cth     = 1.0 - jet_uniform(&state) * (1.0 - cos_max);
+  double sth     = sqrt(1.0 - cth * cth);
+  double phi     = 2.0 * M_PI * jet_uniform(&state);
+
+  const double *a = BhP[i].JetAxis;
+
+  /* orthonormal frame (e1, e2, a) */
+  double h[3] = {0, 0, 0};
+  h[fabs(a[0]) < 0.9 ? 0 : 1] = 1.0;
+
+  double e1[3] = {h[1] * a[2] - h[2] * a[1], h[2] * a[0] - h[0] * a[2], h[0] * a[1] - h[1] * a[0]};
+  double n1    = sqrt(e1[0] * e1[0] + e1[1] * e1[1] + e1[2] * e1[2]);
+
+  for(int k = 0; k < 3; k++)
+    e1[k] /= n1;
+
+  double e2[3] = {a[1] * e1[2] - a[2] * e1[1], a[2] * e1[0] - a[0] * e1[2], a[0] * e1[1] - a[1] * e1[0]};
+
+  double dir[3];
+  for(int k = 0; k < 3; k++)
+    dir[k] = cth * a[k] + sth * (cos(phi) * e1[k] + sin(phi) * e2[k]);
+
+  /* flight time in code time (ln a for comoving runs) -> integer time */
+  double t_fly_s    = All.BhJetLaunchRadius * 3.0856775814913673e21 / (All.BhJetVelocity * 1.0e5);
+  double t_fly_code = t_fly_s / All.cf_UnitTime_in_s;
+  integertime ti_arrive = All.Ti_Current + (integertime)(t_fly_code / All.Timebase_interval);
+
+  BhP[i].JetBurstCount++;
+
+  int n = BhP[i].JetNPackets;
+
+  if(n >= BH_JET_MAXPACKETS)
+    {
+      /* buffer full: fold the burst into the newest packet (energy adds, direction and arrival time are kept) */
+      BhP[i].JetPacket[n - 1].Energy += e;
+      return;
+    }
+
+  BhP[i].JetPacket[n].Energy = e;
+  for(int k = 0; k < 3; k++)
+    BhP[i].JetPacket[n].Dir[k] = dir[k];
+  BhP[i].JetPacket[n].TiArrive = ti_arrive;
+  BhP[i].JetPacket[n].New      = 1;
+  BhP[i].JetNPackets           = n + 1;
+}
+
+#endif /* #ifdef BH_JET_LAUNCH_POINT */
+
 void bh_jet_prepare(void)
 {
 #ifdef BURST_MODE
@@ -118,10 +189,18 @@ void bh_jet_prepare(void)
 #endif
         }
 
-      BhP[i].JetEnergyRelease = release;
       BhP[i].JetEnergyReservoir -= release;
       if(BhP[i].JetEnergyReservoir < 0)
         BhP[i].JetEnergyReservoir = 0;
+
+#ifdef BH_JET_LAUNCH_POINT
+      /* the released energy is now a packet in flight; bh_jet_points() delivers it */
+      if(release > 0)
+        bh_jet_launch_packet(i, release);
+      BhP[i].JetEnergyRelease = 0;
+#else
+      BhP[i].JetEnergyRelease = release;
+#endif
 
       sums[0] += e_new;
       sums[1] += release;

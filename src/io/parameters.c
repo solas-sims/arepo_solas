@@ -757,6 +757,20 @@ void read_parameter_file(char *fname)
       addr[nt] = &All.BhJetBurstMass;
       id[nt++] = REAL;
 #endif
+
+#ifdef BH_JET_LAUNCH_POINT
+      strcpy(tag[nt], "BhJetLaunchRadius");
+      addr[nt] = &All.BhJetLaunchRadius;
+      id[nt++] = REAL;
+
+      strcpy(tag[nt], "BhJetDesNgb");
+      addr[nt] = &All.BhJetDesNgb;
+      id[nt++] = REAL;
+
+      strcpy(tag[nt], "BhJetDesDev");
+      addr[nt] = &All.BhJetDesDev;
+      id[nt++] = REAL;
+#endif
 #endif
         
 #ifdef HALO_SEEDING 
@@ -1040,6 +1054,10 @@ void check_parameters()
 
     if(All.BhJetTimestepFactor <= 0)
       mpi_terminate("BhJetTimestepFactor must be > 0.\n");
+#ifdef BH_JET_LAUNCH_POINT
+    if(All.BhJetLaunchRadius <= 0 || All.BhJetDesNgb <= 0 || All.BhJetDesDev < 0 || All.BhJetDesDev >= All.BhJetDesNgb)
+      mpi_terminate("BH_JET_LAUNCH_POINT needs BhJetLaunchRadius > 0 [kpc] and 0 <= BhJetDesDev < BhJetDesNgb.\n");
+#endif
 #ifdef BH_JET_FIXED_POWER
     if(All.BhJetPower <= 0)
       mpi_terminate("BhJetPower must be > 0 [erg/s] with BH_JET_FIXED_POWER.\n");

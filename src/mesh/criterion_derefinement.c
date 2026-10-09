@@ -60,6 +60,12 @@ static int jeans_derefinement_criteria(int i);
  */
 int derefine_should_this_cell_be_merged(int i, int flag)
 {
+#if defined(BH_JET_FEEDBACK) && defined(JET_TRACER)
+  /* keep the jet resolved: do not merge cells that carry jet material (as in arepobh jets_improvements) */
+  if(SphP[i].PScalars[JET_INDEX] > BH_JET_TRACER_NODEREFINE)
+    return 0;
+#endif
+
 #ifdef REFINEMENT_HIGH_RES_GAS
   if(SphP[i].AllowRefinement == 0)
     return 0;

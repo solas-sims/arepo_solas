@@ -14,13 +14,14 @@ limiter in `timestep.c`.
 | `BH_JET_FEEDBACK` | Enable the jet. Cannot be combined with `BH_THERMAL_FEEDBACK` (the accreted energy would be injected twice). |
 | `MOMENTUM_JET`, `THERMAL_JET`, `ENERGY_JET` | Exactly one. See below. |
 | `BH_JET_FIXED_POWER` | Fixed power `BhJetPower` [erg/s] instead of `Epsilon_f Epsilon_r Mdot c^2`; creates the jet mass (arepobh behaviour). |
+| `BH_JET_LAUNCH_POINT` | arepobh / paper geometry instead of the BH-centred cone: bursts fly out and are deposited in gas spheres at a launch radius (see below). |
 | `BH_JET_SPIN` | Jet axis follows a spin proxy instead of the fixed axis. |
 | `BH_JET_PRESSURE_TRIGGER` | Launch only if the jet ram pressure exceeds `BhJetPressureFactor` times the ambient pressure. Without it the jet always launches. |
 | `BURST_MODE` | Release the stored energy only in multiples of `BhJetBurstMass * v_jet^2`. |
 | `JET_TRACER` | Passive tracer set to 1 in every cell that receives jet material. |
 
 Parameters: `BhJetVelocity` [km/s], `BhJetOpeningAngle` [deg, half-angle], `BhJetAxisX/Y/Z`, `BhJetTimestepFactor`,
-`BhJetPressureFactor` (trigger), `BhJetPower` (fixed power), `BhJetBurstMass` [Msun] (burst mode), plus `Epsilon_f` and
+`BhJetPressureFactor` (trigger), `BhJetLaunchRadius` [kpc], `BhJetDesNgb`, `BhJetDesDev` (launch-point mode), `BhJetPower` (fixed power), `BhJetBurstMass` [Msun] (burst mode), plus `Epsilon_f` and
 `Epsilon_r` for the accretion-driven power.
 
 ## Model
@@ -57,10 +58,32 @@ energy (as in arepobh). Otherwise the jet is made of entrained gas and cell mass
 **Timestep.** Cells in the cone of a BH that holds jet energy get `dt <= BhJetTimestepFactor R_cell / (v_jet + c_s)`
 for two BH steps after they were marked. Replaces the hard-coded radius-based limits of arepobh.
 
+## Launch-point geometry (`BH_JET_LAUNCH_POINT`)
+
+This follows the `jets_improvements` branch of arepobh. A released burst is a *packet*:
+
+1. **Direction.** Random within `BhJetOpeningAngle` of the jet axis, uniform in cos(theta). The draw is a function of the
+   BH ID and the burst number only, so reruns and restarts give the same jets (arepobh used an unseeded `rand()` and a
+   fixed 15 degrees; set `BhJetOpeningAngle 15` to match).
+2. **Flight.** The packet takes `BhJetLaunchRadius / BhJetVelocity` to reach the launch radius. Up to
+   `BH_JET_MAXPACKETS` (64) packets per BH are in flight; a full buffer folds new bursts into the newest packet.
+3. **Delivery** (next BH step after arrival). Each lobe, at BH position +- R d, gets half the energy, spread over a
+   sphere whose radius holds `(BhJetDesNgb +- BhJetDesDev) * TargetGasMass` of gas (bisection, as in `bh_density`),
+   in proportion to cell mass, with the kick along +-d. A sphere that cannot reach the target mass within R is
+   accepted as is (arepobh stops the run). If either lobe's sphere is empty the packet is retried on the next step.
+4. **Timestep.** Cells at the target are marked when the packet is launched, so they already take short steps when it arrives.
+
+The ambient-pressure trigger is unchanged: it still looks at the BH kernel, with the launch area at the kernel radius.
+`JET_TRACER` cells (tracer above `BH_JET_TRACER_NODEREFINE`, 0.01) are never de-refined, as in arepobh.
+
+Tested in the same box with `BURST_MODE`, `BH_JET_FIXED_POWER`, refinement on: bursts launched at t = 1e-4, 2e-4, ... were
+delivered 2e-4 later (the flight time for R = 2 kpc at 1e4 km/s); total energy gain equals the injected energy (90 = 9 bursts
+x 10 to 1e-6); fast cells lie at r = 1.5-2.5 around R = 2; net momentum ~1e-16 of sum |p|. The de-refinement rule
+and mesh splitting during a jet, and restarts with packets in flight, are not tested.
+
 ## Differences from arepobh
 
-* Jets are launched by BHs, not from virtual particles at the box centre; the cone direction is the BH axis, not random.
-* Radial kick inside the cone (arepobh kicked along the axis).
+* Jets are launched by BHs, not from virtual particles at the box centre. The default cone mode kicks radially in a BH-centred cone; `BH_JET_LAUNCH_POINT` reproduces the arepobh deposition geometry.
 * `ENERGY_JET` uses the exact momentum solve above.
 * Dynamical timestep limiter; no hard-coded radii.
 * Energy produced while the trigger is off is stored and released later.

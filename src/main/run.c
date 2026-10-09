@@ -493,8 +493,12 @@ void calculate_non_standard_physics_prior_mesh_construction(void)
 
 #ifdef BH_JET_FEEDBACK
       bh_jet_prepare();
+#ifdef BH_JET_LAUNCH_POINT
+      bh_jet_points();
+#else
       bh_jet_density();
       bh_jet_feedback();
+#endif
 #endif
     }
 }

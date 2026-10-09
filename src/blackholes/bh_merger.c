@@ -63,7 +63,7 @@ typedef struct
   MyDouble Hsml;
   MyDouble Softening;
 #ifdef BH_JET_FEEDBACK
-  MyDouble JetEnergyReservoir; /*!< summed into the survivor's reservoir on merging */
+  MyDouble JetEnergyReservoir; /*!< summed into the survivor's reservoir on merging (includes packets in flight) */
 #ifdef BH_JET_SPIN
   MyDouble SpinVec[3];         /*!< spin proxies add (see BhP[].SpinVec) */
 #endif
@@ -193,6 +193,10 @@ void bh_merger(void)
       local_bhs[n_local].Softening = bh_softening_for_index(i);
 #ifdef BH_JET_FEEDBACK
       local_bhs[n_local].JetEnergyReservoir = BhP[i].JetEnergyReservoir;
+#ifdef BH_JET_LAUNCH_POINT
+      for(int kp = 0; kp < BhP[i].JetNPackets; kp++)
+        local_bhs[n_local].JetEnergyReservoir += BhP[i].JetPacket[kp].Energy;
+#endif
 #ifdef BH_JET_SPIN
       for(k = 0; k < 3; k++)
         local_bhs[n_local].SpinVec[k] = BhP[i].SpinVec[k];

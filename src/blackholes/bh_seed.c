@@ -237,6 +237,9 @@ static void spawn_black_hole_from_cell(int igas, int ibh, double seed_mass, int 
 #endif
 #ifdef BH_JET_FEEDBACK
   BhP[NumBhs].JetEnergyReservoir = BhP[NumBhs].JetEnergyRelease = BhP[NumBhs].JetConeMass = 0;
+#ifdef BH_JET_LAUNCH_POINT
+  BhP[NumBhs].JetBurstCount = BhP[NumBhs].JetNPackets = 0;
+#endif
   for(int k = 0; k < 3; k++)
     {
       BhP[NumBhs].JetAxis[k] = All.BhJetAxis[k];

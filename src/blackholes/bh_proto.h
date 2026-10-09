@@ -56,6 +56,30 @@ double bh_jet_step_time_cgs(int i);
 
 #ifdef BH_JET_FEEDBACK
 void bh_jet_prepare(void);   /* jet axis, energy reservoir, release decision (needs JetLaunchFlag) */
+#ifdef BH_JET_LAUNCH_POINT
+/* arepobh geometry: bursts fly out to BhJetLaunchRadius along +-axis and are deposited in a gas sphere there */
+struct bh_jet_point
+{
+  MyDouble Pos[3];
+  MyDouble Dir[3];     /* unit kick direction of this lobe */
+  MyDouble Energy;     /* energy to deposit (0: only mark the cells for the timestep limiter) */
+  MyDouble Mass;       /* gas mass found inside Hsml */
+  MyDouble NumNgb;
+  MyDouble Left, Right;
+  MyFloat Hsml;
+  integertime MarkTiUntil;
+  int Bh;              /* local BhP index of the owner */
+  int Pk;              /* index of the packet in BhP[Bh].JetPacket */
+  int Due;             /* 1: the packet has arrived and is delivered now; 0: only mark the cells */
+  int Done;            /* Hsml converged */
+};
+
+extern struct bh_jet_point *BhJetPts;
+extern int NBhJetPts;
+
+void bh_jet_points(void);       /* launch-point driver: Hsml iteration, injection, marking, packet bookkeeping */
+void bh_jet_points_inject(void); /* the injection/marking pass over BhJetPts */
+#endif
 void bh_jet_density(void);   /* mass of the cone cells in each active BH kernel; marks cone cells for the timestep limiter */
 void bh_jet_feedback(void);  /* distributes the released energy over the cone cells (buffers in SphP) */
 

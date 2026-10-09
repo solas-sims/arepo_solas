@@ -2,6 +2,14 @@
 #define BH_H
 
 #define ALLOC_BH_ROOM 4
+
+#ifndef BH_JET_TRACER_NODEREFINE
+#define BH_JET_TRACER_NODEREFINE 0.01 /* cells with a jet tracer above this are not de-refined (BH_JET_FEEDBACK + JET_TRACER) */
+#endif
+
+#ifndef BH_JET_MAXPACKETS
+#define BH_JET_MAXPACKETS 64 /* jet packets in flight per BH (BH_JET_LAUNCH_POINT); a full buffer merges into the newest packet */
+#endif
 extern int NumBhs;
 
 #include "../main/allvars.h"
@@ -59,6 +67,18 @@ typedef struct Bh_Particle_Data
   MyDouble SpinVec[3];            /*!< spin proxy J: BH mass along the initial axis plus accreted mass times the unit
                                        gas angular-momentum direction of each accretion event; JetAxis = J/|J| */
 #endif
+#endif
+
+#ifdef BH_JET_LAUNCH_POINT
+  int JetBurstCount;              /*!< number of bursts launched; seeds the reproducible direction draw */
+  int JetNPackets;                /*!< number of jet packets in flight */
+  struct
+  {
+    MyDouble Energy;              /*!< burst energy (both lobes), code units */
+    MyDouble Dir[3];              /*!< unit vector of the +lobe; the -lobe goes the other way */
+    integertime TiArrive;         /*!< integer time at which the packet reaches the launch radius */
+    int New;                      /*!< 1 if launched on this step: cells at the target are marked for the timestep limiter */
+  } JetPacket[BH_JET_MAXPACKETS];
 #endif
 
 #ifdef BH_MERGER

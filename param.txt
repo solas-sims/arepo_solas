@@ -41,6 +41,9 @@ Epsilon_r		0.05
 %BhJetTimestepFactor    0.3     % cone cells: dt <= factor * R / (v_jet + c_s)
 %BhJetPower             1e44    % BH_JET_FIXED_POWER, erg/s
 %BhJetBurstMass         1e3     % BURST_MODE, Msun: burst energy = BhJetBurstMass * v_jet^2
+%BhJetLaunchRadius      10      % BH_JET_LAUNCH_POINT, kpc (physical)
+%BhJetDesNgb            10      % BH_JET_LAUNCH_POINT: injection sphere holds (DesNgb +- DesDev) * TargetGasMass
+%BhJetDesDev            2
 
 DesLinkNgb               20
 ErrTolThetaSubfind       0.7

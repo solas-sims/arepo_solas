@@ -622,8 +622,13 @@ endif
 ifneq (1,$(words $(filter $(JET_MODES),$(CONFIGVARS))))
 $(error BH_JET_FEEDBACK needs exactly one of $(JET_MODES))
 endif
+ifneq (,$(filter BH_JET_LAUNCH_POINT,$(CONFIGVARS)))
+OBJS += blackholes/bh_jet_points.o \
+        blackholes/bh_jet_points_inject.o
+else
 OBJS += blackholes/bh_jet_density.o \
         blackholes/bh_jet_feedback.o
+endif
 endif
 
 ifneq (,$(filter BH_JET_FEEDBACK BH_JET_PRESSURE_TRIGGER,$(CONFIGVARS)))
@@ -631,8 +636,8 @@ OBJS += blackholes/bh_jet_common.o
 endif
 
 ifeq (,$(filter BH_JET_FEEDBACK,$(CONFIGVARS)))
-ifneq (,$(filter $(JET_MODES) BH_JET_SPIN BH_JET_FIXED_POWER BURST_MODE,$(CONFIGVARS)))
-$(error MOMENTUM_JET, THERMAL_JET, ENERGY_JET, BH_JET_SPIN, BH_JET_FIXED_POWER and BURST_MODE require BH_JET_FEEDBACK)
+ifneq (,$(filter $(JET_MODES) BH_JET_SPIN BH_JET_FIXED_POWER BH_JET_LAUNCH_POINT BURST_MODE,$(CONFIGVARS)))
+$(error MOMENTUM_JET, THERMAL_JET, ENERGY_JET, BH_JET_SPIN, BH_JET_FIXED_POWER, BH_JET_LAUNCH_POINT and BURST_MODE require BH_JET_FEEDBACK)
 endif
 endif
 
