@@ -713,7 +713,7 @@ void read_parameter_file(char *fname)
       id[nt++] = REAL;
 #endif
 
-#ifdef BH_JET_PRESSURE_TRIGGER
+#if defined(BH_JET_PRESSURE_TRIGGER) || defined(BH_JET_FEEDBACK)
       strcpy(tag[nt], "BhJetVelocity");
       addr[nt] = &All.BhJetVelocity;
       id[nt++] = REAL;
@@ -721,10 +721,42 @@ void read_parameter_file(char *fname)
       strcpy(tag[nt], "BhJetOpeningAngle");
       addr[nt] = &All.BhJetOpeningAngle;
       id[nt++] = REAL;
+#endif
 
+#ifdef BH_JET_PRESSURE_TRIGGER
       strcpy(tag[nt], "BhJetPressureFactor");
       addr[nt] = &All.BhJetPressureFactor;
       id[nt++] = REAL;
+#endif
+
+#ifdef BH_JET_FEEDBACK
+      strcpy(tag[nt], "BhJetAxisX");
+      addr[nt] = &All.BhJetAxis[0];
+      id[nt++] = REAL;
+
+      strcpy(tag[nt], "BhJetAxisY");
+      addr[nt] = &All.BhJetAxis[1];
+      id[nt++] = REAL;
+
+      strcpy(tag[nt], "BhJetAxisZ");
+      addr[nt] = &All.BhJetAxis[2];
+      id[nt++] = REAL;
+
+      strcpy(tag[nt], "BhJetTimestepFactor");
+      addr[nt] = &All.BhJetTimestepFactor;
+      id[nt++] = REAL;
+
+#ifdef BH_JET_FIXED_POWER
+      strcpy(tag[nt], "BhJetPower");
+      addr[nt] = &All.BhJetPower;
+      id[nt++] = REAL;
+#endif
+
+#ifdef BURST_MODE
+      strcpy(tag[nt], "BhJetBurstMass");
+      addr[nt] = &All.BhJetBurstMass;
+      id[nt++] = REAL;
+#endif
 #endif
         
 #ifdef HALO_SEEDING 
@@ -990,6 +1022,31 @@ void read_parameter_file(char *fname)
  */
 void check_parameters()
 {
+#ifdef BH_JET_FEEDBACK
+  {
+    double n2 = All.BhJetAxis[0] * All.BhJetAxis[0] + All.BhJetAxis[1] * All.BhJetAxis[1] + All.BhJetAxis[2] * All.BhJetAxis[2];
+
+    if(n2 <= 0)
+      mpi_terminate("BhJetAxisX/Y/Z must not all be zero.\n");
+
+    for(int k = 0; k < 3; k++)
+      All.BhJetAxis[k] /= sqrt(n2);
+
+    if(All.BhJetVelocity <= 0)
+      mpi_terminate("BhJetVelocity must be > 0 [km/s].\n");
+
+    if(All.BhJetOpeningAngle <= 0 || All.BhJetOpeningAngle >= 90)
+      mpi_terminate("BhJetOpeningAngle must be in (0, 90) degrees.\n");
+
+    if(All.BhJetTimestepFactor <= 0)
+      mpi_terminate("BhJetTimestepFactor must be > 0.\n");
+#ifdef BH_JET_FIXED_POWER
+    if(All.BhJetPower <= 0)
+      mpi_terminate("BhJetPower must be > 0 [erg/s] with BH_JET_FIXED_POWER.\n");
+#endif
+  }
+#endif
+
   int i, errorFlag = 0;
 
   /* check whether time max is larger than max timestep */

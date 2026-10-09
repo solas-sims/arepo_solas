@@ -612,6 +612,30 @@ endif
 OBJS += blackholes/bh_jet_trigger.o
 endif
 
+# --- jet injection (BH_JET_FEEDBACK); see src/blackholes/bh_jet_feedback.c
+JET_MODES = MOMENTUM_JET THERMAL_JET ENERGY_JET
+
+ifneq (,$(filter BH_JET_FEEDBACK,$(CONFIGVARS)))
+ifneq (,$(filter BH_THERMAL_FEEDBACK,$(CONFIGVARS)))
+$(error BH_THERMAL_FEEDBACK and BH_JET_FEEDBACK together would inject the accreted energy twice; there is no thermal/jet mode switch yet. BH_FEEDBACK enables both)
+endif
+ifneq (1,$(words $(filter $(JET_MODES),$(CONFIGVARS))))
+$(error BH_JET_FEEDBACK needs exactly one of $(JET_MODES))
+endif
+OBJS += blackholes/bh_jet_density.o \
+        blackholes/bh_jet_feedback.o
+endif
+
+ifneq (,$(filter BH_JET_FEEDBACK BH_JET_PRESSURE_TRIGGER,$(CONFIGVARS)))
+OBJS += blackholes/bh_jet_common.o
+endif
+
+ifeq (,$(filter BH_JET_FEEDBACK,$(CONFIGVARS)))
+ifneq (,$(filter $(JET_MODES) BH_JET_SPIN BH_JET_FIXED_POWER BURST_MODE,$(CONFIGVARS)))
+$(error MOMENTUM_JET, THERMAL_JET, ENERGY_JET, BH_JET_SPIN, BH_JET_FIXED_POWER and BURST_MODE require BH_JET_FEEDBACK)
+endif
+endif
+
 ifneq (,$(filter BH_MERGER,$(CONFIGVARS)))
 ifeq (,$(filter BH_ACTIVE,$(CONFIGVARS)))
 $(error BH_MERGER requires BH_ACTIVE)

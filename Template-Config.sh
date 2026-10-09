@@ -79,13 +79,25 @@
 
 #BH_THERMAL_FEEDBACK    # Only thermal
 
-#BH_JET_FEEDBACK        # Only jet (not operational yet)
+#BH_JET_FEEDBACK        # Bipolar jet injection from BHs (src/blackholes/bh_jet_{common,density,feedback}.c). Cannot be combined with
+                        # BH_THERMAL_FEEDBACK (the accreted energy would be injected twice). Needs exactly one injection mode:
+#MOMENTUM_JET           #   add momentum 2E/v_jet to the cone cells, thermal energy unchanged
+#THERMAL_JET            #   add the same momentum and add E to the total energy (remainder becomes thermal)
+#ENERGY_JET             #   add E to the total energy and kick so that all of E becomes kinetic (exact energy conservation)
+                        # Jet power is Epsilon_f Epsilon_r Mdot c^2 unless BH_JET_FIXED_POWER is set. Energy produced while
+                        # JetLaunchFlag = 0 is carried over and released at the next launch. Params: BhJetVelocity [km/s],
+                        # BhJetOpeningAngle [deg], BhJetAxisX/Y/Z, BhJetTimestepFactor (cells in an active jet cone get
+                        # dt <= factor * R / (v_jet + c_s)).
+#BH_JET_FIXED_POWER     # Requires BH_JET_FEEDBACK; fixed power BhJetPower [erg/s] instead of the accretion rate, and the jet
+                        # mass 2E/v_jet^2 is created in the cone cells (arepobh behaviour); otherwise the mass is entrained.
+#BH_JET_SPIN            # Requires BH_JET_FEEDBACK; jet axis follows a spin proxy J = M_BH * BhJetAxis + sum(accreted mass *
+                        # unit gas angular momentum direction in the BH kernel). Without it the axis is fixed at BhJetAxisX/Y/Z.
 #BH_JET_PRESSURE_TRIGGER # Requires BH_THERMAL_FEEDBACK or BH_JET_FEEDBACK; sets BhP[].JetLaunchFlag = 1 only when the jet
                         # ram pressure (2 L_jet / (v_jet A_jet)) exceeds BhJetPressureFactor x the volume-weighted
                         # ambient gas pressure in the BH kernel (src/blackholes/bh_jet_trigger.c). Params: BhJetVelocity
-                        # [km/s], BhJetOpeningAngle [deg], BhJetPressureFactor.
-#BURST_MODE             # Only turn on for jet (not operational yet)
-#JET_TRACER             # Only turn on for jet (not operational yet)
+                        # [km/s], BhJetOpeningAngle [deg], BhJetPressureFactor. Without it, BH_JET_FEEDBACK always launches.
+#BURST_MODE             # Requires BH_JET_FEEDBACK; release the reservoir only in bursts of BhJetBurstMass [Msun] * v_jet^2
+#JET_TRACER             # Passive tracer set to 1 in cells that receive BH feedback
 
 #BH_MERGER              # Requires BH_ACTIVE; merges gravitationally-bound black hole pairs closer than
                         # BhMergerRadiusFactor (param.txt) x <length scale> of each other (src/blackholes/bh_merger.c).
@@ -96,7 +108,7 @@
 #MIN_REFINEMENT_BH_MASS # Minimum BH mass above which refinement around the BH is applied (src/blackholes/bh_refinement.c)
 #REFINEMENT_AROUND_BH_FIXED   # Refine within a fixed radius around the BH
 #REFINEMENT_AROUND_BH_HYBRID  # Refine within a radius that adapts between fixed and resolution-dependent behaviour
-#BH_JET_FEEDBACK        # Repeated here as a reminder: required by BH_JET_REFINEMENT below (see main listing above for details, not operational yet)
+#BH_JET_FEEDBACK        # Repeated here as a reminder: required by BH_JET_REFINEMENT below (see main listing above)
 #BH_JET_REFINEMENT      # Additional refinement around the BH jet region; requires BH_JET_FEEDBACK
 #OUTPUT_REFBHCOUNTER    # Output a per-cell counter of BH-driven refinement events
 

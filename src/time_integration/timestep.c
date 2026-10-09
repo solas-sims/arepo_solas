@@ -492,6 +492,22 @@ integertime get_timestep_hydro(int p)
 
   dt = dt_courant;
 
+#ifdef BH_JET_FEEDBACK
+  /* cell in the cone of a BH that holds jet energy (marked in bh_jet_density()): resolve the jet
+   * crossing the cell, dt <= BhJetTimestepFactor * R / (v_jet + c_s). Same units as the Courant step above. */
+  if(All.Ti_Current < SphP[p].BhJetTiUntil)
+    {
+      double v_jet  = All.BhJetVelocity * 1.0e5 / All.UnitVelocity_in_cm_per_s;
+      double dt_jet = All.BhJetTimestepFactor * rad / (v_jet + csnd);
+
+      if(All.ComovingIntegrationOn)
+        dt_jet *= All.Time;
+
+      if(dt_jet < dt)
+        dt = dt_jet;
+    }
+#endif /* #ifdef BH_JET_FEEDBACK */
+
 #if defined(USE_SFR) && !defined(INDIVIDUAL_STAR_BY_STAR_FORMATION)
 
   if(P[p].Type == 0) /* to protect using a particle that has been turned into a star */

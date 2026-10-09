@@ -1,61 +1,61 @@
-#include <stdlib.h>       
+/*! \file bh_jet_feedback.c
+ *  \brief Bipolar jet injection from black holes into the surrounding gas cells.
+ *
+ *  Each active BH with BhP[].JetEnergyRelease > 0 (see bh_jet_prepare()) deposits that kinetic energy in
+ *  the gas cells that lie within its kernel radius and within BhJetOpeningAngle of its jet axis (either
+ *  lobe). Cell shares are proportional to cell mass (m_j / BhP[].JetConeMass). The kick on a cell is
+ *  directed radially away from the BH, so the two lobes carry equal and opposite momentum.
+ *
+ *  This routine only fills per-cell buffers (SphP[].BhJet*). They are applied by bh_perform_end_of_step_physics()
+ *  when the cell is next active, in one of three ways (compile-time, one of):
+ *    MOMENTUM_JET  add momentum 2 E / v_jet; thermal energy of the cell is unchanged
+ *    THERMAL_JET   add the same momentum and add E to the total energy; the kinetic part of the cell's
+ *                  energy gain comes from the momentum, the remainder is thermal
+ *    ENERGY_JET    add E to the total energy and kick along the cone direction by exactly the momentum
+ *                  that puts all of E into the kinetic energy of the cell
+ *
+ *  BH_JET_FIXED_POWER also creates the jet mass 2 E / v_jet^2, at rest and cold (arepobh behaviour); otherwise the jet
+ *  mass is entrained from the cone cells themselves and the net cell mass is unchanged.
+ */
+
 #include <math.h>
-#include <gsl/gsl_math.h>              
-#include <mpi.h>            
-  
+#include <mpi.h>
+#include <stdio.h>
+#include <stdlib.h>
+
 #include "../main/allvars.h"
 #include "../main/proto.h"
 
 #include "../domain/domain.h"
 
-static int bh_feedback_evaluate(int target, int mode, int threadid);
+#ifdef BH_JET_FEEDBACK
 
-/*! \brief Local data structure for collecting particle/cell data that is sent
- *         to other processors if needed. Type called data_in and static
- *         pointers DataIn and DataGet needed by generic_comm_helpers2.
- */
+static int bh_jet_feedback_evaluate(int target, int mode, int threadid);
+
 typedef struct
 {
-  int Bin;
   MyDouble Pos[3];
+  MyDouble Axis[3];
+  MyDouble Energy;
+  MyDouble ConeMass;
   MyFloat Hsml;
-  MyDouble Ngbsmass;
-  MyDouble NgbsmassFeed;
-  MyDouble Accretion;
-#ifdef BH_JET_PRESSURE_TRIGGER
-  int JetLaunchFlag;
-#endif
   int Firstnode;
 } data_in;
 
 static data_in *DataIn, *DataGet;
 
-/*! \brief Routine that fills the relevant particle/cell data into the input
- *         structure defined above. Needed by generic_comm_helpers2.
- *
- *  \param[out] in Data structure to fill.
- *  \param[in] i Index of particle in P and SphP arrays.
- *  \param[in] firstnode First note of communication.
- *
- *  \return void
- */
 static void particle2in(data_in *in, int i, int firstnode)
 {
   for(int j = 0; j < 3; j++)
-    in->Pos[j] = PPB(i).Pos[j];
-  in->Ngbsmass = BhP[i].Ngbsmass;
-  in->NgbsmassFeed = BhP[i].NgbsmassFeed;
-  in->Accretion = BhP[i].Accretion;
-#ifdef BH_JET_PRESSURE_TRIGGER
-  in->JetLaunchFlag = BhP[i].JetLaunchFlag;
-#endif
-  in->Hsml = BhP[i].Hsml;
+    {
+      in->Pos[j]  = PPB(i).Pos[j];
+      in->Axis[j] = BhP[i].JetAxis[j];
+    }
+  in->Energy   = BhP[i].JetEnergyRelease;
+  in->ConeMass = BhP[i].JetConeMass;
+  in->Hsml     = BhP[i].Hsml;
   in->Firstnode = firstnode;
 }
-
-/*! \brief Local data structure that holds results acquired on remote
- *         processors. Type called data_out and static pointers DataResult and
- *         DataOut needed by generic_comm_helpers2.*/
 
 typedef struct
 {
@@ -63,36 +63,12 @@ typedef struct
 
 static data_out *DataResult, *DataOut;
 
-/*! \brief Routine to store or combine result data. Needed by
- *         generic_comm_helpers2.
- *
- *  \param[in] out Data to be moved to appropriate variables in global
- *  particle and cell data arrays (P, SphP,...)
- *  \param[in] i Index of particle in P and SphP arrays
- *  \param[in] mode Mode of function: local particles or information that was
- *  communicated from other tasks and has to be added locally?
- *
- *  \return void*/
- 
 static void out2particle(data_out *out, int i, int mode)
 {
-  if(mode == MODE_LOCAL_PARTICLES) /* initial store */
-    {
-    }
-  else /* combine */
-    {
-    }
 }
-
 
 #include "../utils/generic_comm_helpers2.h"
 
-/*! \brief Routine that defines what to do with local particles.
- *
- *  Calls the *_evaluate function in MODE_LOCAL_PARTICLES.
- *
- *  \return void
- */
 static void kernel_local(void)
 {
   int i, idx;
@@ -106,31 +82,22 @@ static void kernel_local(void)
       if(Thread[threadid].ExportSpace < MinSpace)
         break;
 
-      //i = NextParticle++;
-
-      //if(i >= NumBhs)
-      //break;
-        
       idx = NextParticle++;
 
       if(idx >= TimeBinsBh.NActiveParticles)
         break;
 
       i = TimeBinsBh.ActiveParticleList[idx];
-        
-      bh_feedback_evaluate(i, MODE_LOCAL_PARTICLES, threadid);
+
+      if(i < 0)
+        continue;
+
+      bh_jet_feedback_evaluate(i, MODE_LOCAL_PARTICLES, threadid);
     }
 }
 
-/*! \brief Routine that defines what to do with imported particles.
- *
- *  Calls the *_evaluate function in MODE_IMPORTED_PARTICLES.
- *
- *  \return void
- */
 static void kernel_imported(void)
 {
-  /* now do the particles that were sent to us */
   int i, cnt = 0;
   int threadid = get_thread_num();
 
@@ -141,27 +108,41 @@ static void kernel_imported(void)
       if(i >= Nimport)
         break;
 
-      bh_feedback_evaluate(i, MODE_IMPORTED_PARTICLES, threadid);
+      bh_jet_feedback_evaluate(i, MODE_IMPORTED_PARTICLES, threadid);
     }
 }
 
-void bh_feedback(void)
+void bh_jet_feedback(void)
 {
-  CPU_Step[CPU_MISC] += measure_time();
+  TIMER_START(CPU_BLACKHOLES_FEEDBACK);
+
+  /* energy released into a cone with no gas stays in the reservoir */
+  for(int idx = 0; idx < TimeBinsBh.NActiveParticles; idx++)
+    {
+      int i = TimeBinsBh.ActiveParticleList[idx];
+
+      if(i < 0)
+        continue;
+
+      if(BhP[i].JetEnergyRelease > 0 && BhP[i].JetConeMass <= 0)
+        {
+          BhP[i].JetEnergyReservoir += BhP[i].JetEnergyRelease;
+          BhP[i].JetEnergyRelease = 0;
+        }
+    }
 
   generic_set_MaxNexport();
 
   generic_comm_pattern(TimeBinsBh.NActiveParticles, kernel_local, kernel_imported);
 
-  CPU_Step[CPU_MISC] += measure_time();
+  TIMER_STOP(CPU_BLACKHOLES_FEEDBACK);
 }
 
-static int bh_feedback_evaluate(int target, int mode, int threadid)
+static int bh_jet_feedback_evaluate(int target, int mode, int threadid)
 {
-  int i, n, numnodes, *firstnode; 
-  double h, h2, r, r2, wk;
-  double dx, dy, dz, dvx, dvy, dvz; 
-  MyDouble *pos, ngbsmass, accretion, massloading, energyfeed;
+  int j, n, numnodes, *firstnode;
+  MyDouble xtmp, ytmp, ztmp;
+  double d[3], r;
 
   data_in local, *target_data;
   data_out out;
@@ -181,119 +162,62 @@ static int bh_feedback_evaluate(int target, int mode, int threadid)
       generic_get_numnodes(target, &numnodes, &firstnode);
     }
 
-#ifdef BH_JET_PRESSURE_TRIGGER
-  /* jet ram pressure does not exceed the ambient pressure: no launch this step */
-  if(!target_data->JetLaunchFlag)
+  if(target_data->Energy > 0 && target_data->ConeMass > 0)
     {
-      if(mode == MODE_LOCAL_PARTICLES)
-        out2particle(&out, target, MODE_LOCAL_PARTICLES);
-      else
-        DataResult[target] = out;
-      return 0;
-    }
+      const double h      = target_data->Hsml;
+      const double h2     = h * h;
+      const double cos_th = cos(All.BhJetOpeningAngle * M_PI / 180.0);
+      MyDouble *pos       = target_data->Pos;
+
+      /* jet speed in cgs; momentum and mass follow from the cell's energy share */
+#if !defined(ENERGY_JET) || defined(BH_JET_FIXED_POWER)
+      const double v_cgs = All.BhJetVelocity * 1.0e5;
+#endif
+#ifndef ENERGY_JET
+      const double p_per_e = 2.0 * All.cf_UnitEnergy_in_cgs / (v_cgs * All.cf_UnitMomentum_in_cgs); /* code momentum per code energy */
+#endif
+#ifdef BH_JET_FIXED_POWER
+      const double m_per_e = 2.0 * All.cf_UnitEnergy_in_cgs / (v_cgs * v_cgs * All.cf_UnitMass_in_g);
 #endif
 
-  pos = target_data->Pos;
-  h = target_data->Hsml;
-  ngbsmass = target_data->Ngbsmass;
-  ngbsmassfeed = target_data->NgbsmassFeed;
-  accretion = target_data->Accretion;
+      int nfound = ngb_treefind_variable_threads(pos, h, target, mode, threadid, numnodes, firstnode);
 
-  h2   = h * h;
-  hinv = 1.0 / h;
-#ifndef TWODIMS
-  hinv3 = hinv * hinv * hinv;
-#else  /* #ifndef  TWODIMS */
-  hinv3 = hinv * hinv / boxSize_Z;
-#endif /* #ifndef  TWODIMS #else */
-  hinv4 = hinv3 * hinv;
-
-  massloading = All.Mload * accretion; 
-  energyfeed = All.Epsilon_f * All.Epsilon_r * accretion * (CLIGHT * CLIGHT / (All.UnitVelocity_in_cm_per_s * All.UnitVelocity_in_cm_per_s));
-
-  /* jet axis and opening angle */    
-
-  /* positive and negative jet axes */
-  double pos_z_axis[3] = {0, 0, 1};
-  double neg_z_axis[3] = {0, 0, -1};      
-  /* jet angle */
-  double theta = DEG_TO_RAD(10);
-  double vx, vy, vz, pos_z_angle, neg_z_angle;
-
-  int nfound = ngb_treefind_variable_threads(pos, h, target, mode, threadid, numnodes, firstnode);
-  for(n = 0; n < nfound; n++)
-    {
-      j = Thread[threadid].Ngblist[n];
-
-      if(P[j].Type != 0 || P[j].Mass == 0 || P[j].ID == 0)
-        continue;
-
-      dx = pos[0] - P[j].Pos[0];
-      dy = pos[1] - P[j].Pos[1];
-      dz = pos[2] - P[j].Pos[2];
-
-#ifndef REFLECTIVE_X
-      if(dx > boxHalf_X)
-        dx -= boxSize_X;
-      if(dx < -boxHalf_X)
-        dx += boxSize_X;
-#endif /* #ifndef REFLECTIVE_X */
-
-#ifndef REFLECTIVE_Y
-      if(dy > boxHalf_Y)
-        dy -= boxSize_Y;
-      if(dy < -boxHalf_Y)
-        dy += boxSize_Y;
-#endif /* #ifndef REFLECTIVE_Y */
-
-#ifndef REFLECTIVE_Z
-      if(dz > boxHalf_Z)
-        dz -= boxSize_Z;
-      if(dz < -boxHalf_Z)
-        dz += boxSize_Z;
-#endif /* #ifndef REFLECTIVE_Z */
-      r2 = dx * dx + dy * dy + dz * dz;
-
-      if(r2 < h2)
+      for(n = 0; n < nfound; n++)
         {
-          r = sqrt(r2);
+          j = Thread[threadid].Ngblist[n];
 
-          u = r * hinv;
+          if(P[j].Type != 0 || P[j].Mass == 0 || P[j].ID == 0)
+            continue;
 
-          bh_kernel(u, hinv3, hinv4, &wk, &dwk);
+          d[0] = NEAREST_X(P[j].Pos[0] - pos[0]);
+          d[1] = NEAREST_Y(P[j].Pos[1] - pos[1]);
+          d[2] = NEAREST_Z(P[j].Pos[2] - pos[2]);
 
-              /* double cone jet setup */
+          if(d[0] * d[0] + d[1] * d[1] + d[2] * d[2] >= h2)
+            continue;
 
-              /* calculate vector to cone vertex */
-              vx = -dx; // x-component of the vector from the vertex to the point
-              vy = -dy; // y-component of the vector from the vertex to the point
-              vz = -dz; // z-component of the vector from the vertex to the point
-              /* calculate angles */    
-              pos_z_angle = acos((vx*pos_z_axis[0] + 
-              vy*pos_z_axis[1] + vz*pos_z_axis[2]) / 
-                (sqrt(pow(vx, 2) + pow(vy, 2) + pow(vz, 2)) * sqrt(pow(pos_z_axis[0], 2) + pow(pos_z_axis[1], 2) + pow(pos_z_axis[2], 2))));
-              neg_z_angle = acos((vx*neg_z_axis[0] + vy*neg_z_axis[1] + vz*neg_z_axis[2]) / 
-                (sqrt(pow(vx, 2) + pow(vy, 2) + pow(vz, 2)) * sqrt(pow(neg_z_axis[0], 2) + pow(neg_z_axis[1], 2) + pow(neg_z_axis[2], 2))));    
-              /* check if particle is inside the cone */ 
-              if((pos_z_angle <= theta) || (neg_z_angle <= theta))
-                {
-                  /* add mass */
-                  SphP[j].MassLoading += massloading/ngbsmass_feed*P[j].Mass;
-                  
-                  /* split kinetic and thermal energy feed */ 
-                  /* add kinetic energy in cone */
-                  SphP[j].KineticFeed   += energyfeed/ngbsmass_feed*P[j].Mass;
-                  All.EnergyExchange[0] += energyfeed/ngbsmass_feed*P[j].Mass;
+          if(!bh_jet_in_cone(d, target_data->Axis, cos_th, &r))
+            continue;
 
-                  /* set radial kick direction */      
-                  SphP[j].BhKickVector[0] = vx/r;
-                  SphP[j].BhKickVector[1] = vy/r;
-                  SphP[j].BhKickVector[2] = vz/r;                
-            }
+          double ej = target_data->Energy * P[j].Mass / target_data->ConeMass;
+
+          SphP[j].BhJetEnergy += ej;
+
+#ifdef ENERGY_JET
+          /* direction accumulator, weighted by the energy each BH deposits */
+          for(int k = 0; k < 3; k++)
+            SphP[j].BhJetMomentum[k] += ej * d[k] / r;
+#else
+          for(int k = 0; k < 3; k++)
+            SphP[j].BhJetMomentum[k] += ej * p_per_e * d[k] / r;
+#endif
+#ifdef BH_JET_FIXED_POWER
+          SphP[j].BhJetMass += ej * m_per_e;
+#endif
+          All.BhFeedbackLocal[0] += ej;
         }
     }
 
-  /* Now collect the result at the right place */
   if(mode == MODE_LOCAL_PARTICLES)
     out2particle(&out, target, MODE_LOCAL_PARTICLES);
   else
@@ -301,3 +225,5 @@ static int bh_feedback_evaluate(int target, int mode, int threadid)
 
   return 0;
 }
+
+#endif /* #ifdef BH_JET_FEEDBACK */

@@ -67,6 +67,10 @@ typedef struct
 #ifdef TORQUE_ACCRETION
   MyDouble GasAngularMomentum[3];
 #endif
+
+#ifdef BH_JET_SPIN
+  MyDouble JetGasL[3];
+#endif
 } data_out;
 
 static data_out *DataResult, *DataOut;
@@ -98,6 +102,11 @@ static void out2particle(data_out *out, int i, int mode)
       for(int j = 0; j < 3; j++)
         BhP[i].GasAngularMomentum[j] = out->GasAngularMomentum[j];
 #endif
+
+#ifdef BH_JET_SPIN
+      for(int j = 0; j < 3; j++)
+        BhP[i].JetGasL[j] = out->JetGasL[j];
+#endif
     }
   else /* combine */
     {
@@ -113,6 +122,11 @@ static void out2particle(data_out *out, int i, int mode)
 #ifdef TORQUE_ACCRETION
       for(int j = 0; j < 3; j++)
         BhP[i].GasAngularMomentum[j] += out->GasAngularMomentum[j];
+#endif
+
+#ifdef BH_JET_SPIN
+      for(int j = 0; j < 3; j++)
+        BhP[i].JetGasL[j] += out->JetGasL[j];
 #endif
     }
 }
@@ -419,6 +433,10 @@ static int bh_density_evaluate(int target, int mode, int threadid)
     gas_angular_momentum[j] = 0;
 #endif 
 
+#ifdef BH_JET_SPIN
+  MyDouble jet_gas_l[3] = {0, 0, 0};
+#endif
+
   MyDouble hinv, hinv3, hinv4, u, dwk;
 
   h2 = h * h;
@@ -482,6 +500,12 @@ static int bh_density_evaluate(int target, int mode, int threadid)
           if(P[i].TimeBinHydro < ngbsminbin)
             ngbsminbin = P[i].TimeBinHydro;
 
+#ifdef BH_JET_SPIN
+          jet_gas_l[0] += P[i].Mass * (dy * dvz - dz * dvy);
+          jet_gas_l[1] += P[i].Mass * (dz * dvx - dx * dvz);
+          jet_gas_l[2] += P[i].Mass * (dx * dvy - dy * dvx);
+#endif
+
 #ifdef TORQUE_ACCRETION           
           gas_angular_momentum[0] += P[i].Mass * (dy * dvz - dz * dvy);
           gas_angular_momentum[1] += P[i].Mass * (dz * dvx - dx * dvz);
@@ -496,6 +520,11 @@ static int bh_density_evaluate(int target, int mode, int threadid)
   out.NgbsMinBin = ngbsminbin;
 #ifdef BH_JET_PRESSURE_TRIGGER
   out.NgbsPressureVolume = ngbspressurevolume;
+#endif
+
+#ifdef BH_JET_SPIN
+  for(int j = 0; j < 3; j++)
+    out.JetGasL[j] = jet_gas_l[j];
 #endif
 
 #ifdef TORQUE_ACCRETION 

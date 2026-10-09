@@ -44,9 +44,21 @@ typedef struct Bh_Particle_Data
 #endif
 
 #ifdef BH_JET_PRESSURE_TRIGGER
-  MyDouble AmbientPressure;       /*!< volume-weighted mean physical gas pressure within the BH kernel (code units) */
-  MyDouble JetRamPressure;        /*!< physical ram pressure of the jet at its launch base (code units) */
+  MyDouble AmbientPressure;       /*!< volume-weighted mean physical gas pressure within the BH kernel [cgs] */
+  MyDouble JetRamPressure;        /*!< physical ram pressure of the jet at its launch base [cgs] */
   int JetLaunchFlag;              /*!< 1 if JetRamPressure > BhJetPressureFactor * AmbientPressure this step, else 0 */
+#endif
+
+#ifdef BH_JET_FEEDBACK
+  MyDouble JetEnergyReservoir;    /*!< jet energy produced but not yet released (code units); carried over while JetLaunchFlag = 0 */
+  MyDouble JetEnergyRelease;      /*!< jet energy to inject on this BH step (code units); 0 if no launch */
+  MyDouble JetConeMass;           /*!< total mass of the gas cells inside the jet cones within the BH kernel */
+  MyDouble JetAxis[3];            /*!< unit vector along the jet axis (either lobe) used on this step */
+#ifdef BH_JET_SPIN
+  MyDouble JetGasL[3];            /*!< mass-weighted gas angular momentum (relative to the BH) within the kernel */
+  MyDouble SpinVec[3];            /*!< spin proxy J: BH mass along the initial axis plus accreted mass times the unit
+                                       gas angular-momentum direction of each accretion event; JetAxis = J/|J| */
+#endif
 #endif
 
 #ifdef BH_MERGER

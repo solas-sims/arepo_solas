@@ -92,3 +92,4 @@ Table of contents
   development.md
   technical-reference.md
   fof_halo_seeding.md
+  bh_jet_feedback.md

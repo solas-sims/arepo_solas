@@ -235,6 +235,17 @@ static void spawn_black_hole_from_cell(int igas, int ibh, double seed_mass, int 
   BhP[NumBhs].JetRamPressure     = 0;
   BhP[NumBhs].JetLaunchFlag      = 0;
 #endif
+#ifdef BH_JET_FEEDBACK
+  BhP[NumBhs].JetEnergyReservoir = BhP[NumBhs].JetEnergyRelease = BhP[NumBhs].JetConeMass = 0;
+  for(int k = 0; k < 3; k++)
+    {
+      BhP[NumBhs].JetAxis[k] = All.BhJetAxis[k];
+#ifdef BH_JET_SPIN
+      BhP[NumBhs].JetGasL[k]  = 0;
+      BhP[NumBhs].SpinVec[k]  = seed_mass * All.BhJetAxis[k];
+#endif
+    }
+#endif
   BhP[NumBhs].TimeBinBh   = 0;
 
   /* timebin_add_particle(&TimeBinsBh, NumBhs, -1, 0, 1); */

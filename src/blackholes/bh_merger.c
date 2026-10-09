@@ -62,6 +62,12 @@ typedef struct
   MyDouble Vel[3];
   MyDouble Hsml;
   MyDouble Softening;
+#ifdef BH_JET_FEEDBACK
+  MyDouble JetEnergyReservoir; /*!< summed into the survivor's reservoir on merging */
+#ifdef BH_JET_SPIN
+  MyDouble SpinVec[3];         /*!< spin proxies add (see BhP[].SpinVec) */
+#endif
+#endif
 } BhMergerCandidate;
 
 /*! \brief One qualifying (bound, within-radius) candidate pair, indices into global_bhs[]. */
@@ -185,6 +191,13 @@ void bh_merger(void)
       local_bhs[n_local].Mass      = PPB(i).Mass;
       local_bhs[n_local].Hsml      = BhP[i].Hsml;
       local_bhs[n_local].Softening = bh_softening_for_index(i);
+#ifdef BH_JET_FEEDBACK
+      local_bhs[n_local].JetEnergyReservoir = BhP[i].JetEnergyReservoir;
+#ifdef BH_JET_SPIN
+      for(k = 0; k < 3; k++)
+        local_bhs[n_local].SpinVec[k] = BhP[i].SpinVec[k];
+#endif
+#endif
       for(k = 0; k < 3; k++)
         {
           local_bhs[n_local].Pos[k] = PPB(i).Pos[k];
@@ -335,6 +348,16 @@ void bh_merger(void)
               for(k = 0; k < 3; k++)
                 PPB(idx).Vel[k] = vel_new[k];
               BhP[idx].NumMergers++;
+#ifdef BH_JET_FEEDBACK
+              BhP[idx].JetEnergyReservoir += global_bhs[loser].JetEnergyReservoir;
+#ifdef BH_JET_SPIN
+              /* an unset survivor spin (all zero) is first initialised along its own axis at the next
+               * bh_jet_prepare(), so only add the loser's if the survivor's has been set */
+              if(BhP[idx].SpinVec[0] != 0 || BhP[idx].SpinVec[1] != 0 || BhP[idx].SpinVec[2] != 0)
+                for(k = 0; k < 3; k++)
+                  BhP[idx].SpinVec[k] += global_bhs[loser].SpinVec[k];
+#endif
+#endif
 
               mpi_printf("BH_MERGER: Task %d: BH ID=%llu (mass=%g) absorbed BH ID=%llu (mass=%g) -> new mass=%g\n", ThisTask,
                          (unsigned long long)global_bhs[survivor].ID, global_bhs[survivor].Mass,

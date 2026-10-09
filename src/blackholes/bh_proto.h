@@ -48,9 +48,37 @@ void bh_feedback(void);
 void bh_jet_pressure_trigger(void);
 #endif
 
+#if defined(BH_JET_FEEDBACK) || defined(BH_JET_PRESSURE_TRIGGER)
+/* kinetic energy [erg] the jet of BH i produces over its current step, and the length of that step [s] */
+double bh_jet_step_energy_cgs(int i);
+double bh_jet_step_time_cgs(int i);
+#endif
+
 #ifdef BH_JET_FEEDBACK
-void bh_jet_density(void);
-void bh_jet_feedback(void);
+void bh_jet_prepare(void);   /* jet axis, energy reservoir, release decision (needs JetLaunchFlag) */
+void bh_jet_density(void);   /* mass of the cone cells in each active BH kernel; marks cone cells for the timestep limiter */
+void bh_jet_feedback(void);  /* distributes the released energy over the cone cells (buffers in SphP) */
+
+/*! \brief Is the BH->cell vector d inside either lobe of the double cone about axis?
+ *
+ *  \param[in] d BH->cell separation (nearest image)
+ *  \param[in] axis unit vector along the jet axis
+ *  \param[in] cos_theta cosine of the half-opening angle
+ *  \param[out] r distance |d|
+ *
+ *  \return 1 if inside the cone and r > 0, else 0
+ */
+static inline int bh_jet_in_cone(const double d[3], const MyDouble axis[3], double cos_theta, double *r)
+{
+  double r2 = d[0] * d[0] + d[1] * d[1] + d[2] * d[2];
+
+  *r = sqrt(r2);
+
+  if(r2 <= 0)
+    return 0;
+
+  return fabs(d[0] * axis[0] + d[1] * axis[1] + d[2] * axis[2]) >= (*r) * cos_theta;
+}
 #endif
 
 void blackhole_mark_cells_for_refinement(void);

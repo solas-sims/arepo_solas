@@ -29,6 +29,19 @@ BhMergerRadiusCriterion SOFTENING
 PotentialDonorSearchNSoft 5.0
 Epsilon_r		0.05
 
+%---- BH jet feedback (BH_JET_FEEDBACK / BH_JET_PRESSURE_TRIGGER); see documentation/source/bh_jet_feedback.md
+%Epsilon_f              0.1     % BH_FEEDBACK_ACTIVE
+%Mload                  0.0
+%BhJetVelocity          1e4     % km/s
+%BhJetOpeningAngle      10      % half-angle, degrees
+%BhJetPressureFactor    1.0     % BH_JET_PRESSURE_TRIGGER: launch if P_ram > factor * P_ambient
+%BhJetAxisX             0       % fixed axis (initial axis with BH_JET_SPIN); normalised on read
+%BhJetAxisY             0
+%BhJetAxisZ             1
+%BhJetTimestepFactor    0.3     % cone cells: dt <= factor * R / (v_jet + c_s)
+%BhJetPower             1e44    % BH_JET_FIXED_POWER, erg/s
+%BhJetBurstMass         1e3     % BURST_MODE, Msun: burst energy = BhJetBurstMass * v_jet^2
+
 DesLinkNgb               20
 ErrTolThetaSubfind       0.7
 %CoolingOn                1

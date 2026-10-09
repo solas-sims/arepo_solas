@@ -1562,10 +1562,24 @@ double InitMetallicityinSolar;
   double Mload;
 #endif
 
-#ifdef BH_JET_PRESSURE_TRIGGER
+#if defined(BH_JET_PRESSURE_TRIGGER) || defined(BH_JET_FEEDBACK)
   double BhJetVelocity;        /* jet launch speed [km/s] */
   double BhJetOpeningAngle;    /* jet half-opening angle [degrees] */
+#endif
+
+#ifdef BH_JET_PRESSURE_TRIGGER
   double BhJetPressureFactor;  /* launch if P_ram > factor * P_ambient */
+#endif
+
+#ifdef BH_JET_FEEDBACK
+  double BhJetAxis[3];         /* fixed jet axis, or the initial axis when BH_JET_SPIN is on (normalised on read) */
+  double BhJetTimestepFactor;  /* cells in an active jet cone get dt <= factor * R_cell / (v_jet + c_s) */
+#ifdef BH_JET_FIXED_POWER
+  double BhJetPower;           /* fixed jet kinetic power [erg/s] (replaces Epsilon_f Epsilon_r Mdot c^2) */
+#endif
+#ifdef BURST_MODE
+  double BhJetBurstMass;       /* a burst releases energy BhJetBurstMass * v_jet^2; mass in Msun */
+#endif
 #endif
 
 #ifdef SUBFIND
@@ -1898,6 +1912,13 @@ extern struct sph_particle_data
   MyDouble BhThermalFeed;
   MyDouble BhKineticFeed;
   MyDouble BhMomentumFeed[3];
+#endif
+
+#ifdef BH_JET_FEEDBACK
+  MyDouble BhJetEnergy;          /* jet energy buffered for this cell (code units) */
+  MyDouble BhJetMomentum[3];     /* MOMENTUM_JET/THERMAL_JET: momentum kick; ENERGY_JET: energy-weighted sum of kick directions */
+  MyDouble BhJetMass;            /* BH_JET_FIXED_POWER: jet mass created in this cell */
+  integertime BhJetTiUntil;      /* timestep limiter active while Ti_Current < BhJetTiUntil */
 #endif
 } * SphP,          /*!< holds SPH particle data on local processor */
     *DomainSphBuf; /*!< buffer for SPH particle data in domain decomposition */

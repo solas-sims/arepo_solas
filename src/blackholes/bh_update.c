@@ -180,6 +180,89 @@ void bh_update_list_of_active_particles(void)
   sumup_large_ints(1, &TimeBinsBh.NActiveParticles, &TimeBinsBh.GlobalNActiveParticles);
 }
 
+#ifdef BH_JET_FEEDBACK
+/*! \brief Applies the jet buffer of active cell i (see bh_jet_feedback.c for the three injection modes).
+ *
+ *  Energy and momentum are the code's comoving quantities (Energy = a^2 M u + 1/2 M Vel^2, Momentum = M Vel),
+ *  so the kinetic energy of a cell is 1/2 |Momentum|^2 / Mass and everything else in Energy (thermal, and
+ *  magnetic if present) is left untouched by the momentum changes below.
+ */
+static void bh_jet_apply_cell(int i, struct pv_update_data *pvd)
+{
+  double dE = SphP[i].BhJetEnergy;
+  double dM = SphP[i].BhJetMass;
+  double dp[3] = {SphP[i].BhJetMomentum[0], SphP[i].BhJetMomentum[1], SphP[i].BhJetMomentum[2]};
+
+  SphP[i].BhJetEnergy = SphP[i].BhJetMass = 0;
+  SphP[i].BhJetMomentum[0] = SphP[i].BhJetMomentum[1] = SphP[i].BhJetMomentum[2] = 0;
+
+  if(P[i].Mass <= 0)
+    return; /* cell was dissolved or drained since the energy was buffered */
+
+  /* Jet mass created in the cell (BH_JET_FIXED_POWER) is added at rest and with no thermal energy, as in arepobh:
+   * Energy and Momentum are left alone, so only the jet energy dE changes the cell's total energy. Scaling them with
+   * the mass instead would give the new mass the host cell's specific energy, which for a cell that has already been
+   * kicked is an uncontrolled source of kinetic energy (measured ~2% of dE in a test with Mach ~50 cones). */
+  double mass_old = P[i].Mass;
+
+  P[i].Mass += dM;
+
+  double mass    = P[i].Mass;
+  double *p      = SphP[i].Momentum;
+  double energy0 = SphP[i].Energy;
+
+  (void)mass_old;
+  (void)mass;
+  (void)dE;
+
+#if defined(MOMENTUM_JET)
+  /* add momentum only; the non-kinetic part of Energy is unchanged */
+  double p0sq = p[0] * p[0] + p[1] * p[1] + p[2] * p[2];
+
+  SphP[i].Energy -= 0.5 * p0sq / mass_old;
+  for(int k = 0; k < 3; k++)
+    p[k] += dp[k];
+  SphP[i].Energy += 0.5 * (p[0] * p[0] + p[1] * p[1] + p[2] * p[2]) / mass;
+#elif defined(THERMAL_JET)
+  /* add momentum and the full jet energy; what the momentum does not take up becomes thermal */
+  for(int k = 0; k < 3; k++)
+    p[k] += dp[k];
+  SphP[i].Energy += dE;
+#else /* ENERGY_JET */
+  double dnorm = sqrt(dp[0] * dp[0] + dp[1] * dp[1] + dp[2] * dp[2]);
+
+  SphP[i].Energy += dE;
+
+  if(dnorm > 0)
+    {
+      double n[3]  = {dp[0] / dnorm, dp[1] / dnorm, dp[2] / dnorm};
+      double pn    = p[0] * n[0] + p[1] * n[1] + p[2] * n[2];
+      double p0sq  = p[0] * p[0] + p[1] * p[1] + p[2] * p[2];
+
+      /* kick s n such that 1/2 |p + s n|^2 / M = 1/2 |p|^2 / M_old + dE, i.e. all of dE becomes kinetic and the
+       * non-kinetic energy of the cell is untouched:
+       * s = -p.n + sqrt((p.n)^2 - |p|^2 + 2 M (1/2 |p|^2 / M_old + dE)), the positive root, exact for any angle between p and n */
+      double s = -pn + sqrt(pn * pn - p0sq + 2.0 * mass * (0.5 * p0sq / mass_old + dE));
+
+      for(int k = 0; k < 3; k++)
+        p[k] += s * n[k];
+    }
+  /* else: no usable direction (opposing contributions cancelled); dE stays thermal */
+#endif
+
+  All.BhFeedbackLocal[1] += SphP[i].Energy - energy0;
+
+  update_primitive_variables_single(P, SphP, i, pvd);
+  update_internal_energy(P, SphP, i, pvd);
+  set_pressure_of_cell_internal(P, SphP, i);
+
+#ifdef JET_TRACER
+  SphP[i].PScalars[JET_INDEX] = 1;
+  sync_conserved_from_primitive(i, JET_INDEX);
+#endif
+}
+#endif /* #ifdef BH_JET_FEEDBACK */
+
 void bh_perform_end_of_step_physics(void)
 {
   int idx, i;
@@ -192,10 +275,7 @@ void bh_perform_end_of_step_physics(void)
 
       PPB(i).Mass += (1 - All.Epsilon_r) * BhP[i].Accretion;
 
-      /* Do we want to track bh spin? */
-      //BhP[i].AngularMomentum[0] += BhP[i].Accretion * BhP[i].VelocityGasCircular[0];
-      //BhP[i].AngularMomentum[1] += BhP[i].Accretion * BhP[i].VelocityGasCircular[1];
-      //BhP[i].AngularMomentum[2] += BhP[i].Accretion * BhP[i].VelocityGasCircular[2];
+      /* BH spin direction (BH_JET_SPIN) is tracked in bh_jet_prepare() */
     }
       
   for(i = 0; i < NumGas; i++)
@@ -268,31 +348,9 @@ void bh_perform_end_of_step_physics(void)
       // Dump mass, momentum and energy injected by bh 
       if(SphP[i].BhThermalFeed > 0)
         {
-          // Add mass
-          //P[i].Mass += SphP[i].BhMassFeed;
-                    
-          // Add kinetic energy */
-          //SphP[i].Energy += SphP[i].KineticFeed;
-                    
-          // Calculate momentum feed exactly so energy is conserved */
-          //-> we need to do this here so that particle properties don't change between loading the buffer and emptying it*/
-          //kick_vector[0] = SphP[i].BhKickVector[0];
-          //kick_vector[1] = SphP[i].BhKickVector[1];
-          //kick_vector[2] = SphP[i].BhKickVector[2];
-                    
-          //p0 = sqrt(pow(SphP[i].Momentum[0], 2) + pow(SphP[i].Momentum[1], 2) + pow(SphP[i].Momentum[2], 2));
-                    
-          //pj = sqrt(2 * P[i].Mass * (SphP[i].Energy - (P[i].Mass-SphP[i].MassLoading)*SphP[i].Utherm*All.cf_atime*All.cf_atime)) - p0;
-
           // Update total energy 
           SphP[i].Energy += SphP[i].BhThermalFeed;
           All.BhFeedbackLocal[1] += SphP[i].BhThermalFeed;
-          // Update momentum 
-          //SphP[i].Momentum[0] += kick_vector[0] * pj / sqrt(pow(kick_vector[0], 2) + pow(kick_vector[1], 2) + pow(kick_vector[2], 2));
-          //SphP[i].Momentum[1] += kick_vector[1] * pj / sqrt(pow(kick_vector[0], 2) + pow(kick_vector[1], 2) + pow(kick_vector[2], 2));
-          //SphP[i].Momentum[2] += kick_vector[2] * pj / sqrt(pow(kick_vector[0], 2) + pow(kick_vector[1], 2) + pow(kick_vector[2], 2));
-          // Update velocities
-          //update_primitive_variables_single(P, SphP, i, &pvd);
           // Update internal energy 
           update_internal_energy(P, SphP, i, &pvd);
           // Update pressure
@@ -306,21 +364,18 @@ void bh_perform_end_of_step_physics(void)
           sync_conserved_from_primitive(i, JET_INDEX);
 #endif
         }
-    }
-#ifdef BURST_MODE
-      All.FeedbackFlag = -1;
-#endif
-        
-    MPI_Allreduce(&All.BhFeedbackLocal, &All.BhFeedbackGlobal, 2, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-  
-    mpi_printf("BLACKHOLES: Number of active blackholes = %lld \n", TimeBinsBh.GlobalNActiveParticles);
-    mpi_printf("BLACKHOLES: Energy given by BHs = %e, Energy taken up by gas particles = %e \n",
-    All.BhFeedbackGlobal[0], All.BhFeedbackGlobal[1]);
 
-#ifdef BURST_MODE
-    if(All.EnergyExchangeTot[0] - All.EnergyExchangeTot[1] > 10)
-        All.FeedbackFlag = 1;
+#ifdef BH_JET_FEEDBACK
+      if(SphP[i].BhJetEnergy > 0)
+        bh_jet_apply_cell(i, &pvd);
 #endif
+    }
+        
+  MPI_Allreduce(&All.BhFeedbackLocal, &All.BhFeedbackGlobal, 2, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+  
+  mpi_printf("BLACKHOLES: Number of active blackholes = %lld \n", TimeBinsBh.GlobalNActiveParticles);
+  mpi_printf("BLACKHOLES: Energy given by BHs = %e, Energy taken up by gas particles = %e \n",
+             All.BhFeedbackGlobal[0], All.BhFeedbackGlobal[1]);
 
 #endif
 } // perform_end_of_step_physics(void)
