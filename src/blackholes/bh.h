@@ -31,6 +31,9 @@ typedef struct Bh_Particle_Data
   MyDouble NgbsVolume;
   MyDouble AngularMomentum[3];
   int NgbsMinBin;
+#ifdef BH_JET_PRESSURE_TRIGGER
+  MyDouble NgbsPressureVolume;    /*!< sum over kernel cells of Pressure * Volume (comoving code units) */
+#endif
   int DensityFlag;
   signed char TimeBinBh;
 #endif
@@ -38,6 +41,12 @@ typedef struct Bh_Particle_Data
 #ifdef BH_ACCRETION_ACTIVE
   MyDouble Accretion;
   MyDouble MassToDrain;
+#endif
+
+#ifdef BH_JET_PRESSURE_TRIGGER
+  MyDouble AmbientPressure;       /*!< volume-weighted mean physical gas pressure within the BH kernel (code units) */
+  MyDouble JetRamPressure;        /*!< physical ram pressure of the jet at its launch base (code units) */
+  int JetLaunchFlag;              /*!< 1 if JetRamPressure > BhJetPressureFactor * AmbientPressure this step, else 0 */
 #endif
 
 #ifdef BH_MERGER

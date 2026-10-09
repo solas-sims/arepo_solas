@@ -80,6 +80,10 @@
 #BH_THERMAL_FEEDBACK    # Only thermal
 
 #BH_JET_FEEDBACK        # Only jet (not operational yet)
+#BH_JET_PRESSURE_TRIGGER # Requires BH_THERMAL_FEEDBACK or BH_JET_FEEDBACK; sets BhP[].JetLaunchFlag = 1 only when the jet
+                        # ram pressure (2 L_jet / (v_jet A_jet)) exceeds BhJetPressureFactor x the volume-weighted
+                        # ambient gas pressure in the BH kernel (src/blackholes/bh_jet_trigger.c). Params: BhJetVelocity
+                        # [km/s], BhJetOpeningAngle [deg], BhJetPressureFactor.
 #BURST_MODE             # Only turn on for jet (not operational yet)
 #JET_TRACER             # Only turn on for jet (not operational yet)
 

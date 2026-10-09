@@ -22,6 +22,9 @@ typedef struct
   MyDouble Ngbsmass;
   MyDouble NgbsmassFeed;
   MyDouble Accretion;
+#ifdef BH_JET_PRESSURE_TRIGGER
+  int JetLaunchFlag;
+#endif
   int Firstnode;
 } data_in;
 
@@ -43,6 +46,9 @@ static void particle2in(data_in *in, int i, int firstnode)
   in->Ngbsmass = BhP[i].Ngbsmass;
   in->NgbsmassFeed = BhP[i].NgbsmassFeed;
   in->Accretion = BhP[i].Accretion;
+#ifdef BH_JET_PRESSURE_TRIGGER
+  in->JetLaunchFlag = BhP[i].JetLaunchFlag;
+#endif
   in->Hsml = BhP[i].Hsml;
   in->Firstnode = firstnode;
 }
@@ -174,6 +180,18 @@ static int bh_feedback_evaluate(int target, int mode, int threadid)
 
       generic_get_numnodes(target, &numnodes, &firstnode);
     }
+
+#ifdef BH_JET_PRESSURE_TRIGGER
+  /* jet ram pressure does not exceed the ambient pressure: no launch this step */
+  if(!target_data->JetLaunchFlag)
+    {
+      if(mode == MODE_LOCAL_PARTICLES)
+        out2particle(&out, target, MODE_LOCAL_PARTICLES);
+      else
+        DataResult[target] = out;
+      return 0;
+    }
+#endif
 
   pos = target_data->Pos;
   h = target_data->Hsml;

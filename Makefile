@@ -605,6 +605,13 @@ ifneq (,$(filter BH_FEEDBACK_ACTIVE,$(CONFIGVARS)))
 OBJS += blackholes/bh_feedback.o
 endif
 
+ifneq (,$(filter BH_JET_PRESSURE_TRIGGER,$(CONFIGVARS)))
+ifeq (,$(filter BH_FEEDBACK_ACTIVE,$(CONFIGVARS)))
+$(error BH_JET_PRESSURE_TRIGGER requires BH_THERMAL_FEEDBACK or BH_JET_FEEDBACK (BH_FEEDBACK_ACTIVE))
+endif
+OBJS += blackholes/bh_jet_trigger.o
+endif
+
 ifneq (,$(filter BH_MERGER,$(CONFIGVARS)))
 ifeq (,$(filter BH_ACTIVE,$(CONFIGVARS)))
 $(error BH_MERGER requires BH_ACTIVE)

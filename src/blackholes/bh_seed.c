@@ -229,6 +229,12 @@ static void spawn_black_hole_from_cell(int igas, int ibh, double seed_mass, int 
   BhP[NumBhs].NgbsVolume  = 0;
   BhP[NumBhs].NgbsMinBin  = 0;
   BhP[NumBhs].DensityFlag = 0;
+#ifdef BH_JET_PRESSURE_TRIGGER
+  BhP[NumBhs].NgbsPressureVolume = 0;
+  BhP[NumBhs].AmbientPressure    = 0;
+  BhP[NumBhs].JetRamPressure     = 0;
+  BhP[NumBhs].JetLaunchFlag      = 0;
+#endif
   BhP[NumBhs].TimeBinBh   = 0;
 
   /* timebin_add_particle(&TimeBinsBh, NumBhs, -1, 0, 1); */

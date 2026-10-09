@@ -44,6 +44,10 @@ double bh_softening_for_index(int idx);
 void bh_feedback(void);
 #endif
 
+#ifdef BH_JET_PRESSURE_TRIGGER
+void bh_jet_pressure_trigger(void);
+#endif
+
 #ifdef BH_JET_FEEDBACK
 void bh_jet_density(void);
 void bh_jet_feedback(void);

@@ -712,6 +712,20 @@ void read_parameter_file(char *fname)
       addr[nt] = &All.Mload;
       id[nt++] = REAL;
 #endif
+
+#ifdef BH_JET_PRESSURE_TRIGGER
+      strcpy(tag[nt], "BhJetVelocity");
+      addr[nt] = &All.BhJetVelocity;
+      id[nt++] = REAL;
+
+      strcpy(tag[nt], "BhJetOpeningAngle");
+      addr[nt] = &All.BhJetOpeningAngle;
+      id[nt++] = REAL;
+
+      strcpy(tag[nt], "BhJetPressureFactor");
+      addr[nt] = &All.BhJetPressureFactor;
+      id[nt++] = REAL;
+#endif
         
 #ifdef HALO_SEEDING 
 #ifndef FOF

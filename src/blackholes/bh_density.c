@@ -60,6 +60,10 @@ typedef struct
   MyDouble NgbsVolume;
   int NgbsMinBin;
 
+#ifdef BH_JET_PRESSURE_TRIGGER
+  MyDouble NgbsPressureVolume;
+#endif
+
 #ifdef TORQUE_ACCRETION
   MyDouble GasAngularMomentum[3];
 #endif
@@ -86,6 +90,9 @@ static void out2particle(data_out *out, int i, int mode)
       BhP[i].NgbsMass = out->NgbsMass;
       BhP[i].NgbsVolume = out->NgbsVolume;
       BhP[i].NgbsMinBin = out->NgbsMinBin;
+#ifdef BH_JET_PRESSURE_TRIGGER
+      BhP[i].NgbsPressureVolume = out->NgbsPressureVolume;
+#endif
 
 #ifdef TORQUE_ACCRETION
       for(int j = 0; j < 3; j++)
@@ -99,6 +106,9 @@ static void out2particle(data_out *out, int i, int mode)
       BhP[i].NgbsVolume += out->NgbsVolume;
       if(out->NgbsMinBin < BhP[i].NgbsMinBin)
         BhP[i].NgbsMinBin = out->NgbsMinBin;
+#ifdef BH_JET_PRESSURE_TRIGGER
+      BhP[i].NgbsPressureVolume += out->NgbsPressureVolume;
+#endif
 
 #ifdef TORQUE_ACCRETION
       for(int j = 0; j < 3; j++)
@@ -377,6 +387,9 @@ static int bh_density_evaluate(int target, int mode, int threadid)
   MyDouble xtmp, ytmp, ztmp;   
   MyDouble h, h2, dx, dy, dz, r2; 
   MyDouble *pos, *vel, ngbsmass = 0, ngbsvolume = 0;
+#ifdef BH_JET_PRESSURE_TRIGGER
+  MyDouble ngbspressurevolume = 0;
+#endif
 
   data_in local, *target_data;
   data_out out = {0};
@@ -461,6 +474,9 @@ static int bh_density_evaluate(int target, int mode, int threadid)
           ngbsmass += P[i].Mass;
           // compute the bh-ngbs-volume
           ngbsvolume += SphP[i].Volume;
+#ifdef BH_JET_PRESSURE_TRIGGER
+          ngbspressurevolume += SphP[i].Pressure * SphP[i].Volume;
+#endif
 
           // compute the max hydro bin for neighbors   
           if(P[i].TimeBinHydro < ngbsminbin)
@@ -478,6 +494,9 @@ static int bh_density_evaluate(int target, int mode, int threadid)
   out.NgbsMass = ngbsmass;
   out.NgbsVolume = ngbsvolume;
   out.NgbsMinBin = ngbsminbin;
+#ifdef BH_JET_PRESSURE_TRIGGER
+  out.NgbsPressureVolume = ngbspressurevolume;
+#endif
 
 #ifdef TORQUE_ACCRETION 
   for(int j = 0; j < 3; j++)

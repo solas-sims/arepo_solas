@@ -119,6 +119,9 @@ downstream. Additionally:
 |---|---|---|---|---|
 | `Epsilon_f` | `BH_FEEDBACK_ACTIVE` | REAL | ⚠️ dimensionless coupling efficiency | Also used by `bh_jet_feedback.c`, so applies to jets too even though it's only gated on `BH_FEEDBACK_ACTIVE`. |
 | `Mload` | `BH_FEEDBACK_ACTIVE` | REAL | ⚠️ dimensionless, expected in [0,1] — appears as both `Mload` and `(1 − Mload)` in the mass/energy split | |
+| `BhJetVelocity` | `BH_JET_PRESSURE_TRIGGER` | REAL | ✅ km/s (converted with `cf_UnitVelocity_in_cm_per_s`) | Jet launch speed `v_jet` in the ram-pressure criterion. |
+| `BhJetOpeningAngle` | `BH_JET_PRESSURE_TRIGGER` | REAL | ✅ degrees, half-opening angle | Launch area is `π (R_inj sin θ)²`, `R_inj` = BH kernel radius. |
+| `BhJetPressureFactor` | `BH_JET_PRESSURE_TRIGGER` | REAL | ✅ dimensionless | Jet launches if `P_ram > BhJetPressureFactor × P_ambient`; use 1 for the plain criterion. |
 
 ## Black hole refinement
 

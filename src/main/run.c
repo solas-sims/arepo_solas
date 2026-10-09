@@ -482,6 +482,10 @@ void calculate_non_standard_physics_prior_mesh_construction(void)
       bh_accretion();
       bh_swallow();
 #endif
+
+#ifdef BH_JET_PRESSURE_TRIGGER
+      bh_jet_pressure_trigger();
+#endif
  
 #ifdef BH_THERMAL_FEEDBACK
       bh_feedback();

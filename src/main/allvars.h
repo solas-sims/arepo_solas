@@ -1562,6 +1562,12 @@ double InitMetallicityinSolar;
   double Mload;
 #endif
 
+#ifdef BH_JET_PRESSURE_TRIGGER
+  double BhJetVelocity;        /* jet launch speed [km/s] */
+  double BhJetOpeningAngle;    /* jet half-opening angle [degrees] */
+  double BhJetPressureFactor;  /* launch if P_ram > factor * P_ambient */
+#endif
+
 #ifdef SUBFIND
   int DesLinkNgb;
   double ErrTolThetaSubfind;
