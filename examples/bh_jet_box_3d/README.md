@@ -135,6 +135,23 @@ In `Config.sh`:
 * Add `BH_JET_PRESSURE_TRIGGER` (and `BhJetPressureFactor` to `param.txt`) to launch only when the jet ram pressure
   exceeds the ambient pressure; `BH_JET_SPIN` to let the jet axis follow the accreted angular momentum.
 
+## Running on many tasks: `OVERRIDE_PEANOGRID_WARNING`
+
+`Config.sh` sets `OVERRIDE_PEANOGRID_WARNING`. Without it, a run on many tasks (32 in the test) stops with
+
+```
+DOMAIN: Note: we would like to refine top-tree, but PEANOGRID is not fine enough
+TERMINATE: ... domain_determineTopTree() ... Consider setting BITS_PER_DIMENSION up to a value of 42 ...
+```
+
+`BITS_PER_DIMENSION` already defaults to 42, so the hint does not apply. The cause is the domain workload: the top-tree must split every
+node whose share of the work exceeds `1 / (TopNodeFactor * MultipleDomains * NTask)` (1/256 for 32 tasks here, 1/32 for 4). Cells in the jet
+region are in the shortest time bins and carry far more work than the others, so at a sync-point where only a few cells are active a single
+cell can exceed that share, and it cannot be split. The override lets the run continue; the cost is one less well-balanced domain
+decomposition. In the 32-task test the note printed once, the run finished, and `check.py` gave the same results as on 4 tasks (energy
+closure 3e-13, 206 against 208 tracer cells, since the decomposition differs). This is not a coordinate problem (NaN or coincident particles), which would be
+a different failure to look for.
+
 ## Restart test
 
 Packets in flight are stored in the BH's `BhP` entry, so they go into the restart files. To check this, stop the run while a

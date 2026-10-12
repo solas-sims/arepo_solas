@@ -35,3 +35,4 @@ INPUT_IN_DOUBLEPRECISION       # initial conditions are in double precision
 OUTPUT_IN_DOUBLEPRECISION      # snapshot files will be written in double precision
 HAVE_HDF5                      # HDF5 I/O
 DEBUG                          # enables core-dumps
+OVERRIDE_PEANOGRID_WARNING     # don't stop if the top-tree cannot be split further (see README: needed with many tasks)
