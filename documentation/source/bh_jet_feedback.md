@@ -79,7 +79,7 @@ The ambient-pressure trigger is unchanged: it still looks at the BH kernel, with
 Tested in the same box with `BURST_MODE`, `BH_JET_FIXED_POWER`, refinement on: bursts launched at t = 1e-4, 2e-4, ... were
 delivered 2e-4 later (the flight time for R = 2 kpc at 1e4 km/s); total energy gain equals the injected energy (90 = 9 bursts
 x 10 to 1e-6); fast cells lie at r = 1.5-2.5 around R = 2; net momentum ~1e-16 of sum |p|. The de-refinement rule
-and mesh splitting during a jet, and restarts with packets in flight, are not tested.
+and mesh splitting during a jet, are not tested. A restart with a packet in flight reproduces an uninterrupted run bitwise (4 tasks, `examples/bh_jet_box_3d`); a BH that migrates between tasks with packets in flight is not tested.
 
 ## Differences from arepobh
 

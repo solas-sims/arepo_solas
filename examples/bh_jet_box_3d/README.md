@@ -135,6 +135,25 @@ In `Config.sh`:
 * Add `BH_JET_PRESSURE_TRIGGER` (and `BhJetPressureFactor` to `param.txt`) to launch only when the jet ram pressure
   exceeds the ambient pressure; `BH_JET_SPIN` to let the jet axis follow the accreted angular momentum.
 
+## Restart test
+
+Packets in flight are stored in the BH's `BhP` entry, so they go into the restart files. To check this, stop the run while a
+packet is in flight and restart it:
+
+```bash
+cd run
+mpirun -np 4 ./Arepo param.txt > log1.txt &     # start the run
+touch output/stop                                # once the log shows Time > 0.00165 and "1 in flight"
+# (wait for it to exit: it writes restart files and stops)
+mpirun -np 4 ./Arepo param.txt 1 > log2.txt      # restart
+```
+
+In the reference test (stopped at t = 0.00171 with one packet in flight, restarted with the same 4 tasks) the restarted run's
+launch and delivery events were identical to an uninterrupted run, and all five snapshots, including the one after the restart, were
+bitwise identical (positions, velocities, masses, internal energies and tracer). The packet in flight at the stop was delivered after the
+restart.
+
 ## Not tested here
 
-Restarts with jet packets in flight, and comoving integration.
+A restart on a different number of tasks (Arepo needs the same number as the run that wrote the restart files), a BH that moves
+between tasks while packets are in flight (the BH sits still in this example), and comoving integration.
