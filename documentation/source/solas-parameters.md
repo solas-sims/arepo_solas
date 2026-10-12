@@ -99,7 +99,7 @@ downstream. Additionally:
 | Parameter | Required flag(s) | Type | Units | Notes |
 |---|---|---|---|---|
 | `BhRadius` | `BH_ACTIVE` + `BH_CONSTANT_RADIUS` | REAL | ✅ code length units — used directly in `r² < BhRadius²` distance comparisons | |
-| `BhDesNgb` | `BH_ACTIVE`, else-branch (adaptive radius) | REAL | ✅ dimensionless, mass-weighted neighbour count (compared against `NgbsMass / TargetGasMass`) | Distinct from gas's `DesNumNgb` and BH-jet's separate check in `bh_jet_density.c`. |
+| `BhDesNgb` | `BH_ACTIVE`, else-branch (adaptive radius) | REAL | ✅ dimensionless, mass-weighted neighbour count (compared against `NgbsMass / TargetGasMass`) | Distinct from gas's `DesNumNgb`, and from `BhJetDesNgb` (the jet's own injection-sphere target, `BH_JET_LAUNCH_POINT`). |
 | `BhDesDev` | same as above | REAL | ✅ dimensionless, same convention | |
 | `HMaxFactor` | same as above | REAL | ✅ dimensionless — multiplies `SofteningTable[...]` to get a max search radius | |
 
@@ -117,11 +117,19 @@ downstream. Additionally:
 
 | Parameter | Required flag(s) | Type | Units | Notes |
 |---|---|---|---|---|
-| `Epsilon_f` | `BH_FEEDBACK_ACTIVE` | REAL | ⚠️ dimensionless coupling efficiency | Also used by `bh_jet_feedback.c`, so applies to jets too even though it's only gated on `BH_FEEDBACK_ACTIVE`. |
+| `Epsilon_f` | `BH_FEEDBACK_ACTIVE` | REAL | ⚠️ dimensionless coupling efficiency | Jet efficiency: the jet power is `Epsilon_f Epsilon_r Mdot c^2` (not used with `BH_JET_FIXED_POWER`). `Mload` is not used by the jet. |
 | `Mload` | `BH_FEEDBACK_ACTIVE` | REAL | ⚠️ dimensionless, expected in [0,1] — appears as both `Mload` and `(1 − Mload)` in the mass/energy split | |
-| `BhJetVelocity` | `BH_JET_PRESSURE_TRIGGER` | REAL | ✅ km/s (converted with `cf_UnitVelocity_in_cm_per_s`) | Jet launch speed `v_jet` in the ram-pressure criterion. |
-| `BhJetOpeningAngle` | `BH_JET_PRESSURE_TRIGGER` | REAL | ✅ degrees, half-opening angle | Launch area is `π (R_inj sin θ)²`, `R_inj` = BH kernel radius. |
+| `BhJetVelocity` | `BH_JET_PRESSURE_TRIGGER` or `BH_JET_FEEDBACK` | REAL | ✅ km/s | Jet launch speed `v_jet`: in the ram-pressure criterion, the momentum `2E/v_jet` of `MOMENTUM_JET`/`THERMAL_JET`, the burst energy, and the flight time. |
+| `BhJetOpeningAngle` | same | REAL | ✅ degrees, half-opening angle | Launch area `π (R_inj sin θ)²` in the criterion (`R_inj` = BH kernel radius); the cone half-angle in the default injection; the half-angle bursts are drawn from in `BH_JET_LAUNCH_POINT`. |
 | `BhJetPressureFactor` | `BH_JET_PRESSURE_TRIGGER` | REAL | ✅ dimensionless | Jet launches if `P_ram > BhJetPressureFactor × P_ambient`; use 1 for the plain criterion. |
+| `BhJetAxisX`, `BhJetAxisY`, `BhJetAxisZ` | `BH_JET_FEEDBACK` | REAL | ✅ direction (normalised on read; must not all be 0) | Jet axis, or with `BH_JET_SPIN` the initial axis. |
+| `BhJetTimestepFactor` | `BH_JET_FEEDBACK` | REAL | ✅ dimensionless | Cells in an active jet region get `dt ≤ factor R / (v_jet + c_s)`. 0.3 is a reasonable start. |
+| `BhJetPower` | `BH_JET_FIXED_POWER` | REAL | ✅ erg/s | Fixed jet power; replaces the accretion-driven power. |
+| `BhJetBurstMass` | `BURST_MODE` | REAL | ✅ Msun | A burst releases `BhJetBurstMass × v_jet²` of energy (arepobh's `JetParticleMass`, which is in units of 1e6 Msun there). |
+| `BhJetLaunchRadius` | `BH_JET_LAUNCH_POINT` | REAL | ✅ kpc, physical | Distance from the BH to the injection points along ±axis (10 in the arepobh runs). |
+| `BhJetDesNgb`, `BhJetDesDev` | `BH_JET_LAUNCH_POINT` | REAL | ✅ in units of `TargetGasMass` (cell counts without `REFINEMENT`) | Each injection sphere holds `(DesNgb ± DesDev) × TargetGasMass` of gas. |
+
+The jet is described in `bh_jet_feedback.md`.
 
 ## Black hole refinement
 

@@ -7,6 +7,24 @@ than by spawned particles, so it works for any number of BHs, in cosmological ru
 Source: `src/blackholes/bh_jet_{common,density,feedback,trigger}.c`, the apply step in `bh_update.c`, and the timestep
 limiter in `timestep.c`.
 
+## How it fits together
+
+Per BH step (`run.c`, `calculate_non_standard_physics_prior_mesh_construction()`), after `bh_density()`, `bh_accretion()` and `bh_swallow()`:
+
+| Step | Routine | File | What it does |
+|---|---|---|---|
+| 1 | `bh_jet_pressure_trigger()` | `bh_jet_trigger.c` | Launch criterion: sets `BhP[].JetLaunchFlag` (only with `BH_JET_PRESSURE_TRIGGER`). |
+| 2 | `bh_jet_prepare()` | `bh_jet_common.c` | Jet axis; adds this step's jet energy to the reservoir; decides how much to release. |
+| 3a | `bh_jet_density()` + `bh_jet_feedback()` | `bh_jet_density.c`, `bh_jet_feedback.c` | Default cone mode: cone mass, then mass-weighted deposit into per-cell buffers. |
+| 3b | `bh_jet_points()` + `bh_jet_points_inject()` | `bh_jet_points.c`, `bh_jet_points_inject.c` | `BH_JET_LAUNCH_POINT`: packets, flight delay, injection spheres, deposit into the same buffers. |
+| 4 | `bh_jet_apply_cell()` | `bh_update.c` | At the end of the step, for each active cell with a buffer: applies the injection mode. |
+
+Per-cell buffers are `SphP[].BhJetEnergy`, `BhJetMomentum[3]`, `BhJetMass` and the timestep mark `BhJetTiUntil`. Per-BH state, in
+`BhP[]` (so it is written to restart files with the rest of the struct): `JetEnergyReservoir`, `JetEnergyRelease`, `JetConeMass`,
+`JetAxis[3]`, and with `BH_JET_SPIN` `SpinVec[3]`, with `BH_JET_LAUNCH_POINT` `JetBurstCount` and the packet buffer `JetPacket[]`.
+`bh_merger.c` adds the loser's reservoir (and packets' energy, and spin proxy) to the survivor. Buffers are applied the next time a
+cell is active, so cells that will receive jet energy are marked for the timestep limiter first (`get_timestep_hydro()`).
+
 ## Configuration
 
 | Option | Meaning |
@@ -57,6 +75,44 @@ energy (as in arepobh). Otherwise the jet is made of entrained gas and cell mass
 
 **Timestep.** Cells in the cone of a BH that holds jet energy get `dt <= BhJetTimestepFactor R_cell / (v_jet + c_s)`
 for two BH steps after they were marked. Replaces the hard-coded radius-based limits of arepobh.
+
+## Launch criterion (`BH_JET_PRESSURE_TRIGGER`)
+
+A jet only launches if it can push its way out: its ram pressure at the launch base has to exceed the thermal pressure of the gas
+it is launched into (`bh_jet_trigger.c`).
+
+For each active BH, with `E_step` the jet energy of the step (accretion-driven: `Epsilon_f Epsilon_r Accretion c^2`, or
+`BhJetPower dt` with `BH_JET_FIXED_POWER`) and `dt` its length, both in cgs:
+
+* jet power `L_jet = E_step / dt`
+* launch speed `v_jet = BhJetVelocity`; mass outflow rate `Mdot_j = 2 L_jet / v_jet^2` (a purely kinetic jet)
+* launch area `A_jet = pi (R_inj sin theta)^2`, with `R_inj` the BH kernel radius `Hsml` (physical) and `theta = BhJetOpeningAngle`
+* jet density `rho_jet = Mdot_j / (A_jet v_jet)`, so `P_ram = rho_jet v_jet^2 = 2 L_jet / (v_jet A_jet)`
+* ambient pressure `P_amb`: the volume-weighted mean of the cell pressures in the BH kernel,
+  `sum(P_cell V_cell) / sum(V_cell)`, accumulated in `bh_density()` (`BhP[].NgbsPressureVolume`, `NgbsVolume`)
+
+`BhP[].JetLaunchFlag = 1` if `P_ram > BhJetPressureFactor * P_amb`. `BhJetPressureFactor = 1` is the plain criterion; larger values
+make launching harder. `BhP[].JetRamPressure` and `AmbientPressure` hold the two pressures [cgs] for diagnostics (they are not in the
+snapshots). The log reports, each BH step, how many active BHs can launch and the largest `P_ram / P_amb`:
+
+```
+BLACKHOLES: Jet pressure trigger: 1 of 1 active BHs can launch (max P_ram/P_amb = 5.4)
+```
+
+Units: everything is evaluated in cgs through the `cf_*` conversions (`cf_UnitTime_in_s`, `cf_UnitLength_in_cm`,
+`cf_UnitPressure_in_cgs`), so it is also correct for comoving runs. The first version of the trigger took the BH timestep, which for
+comoving runs is in ln(a), as a time and mixed code and physical units; that is fixed.
+
+What the flag does depends on the mode:
+
+* `BH_JET_FEEDBACK`: `bh_jet_prepare()` releases the jet energy only when the flag is 1. Energy produced while it is 0 is kept in
+  `JetEnergyReservoir` and released at the next launch (in `BURST_MODE`, in whole bursts), so suppressed steps do not lower the mean
+  power. On release the jet power is larger than the `L_jet` that was tested, so the condition is still satisfied.
+* `BH_THERMAL_FEEDBACK` alone: the flag is only a diagnostic.
+* Without `BH_JET_PRESSURE_TRIGGER`, `BH_JET_FEEDBACK` always launches.
+
+The criterion always looks at the BH kernel, also in `BH_JET_LAUNCH_POINT` mode, where the gas that is actually hit lies at the
+launch radius. Evaluating it at the injection sphere instead is not implemented.
 
 ## Launch-point geometry (`BH_JET_LAUNCH_POINT`)
 

@@ -418,13 +418,22 @@ Fixed by restoring the two assignments.
 remain commented out (lines 224–225). If `h2`/`hinv` are read later in this function the same
 class of bug likely still exists here — worth a follow-up check.
 
+### 2.5b BH jet feedback (Oct 2026)
+
+`bh_jet_feedback.c` and `bh_jet_density.c` were rewritten (before, they did not compile and were not in the Makefile build), and
+`bh_jet_common.c`, `bh_jet_points.c` and `bh_jet_points_inject.c` added; `bh_jet_trigger.c` now evaluates the launch criterion in cgs.
+The model, the three injection modes, the two geometries (BH-centred cone and the arepobh launch-point), the launch criterion and
+the tests are in `bh_jet_feedback.md`; the example is `examples/bh_jet_box_3d`. Touches outside `src/blackholes/`:
+`timestep.c` (jet timestep limiter), `criterion_derefinement.c` (no de-refinement of jet-tracer cells), `parameters.c`, `allvars.h`,
+`run.c`, and the `Makefile` (mode checks; `BH_THERMAL_FEEDBACK` with `BH_JET_FEEDBACK` is an error).
+
 ### 2.6 `bh_proto.h`
 
 New prototype `void bh_merger(void)` under `#ifdef BH_MERGER` (lines 31–34); a trailing comment
 (line 55) documents that `seed_black_holes_from_events()`'s prototype deliberately lives in
 `fof_seeding.h` instead. (A pre-existing, possibly-duplicate `bh_jet_density` prototype under two
 different guard macros, `BH_JET_FEEDBACK` and `BLACKHOLES_FEEDBACK`, was noticed in passing —
-not resolved here, flagged for whoever next touches jet feedback.)
+not resolved here. The jet port of Oct 2026 left them as they were.)
 
 ---
 
