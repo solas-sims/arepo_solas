@@ -83,7 +83,9 @@
                         # BH_THERMAL_FEEDBACK (the accreted energy would be injected twice). Needs exactly one injection mode:
 #MOMENTUM_JET           #   add momentum 2E/v_jet to the cone cells, thermal energy unchanged
 #THERMAL_JET            #   add the same momentum and add E to the total energy (remainder becomes thermal)
-#ENERGY_JET             #   add E to the total energy and kick so that all of E becomes kinetic (exact energy conservation)
+#ENERGY_JET             #   add E to the total energy and kick by sqrt(2 M K) - |p| along the jet direction, K = old kinetic energy + E (paper eq. 12;
+                        #   any shortfall from non-parallel momentum becomes thermal; total energy is conserved exactly)
+#ENERGY_JET_EXACT       #   with ENERGY_JET: choose the kick so that all of E becomes kinetic, exactly, for any angle (differs from the paper)
                         # Jet power is Epsilon_f Epsilon_r Mdot c^2 unless BH_JET_FIXED_POWER is set. Energy produced while
                         # JetLaunchFlag = 0 is carried over and released at the next launch. Params: BhJetVelocity [km/s],
                         # BhJetOpeningAngle [deg], BhJetAxisX/Y/Z, BhJetTimestepFactor (cells in an active jet cone get

@@ -33,13 +33,11 @@ BoxSize = FloatType(64.0)
 LONG_Z = 2
 Lx, Ly, Lz = BoxSize, BoxSize, BoxSize * LONG_Z
 
-""" gas: uniform, at rest, hot (a stand-in for a group/cluster atmosphere; there is no gravity to hold a profile) """
-n_H = 1.0e-2             # hydrogen number density [cm^-3]
-X_H = 0.76               # hydrogen mass fraction
+""" gas: uniform and at rest, as in the uniform-medium runs of Maragkakis et al. (2026), section 3.3:
+    rho_0 = 2.5e-26 g/cm^3, T = 1e7 K (representative of the central regions of galaxy clusters) """
+rho_cgs = 2.5e-26        # [g/cm^3]
 T = 1.0e7                # temperature [K]
 mu = 0.6                 # mean molecular weight
-
-rho_cgs = n_H * PROTONMASS / X_H
 rho = rho_cgs * UnitLength_in_cm**3 / UnitMass_in_g                                       # code density
 utherm = BOLTZMANN * T / (mu * PROTONMASS) / (GAMMA - 1.0) / UnitVelocity_in_cm_per_s**2  # code specific energy
 
@@ -110,6 +108,6 @@ IC.close()
 """ summary, and the values in param.txt that depend on the grid """
 cellmass_msun = rho * dx**3 * UnitMass_in_g / SOLAR_MASS
 print("  box                : %g x %g x %g kpc, %d x %d x %d = %d gas cells (dx = %g kpc) + 1 BH" % (Lx, Ly, Lz, Nx, Ny, Nz, NumberOfCells, dx))
-print("  gas                : n_H = %g cm^-3, T = %g K, rho = %g, u = %g (code units)" % (n_H, T, rho, utherm))
+print("  gas                : rho = %g g/cm^3, T = %g K, rho = %g, u = %g (code units)" % (rho_cgs, T, rho, utherm))
 print("  cell mass          : %g code = %g Msun  -> ReferenceGasPartMass in param.txt should be %.3g" % (rho * dx**3, cellmass_msun, rho * dx**3))
 print("  total gas energy   : %g code" % (NumberOfCells * rho * dx**3 * utherm))

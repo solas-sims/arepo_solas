@@ -92,7 +92,7 @@ CellShapingSpeed                      0.5
 CellMaxAngleFactor                    2.25 
 
 %---- Refinement (gas mass resolution; create.py prints the matching ReferenceGasPartMass for its grid)
-ReferenceGasPartMass                  2.6     % code mass = 1e6 Msun
+ReferenceGasPartMass                  2.96    % code mass = 1e6 Msun
 TargetGasMassFactor                   1
 RefinementCriterion                   1
 DerefinementCriterion                 1

@@ -31,6 +31,7 @@ cell is active, so cells that will receive jet energy are marked for the timeste
 | --- | --- |
 | `BH_JET_FEEDBACK` | Enable the jet. Cannot be combined with `BH_THERMAL_FEEDBACK` (the accreted energy would be injected twice). |
 | `MOMENTUM_JET`, `THERMAL_JET`, `ENERGY_JET` | Exactly one. See below. |
+| `ENERGY_JET_EXACT` | With `ENERGY_JET`: the exact all-kinetic kick instead of the paper's eq. 12. |
 | `BH_JET_FIXED_POWER` | Fixed power `BhJetPower` [erg/s] instead of `Epsilon_f Epsilon_r Mdot c^2`; creates the jet mass (arepobh behaviour). |
 | `BH_JET_LAUNCH_POINT` | arepobh / paper geometry instead of the BH-centred cone: bursts fly out and are deposited in gas spheres at a launch radius (see below). |
 | `BH_JET_SPIN` | Jet axis follows a spin proxy instead of the fixed axis. |
@@ -66,9 +67,12 @@ magnitude or a Bardeen-Petterson alignment.
 * `MOMENTUM_JET`: add momentum `2E/v_jet`; thermal energy unchanged. Most of `E` is not deposited when the cell is
   more massive than the entrained jet mass `2E/v_jet^2`.
 * `THERMAL_JET`: add the same momentum and add `E` to the total energy; what the momentum does not take up is heat.
-* `ENERGY_JET`: add `E` to the total energy and kick along the cone direction by the momentum that puts all of `E` into
-  kinetic energy, solving `|p + s n|^2 / 2M = |p|^2 / 2M + E` exactly for any angle between `p` and `n`. The arepobh
-  form `|p'| - |p|` is only exact when the kick is parallel to the existing momentum.
+* `ENERGY_JET`: add `E` to the total energy and kick along the jet direction by `sqrt(2 M K) - |p|`, with `K` the old kinetic
+  energy plus `E` (Maragkakis et al. 2026, eq. 12, and arepobh). If `p` and the kick direction are not parallel the cell's kinetic
+  energy ends up below `K`; the total energy has been raised by `E` regardless, so the shortfall becomes heat when the internal energy
+  is recomputed. This is exact when the cell starts at rest or the kick is parallel to its momentum. `ENERGY_JET_EXACT` instead chooses
+  the kick, `|p + s n|^2 / 2M = |p|^2 / 2M + E`, so that all of `E` is kinetic for any angle. In the example box the kinetic fraction of
+  the energy gain was 0.630 with eq. 12 and 0.632 with the exact kick.
 
 **Mass.** With `BH_JET_FIXED_POWER` the jet mass `2E/v_jet^2` is created in the cone cells, at rest and with no thermal
 energy (as in arepobh). Otherwise the jet is made of entrained gas and cell masses are unchanged.
@@ -116,7 +120,7 @@ launch radius. Evaluating it at the injection sphere instead is not implemented.
 
 ## Launch-point geometry (`BH_JET_LAUNCH_POINT`)
 
-This follows the `jets_improvements` branch of arepobh. A released burst is a pair of virtual particles, carried as one *packet*:
+This reproduces the injection model of Maragkakis et al. (2026), section 3.2, as implemented in arepobh. A released burst is a pair of virtual particles, carried as one *packet* (in `BURST_MODE` every whole burst is its own packet, with its own random direction, as in the paper's eq. 7):
 
 1. **Direction.** Random within `BhJetOpeningAngle` of the jet axis, uniform in cos(theta). The draw is a function of the
    BH ID and the burst number only, so reruns and restarts give the same jets (arepobh used an unseeded `rand()` and a
@@ -125,19 +129,21 @@ This follows the `jets_improvements` branch of arepobh. A released burst is a pa
    `BhJetLaunchRadius / BhJetVelocity`. The packet stores the BH position at launch, and the flight is ballistic: the end point is
    the launch position plus R along +-d, whatever the BH does in the meantime. Up to
    `BH_JET_MAXPACKETS` (64) packets per BH are in flight; a full buffer folds new bursts into the newest packet.
-3. **Delivery** (next BH step after arrival). Each lobe, at launch position +- R d, gets half the energy, spread over a
-   sphere whose radius holds `(BhJetDesNgb +- BhJetDesDev) * TargetGasMass` of gas (bisection, as in `bh_density`),
-   in proportion to cell mass, with the kick along +-d. A sphere that cannot reach the target mass within R is
+3. **Delivery** (next BH step after arrival). Each lobe, at launch position +- R d, gets half the energy, shared in proportion to cell
+   mass over the cells in a sphere whose radius holds `(BhJetDesNgb +- BhJetDesDev) * TargetGasMass` of gas (bisection, as in
+   `bh_density`). The kick is along +-d. A sphere that cannot reach the target mass within R is
    accepted as is (arepobh stops the run). If either lobe's sphere is empty the packet is retried on the next step.
+   The paper's fiducial runs (and arepobh `jets`) use the 10 nearest cells, a fixed number; the target-mass sphere is the paper's
+   section 4.4 scheme (and arepobh `jets_improvements`). The paper finds that AREPO changes little between the two and PLUTO changes a lot.
 4. **Timestep.** Cells at the target are marked when the packet is launched, so they already take short steps when it arrives.
 
 The ambient-pressure trigger is unchanged: it still looks at the BH kernel, with the launch area at the kernel radius.
-`JET_TRACER` cells (tracer above `BH_JET_TRACER_NODEREFINE`, 0.01) are never de-refined, as in arepobh.
+`JET_TRACER` cells (tracer above `BH_JET_TRACER_NODEREFINE`, 0.01) are never de-refined, as in arepobh `jets_improvements` (April 2026, after the paper; the paper only says that AREPO cells are kept within a factor of two of the target mass).
 
 Tested in the same box with `BURST_MODE`, `BH_JET_FIXED_POWER`, refinement on: bursts launched at t = 1e-4, 2e-4, ... were
 delivered 2e-4 later (the flight time for R = 2 kpc at 1e4 km/s); total energy gain equals the injected energy (90 = 9 bursts
 x 10 to 1e-6); fast cells lie at r = 1.5-2.5 around R = 2; net momentum ~1e-16 of sum |p|. The de-refinement rule
-and mesh splitting during a jet, are not tested. A restart with a packet in flight reproduces an uninterrupted run bitwise (4 tasks, `examples/bh_jet_box_3d`); a BH that migrates between tasks with packets in flight is not tested. With the BH given a velocity of 1e4 km/s across the box, the deposits stay at the launch position (not at the BH's current position): in that run the jet cells at the first delivery were centred 6 kpc behind the BH, at the launch x and at the launch radius in z. Whether the BH changed task during that run was not checked.
+and mesh splitting during a jet, are not tested. A restart with 12 packets in flight reproduces an uninterrupted run bitwise (4 tasks, `examples/bh_jet_box_3d`, repeated after the last changes to the packet record and the kick); a BH that migrates between tasks with packets in flight is not tested. With the BH given a velocity of 1e4 km/s across the box, the deposits stay at the launch position (not at the BH's current position): in that run the jet cells at the first delivery were centred 6 kpc behind the BH, at the launch x and at the launch radius in z. Whether the BH changed task during that run was not checked.
 
 ## Differences from arepobh
 
@@ -149,7 +155,8 @@ and mesh splitting during a jet, are not tested. A restart with a packet in flig
   after launch, and the end point, launch position + R along +-d, is computed when it is delivered (arepobh launches from the fixed
   box centre). So no IDs, domain exchange or destruction are needed and any number of BHs work, but the virtual particles are not in
   snapshots, and delivery happens on the first BH step after the arrival time, not the step the particle crosses the radius. The default cone mode has no virtual particles: it deposits straight into a BH-centred cone with a radial kick.
-* `ENERGY_JET` uses the exact momentum solve above.
+* `ENERGY_JET` follows the paper's eq. 12 as arepobh does; the exact solve is the optional `ENERGY_JET_EXACT`.
+* **Neighbour scheme.** Mass-targeted deposit sphere (paper section 4.4) rather than the 10 nearest cells (paper fiducial, arepobh `jets`). This was a choice, because the injection velocity then depends less on the local resolution.
 * Dynamical timestep limiter; no hard-coded radii.
 * Energy produced while the trigger is off is stored and released later.
 

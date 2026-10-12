@@ -236,13 +236,21 @@ static void bh_jet_apply_cell(int i, struct pv_update_data *pvd)
   if(dnorm > 0)
     {
       double n[3]  = {dp[0] / dnorm, dp[1] / dnorm, dp[2] / dnorm};
-      double pn    = p[0] * n[0] + p[1] * n[1] + p[2] * n[2];
       double p0sq  = p[0] * p[0] + p[1] * p[1] + p[2] * p[2];
+
+#ifdef ENERGY_JET_EXACT
+      double pn = p[0] * n[0] + p[1] * n[1] + p[2] * n[2];
 
       /* kick s n such that 1/2 |p + s n|^2 / M = 1/2 |p|^2 / M_old + dE, i.e. all of dE becomes kinetic and the
        * non-kinetic energy of the cell is untouched:
        * s = -p.n + sqrt((p.n)^2 - |p|^2 + 2 M (1/2 |p|^2 / M_old + dE)), the positive root, exact for any angle between p and n */
       double s = -pn + sqrt(pn * pn - p0sq + 2.0 * mass * (0.5 * p0sq / mass_old + dE));
+#else
+      /* Maragkakis et al. (2026) eq. 12, as in arepobh: add (sqrt(2 M K) - |p|) along n, with K = the target kinetic energy,
+       * i.e. the old kinetic energy plus dE. If p and n are not parallel the new kinetic energy falls short of K; the total
+       * energy has been raised by dE regardless, so the shortfall becomes thermal energy when Utherm is recomputed. */
+      double s = sqrt(2.0 * mass * (0.5 * p0sq / mass_old + dE)) - sqrt(p0sq);
+#endif
 
       for(int k = 0; k < 3; k++)
         p[k] += s * n[k];

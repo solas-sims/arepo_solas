@@ -24,18 +24,20 @@ It does **not** plug into `test.sh`; run it by hand as described below.
   `Config.sh`. `GRAVITY_NOT_PERIODIC` is set and `param.txt` has `PeriodicBoundariesOn 0`, but there is no
   `SELFGRAVITY` and `GravityConstantInternal 0`, so this only satisfies the consistency check in
   `check_parameters()`. Do not read `PeriodicBoundariesOn 0` as open boundaries for the gas.
-* **Gas:** uniform and at rest, n_H = 0.01 cm^-3, T = 10^7 K, on a 32 x 32 x 64 grid (dx = 2 kpc). There is no
-  gravity, so a uniform medium is the only equilibrium state. This is not the paper's initial condition (see below).
+* **Gas:** uniform and at rest, rho_0 = 2.5e-26 g/cm^3 and T = 10^7 K, the uniform medium of Maragkakis et al. (2026), section 3.3,
+  on a 32 x 32 x 64 grid (dx = 2 kpc; the paper uses a regular grid of 10^8 elements). There is no gravity, so a uniform medium
+  is the only equilibrium state. The paper's stratified runs need an external potential (their eq. 14) that `arepo_jets` does not have.
 * **Units:** 1 kpc, 1 km/s, 1e6 Msun (so the time unit is 0.978 Gyr), as in the arepobh `param.txt`.
 * **Jet:** 1e45 erg/s at 1e4 km/s, in bursts of `BhJetBurstMass * v_jet^2` = 2e57 erg (every ~63 kyr), within 15 degrees of
   the z axis. A burst takes `BhJetLaunchRadius / v_jet` (0.5 Myr) to reach 5 kpc and is then spread over the gas in a
-  sphere around each lobe point that holds 8 +- 2 target gas masses. `ENERGY_JET` makes all of it kinetic energy.
+  sphere around each lobe point that holds 8 +- 2 target gas masses (the neighbour-mass scheme, see below). `ENERGY_JET` follows the paper's eq. 12: the kick is
+  sqrt(2 M K) - |p| along the direction of travel, and any shortfall in kinetic energy becomes heat.
 * **BH:** 1e6 Msun. `BONDI_ACCRETION` is on only because `BH_FEEDBACK_ACTIVE` needs an accretion model; with
   `BH_JET_FIXED_POWER` the jet does not use the accretion rate.
 * **Run length:** `TimeMax 0.003` is 2.9 Myr. The BH's timestep is limited by its neighbours', which are long until the
-  first burst lands (7.5e-4 here), so the jet energy is produced in three chunks (one per BH step) and about 35 bursts
-  are released, not the 46 that 1e45 erg/s over 2.9 Myr would give. About 27 are delivered by the end and 7-8 are
-  still in flight. Cells in an active jet region take timesteps down to ~2e-5.
+  first burst lands (7.5e-4 here), so the jet energy is produced in three chunks (one per BH step) and 34 bursts
+  are released, not the 46 that 1e45 erg/s over 2.9 Myr would give. 29 are delivered by the end and 5 are
+  still in flight. Each burst is its own pair of virtual particles with its own random direction. Cells in an active jet region take timesteps down to ~2e-5.
 
 ## 1. Initial conditions
 
@@ -45,7 +47,7 @@ python3 create.py run 32
 ```
 
 The second argument is the number of cells per side in x and y (default 32; z gets twice as many). It prints the
-`ReferenceGasPartMass` that matches the grid (2.6 for 32); change it in `param.txt` if you change the resolution.
+`ReferenceGasPartMass` that matches the grid (2.96 for 32); change it in `param.txt` if you change the resolution.
 `BhJetDesNgb` is in units of that mass.
 
 ## 2. Build
@@ -79,15 +81,15 @@ python3 check.py run
 It compares the last snapshot with the IC and exits non-zero if a check fails:
 
 1. **Energy closes.** The total energy gain (from the snapshots, at full precision) equals the jet energy the
-   code reports as taken up by the gas, to 1e-3. In the reference run the difference is 3e-13.
+   code reports as taken up by the gas, to 1e-3. In the reference run the difference is 1e-13.
 2. **Momentum.** The net momentum is below 1% of the sum of |p|. The two lobes are launched symmetrically, but the
-   kick depends on each cell's own momentum, so it is not exactly zero (7e-4 in the reference run).
+   kick depends on each cell's own momentum, so it is not exactly zero (2e-3 in the reference run).
 3. **Tracer.** Cells carry jet tracer, and they lie around the launch radius and beyond.
 
 It also writes `jet_slice.png`: |v| and the jet tracer in a slab through the BH, showing the two lobes along z.
 
-Reference run (2026-10-12, 4 tasks, `-O2`): 27 bursts' worth of energy (2.7e9 code units) delivered by t = 0.003, 208 cells with
-tracer at 4-14 kpc from the BH. The jet energy in flight at the end (~0.8e9) is the power times the 0.5 Myr flight time, as expected.
+Reference run (4 tasks, `-O2`): 29 bursts' worth of energy (2.9e9 code units) delivered by t = 0.003, 265 cells with
+tracer at 2-13 kpc from the BH. The jet energy in flight at the end (5 bursts) is about the power times the 0.5 Myr flight time, as expected.
 
 The energy bookkeeping lines to look at in `log.txt`:
 
@@ -101,8 +103,9 @@ BLACKHOLES: Energy given by BHs = ..., Energy taken up by gas particles = ...
 
 ## Relation to the paper runs
 
-The arepobh `jets_improvements` branch (the version used for the paper) has these settings. The example differs in the
-last column.
+The paper is Maragkakis et al. (2026, MNRAS 547, stag368). Its fiducial jet runs correspond to the arepobh `jets` branch (July 2025). The
+`jets_improvements` branch dates from April 2026, after the paper was accepted. The settings below are from the `jets` files and agree with the paper's
+section 3.3; the example differs in the last column.
 
 | | arepobh `param.txt` / `Config.sh` | This example |
 |---|---|---|
@@ -113,15 +116,14 @@ last column.
 | Burst mass | `JetParticleMass 0.04` (4e4 Msun) | `BhJetBurstMass 1e6` Msun |
 | Launch radius | 10 kpc (hard-coded in `bh_virtual_particles.c`) | `BhJetLaunchRadius 5` |
 | Cone | 15 degrees (hard-coded) | `BhJetOpeningAngle 15` |
-| Sphere gas mass | `BhDesNgbMass 10` target masses +- 2 | `BhJetDesNgb 8` +- 2 |
-| Resolution | `ReferenceGasPartMass 0.2` (2e5 Msun) | 2.6 (2.6e6 Msun) |
+| Deposit region | the 10 nearest gas elements (`BhDesNgbMass 10`, which counts cells, +- 2) | a sphere holding `BhJetDesNgb` 8 +- 2 target gas masses (the paper's section 4.4 neighbour-mass scheme) |
+| Resolution | `ReferenceGasPartMass 0.2` (2e5 Msun, N = 10^8) | 2.96 (3e6 Msun) |
 | Flags | `ENERGY_JET`, `BURST_MODE`, `LONG_Z=2`, mass-based refinement | same, plus `BH_JET_FIXED_POWER`, `BH_JET_LAUNCH_POINT`, `JET_TRACER` |
 
 To get closer to the paper, set `BoxSize 300`, `TimeMax 0.1`, `BhJetPower 5e45`, `BhJetVelocity 4e4`, `BhJetBurstMass 4e4`,
-`BhJetLaunchRadius 10`, `BhJetDesNgb 10`, `ReferenceGasPartMass 0.2` and make a larger grid with `create.py`. That is a much
-larger run (~54 million cells at the paper's resolution if uniform; the paper used refinement) and needs a cluster. The
-paper's initial conditions are not in the arepobh repository; whether its gas was uniform or a profile is not known from the
-files, so this example does not claim to reproduce it.
+`BhJetLaunchRadius 10`, `BhJetDesNgb 10`, `ReferenceGasPartMass 0.2` and make a larger grid with `create.py` (its gas is already the paper's
+uniform medium). The paper's fiducial run has 10^8 elements, so this needs a cluster. Checks against the paper's uniform-medium results (its Figs 5-7, AREPO curves at 98 Myr): lobe length about 250 kpc, lobe aspect ratio about 4.8,
+and about 60 per cent of the injected energy in the ambient medium, mostly as heat. Lobe cells are those with T > 10^8 K, v > 5000 km/s, or tracer > 0.01.
 
 ## Variations
 
@@ -149,7 +151,7 @@ node whose share of the work exceeds `1 / (TopNodeFactor * MultipleDomains * NTa
 region are in the shortest time bins and carry far more work than the others, so at a sync-point where only a few cells are active a single
 cell can exceed that share, and it cannot be split. The override lets the run continue; the cost is one less well-balanced domain
 decomposition. In the 32-task test the note printed once, the run finished, and `check.py` gave the same results as on 4 tasks (energy
-closure 3e-13, 206 against 208 tracer cells, since the decomposition differs). This is not a coordinate problem (NaN or coincident particles), which would be
+closure 3e-13, 206 against 208 tracer cells, since the decomposition differs; measured before the later changes to the kick formula and the burst splitting). This is not a coordinate problem (NaN or coincident particles), which would be
 a different failure to look for.
 
 ## Restart test
@@ -160,14 +162,14 @@ packet is in flight and restart it:
 ```bash
 cd run
 mpirun -np 4 ./Arepo param.txt > log1.txt &     # start the run
-touch output/stop                                # once the log shows Time > 0.00165 and "1 in flight"
+touch output/stop                                # once the log shows Time > 0.00165 and some packets "in flight"
 # (wait for it to exit: it writes restart files and stops)
 mpirun -np 4 ./Arepo param.txt 1 > log2.txt      # restart
 ```
 
-In the reference test (stopped at t = 0.00171 with one packet in flight, restarted with the same 4 tasks) the restarted run's
+In the reference test (stopped at t = 0.00171 with 12 packets in flight, restarted with the same 4 tasks) the restarted run's
 launch and delivery events were identical to an uninterrupted run, and all five snapshots, including the one after the restart, were
-bitwise identical (positions, velocities, masses, internal energies and tracer). The packet in flight at the stop was delivered after the
+bitwise identical (positions, velocities, masses, internal energies and tracer). The packets in flight at the stop were delivered after the
 restart.
 
 ## Not tested here

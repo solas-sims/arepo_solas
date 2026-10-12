@@ -198,7 +198,17 @@ void bh_jet_prepare(void)
 #ifdef BH_JET_LAUNCH_POINT
       /* the released energy is now a packet in flight; bh_jet_points() delivers it */
       if(release > 0)
-        bh_jet_launch_packet(i, release);
+        {
+#ifdef BURST_MODE
+          /* one pair of virtual particles per burst (eq. 7), each with its own random direction */
+          int nb = (int)floor(release / e_burst + 0.5);
+
+          for(int b = 0; b < nb; b++)
+            bh_jet_launch_packet(i, e_burst);
+#else
+          bh_jet_launch_packet(i, release);
+#endif
+        }
       BhP[i].JetEnergyRelease = 0;
 #else
       BhP[i].JetEnergyRelease = release;
