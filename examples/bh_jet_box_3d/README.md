@@ -15,9 +15,6 @@ It does **not** plug into `test.sh`; run it by hand as described below.
 | `param.txt` | Runtime parameters |
 | `create.py` | Writes `IC.hdf5` (needs `numpy` and `h5py`) |
 | `check.py` | Post-run checks (energy accounting, momentum, tracer); optional plot |
-| `Config_stratified.sh`, `param_stratified.txt` | The stratified (beta-model) variant, see below |
-| `Config_relax.sh`, `param_relax.txt` | Relaxation of that atmosphere without the black hole |
-| `add_bh.py` | Adds the black hole to a relaxed snapshot to make the jet run's ICs |
 
 ## The set-up
 
@@ -29,7 +26,7 @@ It does **not** plug into `test.sh`; run it by hand as described below.
   `check_parameters()`. Do not read `PeriodicBoundariesOn 0` as open boundaries for the gas.
 * **Gas:** uniform and at rest, rho_0 = 2.5e-26 g/cm^3 and T = 10^7 K, the uniform medium of Maragkakis et al. (2026), section 3.3,
   on a 32 x 32 x 64 grid (dx = 2 kpc; the paper uses a regular grid of 10^8 elements). There is no gravity, so a uniform medium
-  is the only equilibrium state. The paper's stratified runs need an external potential (their eq. 14) that `arepo_jets` does not have.
+  is the only equilibrium state. The paper's stratified atmosphere is in `examples/bh_jet_stratified_3d`.
 * **Units:** 1 kpc, 1 km/s, 1e6 Msun (so the time unit is 0.978 Gyr), as in the arepobh `param.txt`.
 * **Jet:** 1e45 erg/s at 1e4 km/s, in bursts of `BhJetBurstMass * v_jet^2` = 2e57 erg (every ~63 kyr), within 15 degrees of
   the z axis. A burst takes `BhJetLaunchRadius / v_jet` (0.5 Myr) to reach 5 kpc and is then spread over the gas in a
@@ -128,51 +125,6 @@ To get closer to the paper, set `BoxSize 300`, `TimeMax 0.1`, `BhJetPower 5e45`,
 uniform medium). The paper's fiducial run has 10^8 elements, so this needs a cluster. Checks against the paper's uniform-medium results (its Figs 5-7, AREPO curves at 98 Myr): lobe length about 250 kpc, lobe aspect ratio about 4.8,
 and about 60 per cent of the injected energy in the ambient medium, mostly as heat. Lobe cells are those with T > 10^8 K, v > 5000 km/s, or tracer > 0.01.
 
-## Stratified medium (the paper's section 4.5, scaled down)
-
-`Config_stratified.sh`, `param_stratified.txt` and `python3 create.py run 32 beta` set up the paper's stratified atmosphere in the same box:
-an isothermal beta model, rho = rho_0 [1 + (r/r_c)^2]^(-3 beta / 2) with rho_0 = 1e-25 g/cm^3, beta = 0.38, r_c = 10 kpc and T = 10^7 K (eq. 13).
-It needs both parts:
-
-* **The ICs** (`create.py ... beta`): equal-mass cells drawn from the profile by inverse-transform sampling inside the sphere that encloses
-  the box, keeping the cells in the box, as the paper does for AREPO. The cell number is set by the first argument as before (65,715 cells for 32).
-  The enclosed-mass profile of the cells matches the analytic one within the sampling noise (a few per cent in the inner shells).
-* **The acceleration** (`STATICBETA`, with `EXTERNALGRAVITY`): g = -3 beta k T / (mu m_p) **r** / (r^2 + r_c^2), centred on the box centre (eq. 14).
-  Without it the gas expands. The constants are set in `Config_stratified.sh` (`BETA_MODEL_BETA`, `BETA_MODEL_RC`, `BETA_MODEL_TEMP`, `BETA_MODEL_MU`);
-  keep them equal to the values in `create.py`. Not for comoving runs.
-
-Build and run as above with `Config_stratified.sh`, `param_stratified.txt` (copy them to `Config.sh` and `param.txt`) and the `beta` IC. `check.py` then also
-includes the potential energy of the gas in the energy sum, and uses a tolerance of 1e-2 instead of 1e-3 (see below). The `ReferenceGasPartMass` printed by `create.py` is 2.57 for 32.
-
-Tests, with no jet (the `nobh` option, 4 tasks, 196 Myr): the shell densities between 0 and 30 kpc stayed within 3 to 9 per cent of their initial values and the
-mass-weighted rms velocity was about 25 km/s (the sound speed is about 480 km/s). Most of the adjustment happens in the first 50 Myr and is the sampling noise
-of the initial cells. Without the acceleration the central 5 kpc fell to 0.33 of its initial density in 49 Myr.
-With the jet (`Config_stratified.sh`, 2.9 Myr, 4 tasks): 34 bursts delivered, the energy the log reports as given and as taken up by the gas are equal (3.4e9), and the
-change in thermal plus kinetic plus potential energy of the gas differs from that by 1.2e-3. That difference is about the size of the drift in the run without the jet
-(a few 1e6 against the jet's 3.4e9), so it comes from the gravity coupling and from evaluating the potential at the mesh-generating points rather than from the
-injection, but this was not separated more finely.
-
-## Relaxation, and switching the jet off
-
-**Relaxation.** The paper relaxes the sampled atmosphere for 200 Myr with the potential on, before the jet starts, which removes the noise of the random sampling.
-
-1. `python3 create.py relax 32 beta nobh`, copy `Config_relax.sh` and `param_relax.txt` into `relax/` as `Config.sh` and `param.txt`, build and run as above. It writes
-   snapshots every 49 Myr; `snap_004.hdf5` is at t = 0.2 (196 Myr). No black hole and no jet.
-2. `python3 add_bh.py relax/output/snap_004.hdf5 run/IC.hdf5` writes the jet run's ICs: the relaxed gas as it is (including its leftover motions) plus the black hole
-   at the box centre, with the header time reset to 0. The BH mass is an optional third argument (default 1, which is 1e6 Msun). `LONG_Z` in the script must match `Config.sh`.
-3. Run the jet with `Config_stratified.sh` and `param_stratified.txt`.
-
-This chain was run once at the 32-cell resolution (196 Myr relaxation, 65,708 cells, then the jet). The relaxed gas has random motions of about 25 km/s rms, so `check.py` compares
-the *change* in net momentum with the first snapshot, not its absolute value.
-
-**Switching the jet off** (the paper's remnant runs). Add `BH_JET_STOP_TIME` to `Config.sh` and `BhJetStopTime` to `param.txt` (code time; 0.045 is 44 Myr). From that time
-on no jet energy is produced and no burst is launched, and the unreleased energy is dropped. Bursts already in flight are still delivered, since they were launched before
-the switch-off. In a test with `BhJetStopTime 0.0015` in a run to 0.003, bursts were launched at t = 0.00075 and 0.001125 (17 in all), the last was delivered at 0.0019, and nothing was produced after
-0.0015; the energy given and taken up by the gas were equal (1.7e9, 17 bursts).
-
-The paper's remnant runs (its section 4.6) use a 900 x 900 x 1200 kpc box with 1.8e7 elements of 10^6 Msun, a 44 Myr jet with `m_j = 2e4 Msun` (`BhJetBurstMass 2e4`), and a total run of 196 Myr
-(`TimeMax 0.2`). That would need `BoxSize 900` and `LONG_Z` = 4/3 (a non-integer value, which has not been tried here), and has not been run.
-
 ## Variations
 
 In `Config.sh`:
@@ -182,6 +134,7 @@ In `Config.sh`:
 * Replace `ENERGY_JET` by `THERMAL_JET` or `MOMENTUM_JET` for the other two injection modes (exactly one must be set).
 * Remove `BH_JET_FIXED_POWER` to drive the jet from `Epsilon_f * Epsilon_r * Mdot * c^2` (drop `BhJetPower` from
   `param.txt`; the Bondi rate for a 1e6 Msun BH in this gas is tiny, so give it a much heavier BH or a denser medium).
+* Add `BH_JET_STOP_TIME` (and `BhJetStopTime`, code time) to switch the jet off at a given time; see `examples/bh_jet_stratified_3d`.
 * Add `BH_JET_PRESSURE_TRIGGER` (and `BhJetPressureFactor` to `param.txt`) to launch only when the jet ram pressure
   exceeds the ambient pressure; `BH_JET_SPIN` to let the jet axis follow the accreted angular momentum.
 

@@ -1,4 +1,4 @@
-%% param_stratified.txt
+%% param.txt
 % BH jet in a stratified (beta-model) atmosphere (Maragkakis et al. 2026 section 4.5, scaled down); see README.md
 
 InitCondFile                          ./IC

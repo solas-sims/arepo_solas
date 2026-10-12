@@ -152,10 +152,10 @@ The paper's stratified runs (section 4.5) use an isothermal beta model, `rho = r
 external acceleration `g = -3 beta k T / (mu m_p) r / (r^2 + r_c^2)` (eq. 14, with `(gamma-1) u = k T / (mu m_p)`). `STATICBETA` (in `grav_external.c`, with
 `EXTERNALGRAVITY`) provides the acceleration and potential, centred on the box centre, with the constants in `Config.sh` (`BETA_MODEL_BETA`, `BETA_MODEL_RC` in code
 length units, `BETA_MODEL_TEMP` in K, `BETA_MODEL_MU`). Non-comoving only. Unlike arepobh, it applies to all particle types, black holes included.
-`examples/bh_jet_box_3d/create.py ... beta` makes the matching initial conditions (equal-mass cells sampled from the profile). In a 64 x 64 x 128 kpc box with
+`examples/bh_jet_stratified_3d/create.py` makes the matching initial conditions (equal-mass cells sampled from the profile). In a 64 x 64 x 128 kpc box with
 6.6e4 cells the gas kept its profile within 3 to 9 per cent in shells for 196 Myr, whereas without the acceleration the central density fell to a third in 49 Myr.
-The example also has the paper's 200 Myr relaxation (`Config_relax.sh`, then `add_bh.py` to insert the black hole) and, for the remnant runs, `BH_JET_STOP_TIME`: with `BhJetStopTime` set,
-no jet energy is produced and no burst is launched from that time on (unreleased energy is dropped; bursts in flight are still delivered). The remnant runs themselves were not run. See the example README.
+`examples/bh_jet_stratified_3d` also has the paper's 200 Myr relaxation (`Config_relax.sh`, then `add_bh.py` to insert the black hole) and, for the remnant runs, `BH_JET_STOP_TIME`: with `BhJetStopTime` set,
+no jet energy is produced and no burst is launched from that time on (unreleased energy is dropped; bursts in flight are still delivered). The remnant runs themselves were not run. See the README of that example.
 
 ## Differences from arepobh
 
