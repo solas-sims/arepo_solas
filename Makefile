@@ -612,6 +612,12 @@ endif
 OBJS += blackholes/bh_jet_trigger.o
 endif
 
+ifneq (,$(filter STATICBETA,$(CONFIGVARS)))
+ifeq (,$(filter EXTERNALGRAVITY,$(CONFIGVARS)))
+$(error STATICBETA requires EXTERNALGRAVITY)
+endif
+endif
+
 # --- jet injection (BH_JET_FEEDBACK); see src/blackholes/bh_jet_feedback.c
 JET_MODES = MOMENTUM_JET THERMAL_JET ENERGY_JET
 

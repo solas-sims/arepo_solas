@@ -234,6 +234,32 @@ static void gravity_external_get_force(double pos[3], int type, MyIDType ID, dou
       }
   }
 #endif /* #ifdef STATICHQ */
+
+#ifdef STATICBETA
+  {
+    /* Acceleration that holds an isothermal beta-model atmosphere, rho = rho_0 [1 + (r/r_c)^2]^(-3 beta / 2), in hydrostatic
+     * equilibrium (Maragkakis et al. 2026, eq. 14):
+     *
+     *   g = -3 beta (gamma - 1) u r / (r^2 + r_c^2),   with (gamma - 1) u = k T / (mu m_p),
+     *
+     * centred on the box centre. The potential is (3 beta / 2) (k T / mu m_p) ln(1 + r^2 / r_c^2). Not for comoving integration. */
+    double dx = pos[0] - boxHalf_X;
+    double dy = pos[1] - boxHalf_Y;
+    double dz = pos[2] - boxHalf_Z;
+
+    double r2 = dx * dx + dy * dy + dz * dz;
+
+    double a   = BOLTZMANN * BETA_MODEL_TEMP / (BETA_MODEL_MU * PROTONMASS) / (All.UnitVelocity_in_cm_per_s * All.UnitVelocity_in_cm_per_s);
+    double rc2 = BETA_MODEL_RC * BETA_MODEL_RC;
+    double fac = -3.0 * BETA_MODEL_BETA * a / (r2 + rc2);
+
+    acc[0] += fac * dx;
+    acc[1] += fac * dy;
+    acc[2] += fac * dz;
+
+    *pot += 1.5 * BETA_MODEL_BETA * a * log(1.0 + r2 / rc2);
+  }
+#endif /* #ifdef STATICBETA */
 }
 #endif /* #ifdef EXTERNALGRAVITY */
 

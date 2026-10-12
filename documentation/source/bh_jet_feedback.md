@@ -145,6 +145,16 @@ delivered 2e-4 later (the flight time for R = 2 kpc at 1e4 km/s); total energy g
 x 10 to 1e-6); fast cells lie at r = 1.5-2.5 around R = 2; net momentum ~1e-16 of sum |p|. The de-refinement rule
 and mesh splitting during a jet, are not tested. A restart with 12 packets in flight reproduces an uninterrupted run bitwise (4 tasks, `examples/bh_jet_box_3d`, repeated after the last changes to the packet record and the kick); a BH that migrates between tasks with packets in flight is not tested. With the BH given a velocity of 1e4 km/s across the box, the deposits stay at the launch position (not at the BH's current position): in that run the jet cells at the first delivery were centred 6 kpc behind the BH, at the launch x and at the launch radius in z. Whether the BH changed task during that run was not checked.
 
+## Stratified atmosphere (`STATICBETA`)
+
+The paper's stratified runs (section 4.5) use an isothermal beta model, `rho = rho_0 [1 + (r/r_c)^2]^(-3 beta/2)` (eq. 13), held in hydrostatic equilibrium by an
+external acceleration `g = -3 beta k T / (mu m_p) r / (r^2 + r_c^2)` (eq. 14, with `(gamma-1) u = k T / (mu m_p)`). `STATICBETA` (in `grav_external.c`, with
+`EXTERNALGRAVITY`) provides the acceleration and potential, centred on the box centre, with the constants in `Config.sh` (`BETA_MODEL_BETA`, `BETA_MODEL_RC` in code
+length units, `BETA_MODEL_TEMP` in K, `BETA_MODEL_MU`). Non-comoving only. Unlike arepobh, it applies to all particle types, black holes included.
+`examples/bh_jet_box_3d/create.py ... beta` makes the matching initial conditions (equal-mass cells sampled from the profile). In a 64 x 64 x 128 kpc box with
+6.6e4 cells the gas kept its profile within 3 to 9 per cent in shells for 196 Myr, whereas without the acceleration the central density fell to a third in 49 Myr.
+The 200 Myr relaxation of the paper and the remnant runs (jet switched off after 44 Myr) are not set up. See the example README.
+
 ## Differences from arepobh
 
 * **Virtual particles are carried as records, not as particles.** In `BH_JET_LAUNCH_POINT` each burst is a pair of virtual particles

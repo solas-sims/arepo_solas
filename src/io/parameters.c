@@ -1036,6 +1036,11 @@ void read_parameter_file(char *fname)
  */
 void check_parameters()
 {
+#ifdef STATICBETA
+  if(All.ComovingIntegrationOn)
+    mpi_terminate("STATICBETA is for non-comoving runs only.\n");
+#endif
+
 #ifdef BH_JET_FEEDBACK
   {
     double n2 = All.BhJetAxis[0] * All.BhJetAxis[0] + All.BhJetAxis[1] * All.BhJetAxis[1] + All.BhJetAxis[2] * All.BhJetAxis[2];

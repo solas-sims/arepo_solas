@@ -4,7 +4,8 @@ Sanity checks for the BH jet box. Not a reference-solution comparison; it tests 
 usage: python3 check.py <simulation_directory> [True|False for plots]
 
 Checks, using the snapshots (full precision) and log.txt (write the run's stdout there: mpirun ... > log.txt):
-  1. total energy gain between snapshots equals the jet energy taken up by the gas, to 1e-3 relative
+  1. total energy gain between snapshots equals the jet energy taken up by the gas, to 1e-3 relative (1e-2 with the beta-model
+     potential, where the energy includes the potential energy of the gas, read from the constants in Config.sh)
   2. net momentum is below 1% of the sum of |p| (the lobes are launched symmetrically, but the kick depends on each
      cell's own momentum, so it is not exactly zero)
   3. the jet tracer is set, and only around the launch radius / jet axis
@@ -57,8 +58,31 @@ def read(isnap):
     return d
 
 
+""" beta-model external potential (STATICBETA): Phi = 1.5 beta (k T / mu m_p) ln(1 + r^2/r_c^2), centred on the box centre """
+beta_model = None
+try:
+    cfg = open(simulation_directory + "/Config.sh").read()
+    if any(l.split("#")[0].strip() == "STATICBETA" for l in cfg.splitlines()):
+        def macro(name):
+            for l in cfg.splitlines():
+                l = l.split("#")[0].strip()
+                if l.startswith(name + "="):
+                    return float(l.split("=")[1])
+        UL, UV = 3.086e21, 1.0e5   # unit length [cm] and velocity [cm/s] of param.txt
+        a = 1.38065e-16 * macro("BETA_MODEL_TEMP") / (macro("BETA_MODEL_MU") * 1.67262178e-24) / UV**2
+        beta_model = (macro("BETA_MODEL_BETA"), macro("BETA_MODEL_RC"), a)
+except OSError:
+    pass
+
+
 def etot(d):
-    return np.sum(d["mass"] * (d["u"] + 0.5 * np.sum(d["vel"] ** 2, axis=1)))
+    e = np.sum(d["mass"] * (d["u"] + 0.5 * np.sum(d["vel"] ** 2, axis=1)))
+    if beta_model is not None:
+        b, rc, a = beta_model
+        c = np.array([0.5 * d["box"], 0.5 * d["box"], d["box"]])  # LONG_Z = 2
+        r2 = np.sum((d["pos"] - c) ** 2, axis=1)
+        e += np.sum(d["mass"] * 1.5 * b * a * np.log(1.0 + r2 / rc**2))
+    return e
 
 
 first = read(0)
@@ -78,8 +102,11 @@ ok = True
 dE = etot(last) - etot(first)
 tk = energy_taken_by(last["time"])
 rel = abs(dE - tk) / max(abs(tk), 1e-300)
-print("t = %g: total energy gain %.8g, jet energy taken up %.8g (relative difference %.2e)" % (last["time"], dE, tk, rel))
-if tk <= 0 or rel > 1e-3:
+# With the external potential the sum also carries the energy errors of the gravity coupling and of evaluating the potential at the
+# mesh-generating points (a run without the jet drifts by a similar amount), so the tolerance is looser there.
+tol = 1e-2 if beta_model is not None else 1e-3
+print("t = %g: total energy gain %.8g, jet energy taken up %.8g (relative difference %.2e, tolerance %.0e)" % (last["time"], dE, tk, rel, tol))
+if tk <= 0 or rel > tol:
     print("FAILED: energy does not close")
     ok = False
 

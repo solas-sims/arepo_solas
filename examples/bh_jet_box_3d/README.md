@@ -125,6 +125,34 @@ To get closer to the paper, set `BoxSize 300`, `TimeMax 0.1`, `BhJetPower 5e45`,
 uniform medium). The paper's fiducial run has 10^8 elements, so this needs a cluster. Checks against the paper's uniform-medium results (its Figs 5-7, AREPO curves at 98 Myr): lobe length about 250 kpc, lobe aspect ratio about 4.8,
 and about 60 per cent of the injected energy in the ambient medium, mostly as heat. Lobe cells are those with T > 10^8 K, v > 5000 km/s, or tracer > 0.01.
 
+## Stratified medium (the paper's section 4.5, scaled down)
+
+`Config_stratified.sh`, `param_stratified.txt` and `python3 create.py run 32 beta` set up the paper's stratified atmosphere in the same box:
+an isothermal beta model, rho = rho_0 [1 + (r/r_c)^2]^(-3 beta / 2) with rho_0 = 1e-25 g/cm^3, beta = 0.38, r_c = 10 kpc and T = 10^7 K (eq. 13).
+It needs both parts:
+
+* **The ICs** (`create.py ... beta`): equal-mass cells drawn from the profile by inverse-transform sampling inside the sphere that encloses
+  the box, keeping the cells in the box, as the paper does for AREPO. The cell number is set by the first argument as before (65,715 cells for 32).
+  The enclosed-mass profile of the cells matches the analytic one within the sampling noise (a few per cent in the inner shells).
+* **The acceleration** (`STATICBETA`, with `EXTERNALGRAVITY`): g = -3 beta k T / (mu m_p) **r** / (r^2 + r_c^2), centred on the box centre (eq. 14).
+  Without it the gas expands. The constants are set in `Config_stratified.sh` (`BETA_MODEL_BETA`, `BETA_MODEL_RC`, `BETA_MODEL_TEMP`, `BETA_MODEL_MU`);
+  keep them equal to the values in `create.py`. Not for comoving runs.
+
+Build and run as above with `Config_stratified.sh`, `param_stratified.txt` (copy them to `Config.sh` and `param.txt`) and the `beta` IC. `check.py` then also
+includes the potential energy of the gas in the energy sum, and uses a tolerance of 1e-2 instead of 1e-3 (see below). The `ReferenceGasPartMass` printed by `create.py` is 2.57 for 32.
+
+Tests, with no jet (the `nobh` option, 4 tasks, 196 Myr): the shell densities between 0 and 30 kpc stayed within 3 to 9 per cent of their initial values and the
+mass-weighted rms velocity was about 25 km/s (the sound speed is about 480 km/s). Most of the adjustment happens in the first 50 Myr and is the sampling noise
+of the initial cells. Without the acceleration the central 5 kpc fell to 0.33 of its initial density in 49 Myr.
+With the jet (`Config_stratified.sh`, 2.9 Myr, 4 tasks): 34 bursts delivered, the energy the log reports as given and as taken up by the gas are equal (3.4e9), and the
+change in thermal plus kinetic plus potential energy of the gas differs from that by 1.2e-3. That difference is about the size of the drift in the run without the jet
+(a few 1e6 against the jet's 3.4e9), so it comes from the gravity coupling and from evaluating the potential at the mesh-generating points rather than from the
+injection, but this was not separated more finely.
+
+Not set up: the paper relaxes the sampled atmosphere for 200 Myr with the potential on before launching the jet, which removes the sampling noise. The ICs here are
+not relaxed. To relax, run the `nobh` IC with a Config that has the potential and no black hole, and add the black hole to the final snapshot; that last step is not scripted.
+The remnant runs (the paper's section 4.6: a 900 x 900 x 1200 kpc box, a 44 Myr jet, then 152 Myr with the jet off) also need a time at which the jet switches off, which the code does not have.
+
 ## Variations
 
 In `Config.sh`:

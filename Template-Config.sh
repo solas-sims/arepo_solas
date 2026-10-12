@@ -255,6 +255,13 @@
 #HQ_C=10.0                     # concentration parameter of Hernquist potential
 #HQ_DARKFRACTION=0.9           # fraction in dark matter in Hernquist potential
 
+#---------------------------------------- Static beta-model atmosphere potential
+#STATICBETA                    # acceleration that holds an isothermal beta-model gas atmosphere in hydrostatic equilibrium (Maragkakis et al. 2026, eq. 14), centred on the box centre; needs EXTERNALGRAVITY; not for comoving runs
+#BETA_MODEL_BETA=0.38          # beta of the density profile rho = rho_0 [1 + (r/r_c)^2]^(-3 beta/2)
+#BETA_MODEL_RC=10.0            # core radius r_c [code length units]
+#BETA_MODEL_TEMP=1.0e7         # gas temperature [K]
+#BETA_MODEL_MU=0.6             # mean molecular weight
+
 #---------------------------------------- Time integration options
 #FORCE_EQUAL_TIMESTEPS         # variable but global timestep
 #TREE_BASED_TIMESTEPS          # non-local timestep criterion (take 'signal speed' into account)
