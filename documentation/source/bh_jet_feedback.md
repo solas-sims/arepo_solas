@@ -139,7 +139,12 @@ and mesh splitting during a jet, are not tested. A restart with a packet in flig
 
 ## Differences from arepobh
 
-* Jets are launched by BHs, not from virtual particles at the box centre. The default cone mode kicks radially in a BH-centred cone; `BH_JET_LAUNCH_POINT` reproduces the arepobh deposition geometry.
+* **No virtual particles.** arepobh spawns two type-5 particles per burst at the box centre, drifts them at `JetVelocity` and
+  deposits the energy when they pass 10 kpc. Here nothing is spawned: the default cone mode deposits straight into a BH-centred cone
+  (radial kick), and `BH_JET_LAUNCH_POINT` reproduces the deposition geometry with a *packet* (energy, direction, arrival time) stored in the launching BH's
+  own `BhP[]` entry. The flight is a timer of `BhJetLaunchRadius / BhJetVelocity`, not a simulated trajectory, and the injection spheres are placed relative to
+  the BH at delivery (arepobh: relative to the fixed box centre). Consequences: any number of BHs work with no particle bookkeeping (IDs, domain exchange, destruction),
+  and the packets are not in snapshots; delivery happens on the first BH step after the arrival time, not the step the particle crosses the radius.
 * `ENERGY_JET` uses the exact momentum solve above.
 * Dynamical timestep limiter; no hard-coded radii.
 * Energy produced while the trigger is off is stored and released later.
