@@ -121,9 +121,11 @@ This follows the `jets_improvements` branch of arepobh. A released burst is a pa
 1. **Direction.** Random within `BhJetOpeningAngle` of the jet axis, uniform in cos(theta). The draw is a function of the
    BH ID and the burst number only, so reruns and restarts give the same jets (arepobh used an unseeded `rand()` and a
    fixed 15 degrees; set `BhJetOpeningAngle 15` to match).
-2. **Flight.** The packet takes `BhJetLaunchRadius / BhJetVelocity` to reach the launch radius. Up to
+2. **Flight.** Each virtual particle flies in a straight line at `BhJetVelocity`, so it reaches the launch radius after
+   `BhJetLaunchRadius / BhJetVelocity`. The packet stores the BH position at launch, and the flight is ballistic: the end point is
+   the launch position plus R along +-d, whatever the BH does in the meantime. Up to
    `BH_JET_MAXPACKETS` (64) packets per BH are in flight; a full buffer folds new bursts into the newest packet.
-3. **Delivery** (next BH step after arrival). Each lobe, at BH position +- R d, gets half the energy, spread over a
+3. **Delivery** (next BH step after arrival). Each lobe, at launch position +- R d, gets half the energy, spread over a
    sphere whose radius holds `(BhJetDesNgb +- BhJetDesDev) * TargetGasMass` of gas (bisection, as in `bh_density`),
    in proportion to cell mass, with the kick along +-d. A sphere that cannot reach the target mass within R is
    accepted as is (arepobh stops the run). If either lobe's sphere is empty the packet is retried on the next step.
@@ -135,18 +137,18 @@ The ambient-pressure trigger is unchanged: it still looks at the BH kernel, with
 Tested in the same box with `BURST_MODE`, `BH_JET_FIXED_POWER`, refinement on: bursts launched at t = 1e-4, 2e-4, ... were
 delivered 2e-4 later (the flight time for R = 2 kpc at 1e4 km/s); total energy gain equals the injected energy (90 = 9 bursts
 x 10 to 1e-6); fast cells lie at r = 1.5-2.5 around R = 2; net momentum ~1e-16 of sum |p|. The de-refinement rule
-and mesh splitting during a jet, are not tested. A restart with a packet in flight reproduces an uninterrupted run bitwise (4 tasks, `examples/bh_jet_box_3d`); a BH that migrates between tasks with packets in flight is not tested.
+and mesh splitting during a jet, are not tested. A restart with a packet in flight reproduces an uninterrupted run bitwise (4 tasks, `examples/bh_jet_box_3d`); a BH that migrates between tasks with packets in flight is not tested. With the BH given a velocity of 1e4 km/s across the box, the deposits stay at the launch position (not at the BH's current position): in that run the jet cells at the first delivery were centred 6 kpc behind the BH, at the launch x and at the launch radius in z. Whether the BH changed task during that run was not checked.
 
 ## Differences from arepobh
 
 * **Virtual particles are carried as records, not as particles.** In `BH_JET_LAUNCH_POINT` each burst is a pair of virtual particles
   (the +- lobes) that fly out and deposit their energy at the launch radius, as in the paper. arepobh implements them as
   type-5 particles spawned at the box centre, drifted at `JetVelocity` and destroyed when they pass 10 kpc. Here a burst is
-  one *packet* (energy, direction, arrival time) in the launching BH's own `BhP[]` entry. The flight is a timer of
-  `BhJetLaunchRadius / BhJetVelocity` rather than a simulated trajectory, and the deposition points are placed relative to the BH at
-  delivery (arepobh: relative to the fixed box centre). So no IDs, domain exchange or destruction are needed and any number of BHs
-  work, but the virtual particles are not in snapshots, and delivery happens on the first BH step after the arrival time, not
-  the step the particle crosses the radius. The default cone mode has no virtual particles: it deposits straight into a BH-centred cone with a radial kick.
+  one *packet* (energy, direction, launch position, arrival time) in the launching BH's own `BhP[]` entry. The flight is straight
+  and ballistic but is not followed step by step: the packet carries an arrival time of `BhJetLaunchRadius / BhJetVelocity`
+  after launch, and the end point, launch position + R along +-d, is computed when it is delivered (arepobh launches from the fixed
+  box centre). So no IDs, domain exchange or destruction are needed and any number of BHs work, but the virtual particles are not in
+  snapshots, and delivery happens on the first BH step after the arrival time, not the step the particle crosses the radius. The default cone mode has no virtual particles: it deposits straight into a BH-centred cone with a radial kick.
 * `ENERGY_JET` uses the exact momentum solve above.
 * Dynamical timestep limiter; no hard-coded radii.
 * Energy produced while the trigger is off is stored and released later.

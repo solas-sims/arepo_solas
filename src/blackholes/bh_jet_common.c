@@ -112,6 +112,8 @@ static void bh_jet_launch_packet(int i, double e)
   BhP[i].JetPacket[n].Energy = e;
   for(int k = 0; k < 3; k++)
     BhP[i].JetPacket[n].Dir[k] = dir[k];
+  for(int k = 0; k < 3; k++)
+    BhP[i].JetPacket[n].Pos[k] = PPB(i).Pos[k];
   BhP[i].JetPacket[n].TiArrive = ti_arrive;
   BhP[i].JetPacket[n].New      = 1;
   BhP[i].JetNPackets           = n + 1;

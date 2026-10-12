@@ -76,6 +76,7 @@ typedef struct Bh_Particle_Data
   {
     MyDouble Energy;              /*!< burst energy (both lobes), code units */
     MyDouble Dir[3];              /*!< unit vector of the +lobe; the -lobe goes the other way */
+    MyDouble Pos[3];              /*!< position of the BH when the burst was launched; the virtual particles fly ballistically from here */
     integertime TiArrive;         /*!< integer time at which the packet reaches the launch radius */
     int New;                      /*!< 1 if launched on this step: cells at the target are marked for the timestep limiter */
   } JetPacket[BH_JET_MAXPACKETS];

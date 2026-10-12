@@ -2,8 +2,8 @@
  *  \brief Launch-point jet geometry (BH_JET_LAUNCH_POINT): the arepobh model of Maragkakis et al. (2026).
  *
  *  A burst released by a BH (see bh_jet_prepare()) is a packet that flies out along +-d, d a random direction within
- *  BhJetOpeningAngle of the jet axis, and is deposited when it reaches BhJetLaunchRadius. The two lobes sit at
- *  BH.Pos +- R d and receive half of the energy each, spread over the gas inside a sphere around the lobe whose
+ *  BhJetOpeningAngle of the jet axis, and is deposited when it reaches BhJetLaunchRadius. The flight is ballistic: the two
+ *  lobes sit at (BH position at launch) +- R d, whatever the BH has done since, and receive half of the energy each, spread over the gas inside a sphere around the lobe whose
  *  radius is chosen so it holds (BhJetDesNgb +- BhJetDesDev) * TargetGasMass of gas (as jets_improvements does with
  *  the virtual particle's smoothing length); shares are proportional to cell mass and the kick points along the lobe.
  *
@@ -223,7 +223,7 @@ void bh_jet_points(void)
               for(int d = 0; d < 3; d++)
                 {
                   pt->Dir[d] = sign * BhP[i].JetPacket[k].Dir[d];
-                  pt->Pos[d] = PPB(i).Pos[d] + r_com * pt->Dir[d];
+                  pt->Pos[d] = BhP[i].JetPacket[k].Pos[d] + r_com * pt->Dir[d]; /* ballistic: from the launch position */
                 }
               pt->Pos[0] = WRAP_X(pt->Pos[0]);
               pt->Pos[1] = WRAP_Y(pt->Pos[1]);
