@@ -34,6 +34,7 @@ cell is active, so cells that will receive jet energy are marked for the timeste
 | `ENERGY_JET_EXACT` | With `ENERGY_JET`: the exact all-kinetic kick instead of the paper's eq. 12. |
 | `BH_JET_FIXED_POWER` | Fixed power `BhJetPower` [erg/s] instead of `Epsilon_f Epsilon_r Mdot c^2`; creates the jet mass (arepobh behaviour). |
 | `BH_JET_LAUNCH_POINT` | arepobh / paper geometry instead of the BH-centred cone: bursts fly out and are deposited in gas spheres at a launch radius (see below). |
+| `BH_JET_STOP_TIME` | Requires `BH_JET_FEEDBACK`; from `BhJetStopTime` on the jet produces and launches nothing. |
 | `BH_JET_SPIN` | Jet axis follows a spin proxy instead of the fixed axis. |
 | `BH_JET_PRESSURE_TRIGGER` | Launch only if the jet ram pressure exceeds `BhJetPressureFactor` times the ambient pressure. Without it the jet always launches. |
 | `BURST_MODE` | Release the stored energy only in multiples of `BhJetBurstMass * v_jet^2`. |
@@ -153,7 +154,8 @@ external acceleration `g = -3 beta k T / (mu m_p) r / (r^2 + r_c^2)` (eq. 14, wi
 length units, `BETA_MODEL_TEMP` in K, `BETA_MODEL_MU`). Non-comoving only. Unlike arepobh, it applies to all particle types, black holes included.
 `examples/bh_jet_box_3d/create.py ... beta` makes the matching initial conditions (equal-mass cells sampled from the profile). In a 64 x 64 x 128 kpc box with
 6.6e4 cells the gas kept its profile within 3 to 9 per cent in shells for 196 Myr, whereas without the acceleration the central density fell to a third in 49 Myr.
-The 200 Myr relaxation of the paper and the remnant runs (jet switched off after 44 Myr) are not set up. See the example README.
+The example also has the paper's 200 Myr relaxation (`Config_relax.sh`, then `add_bh.py` to insert the black hole) and, for the remnant runs, `BH_JET_STOP_TIME`: with `BhJetStopTime` set,
+no jet energy is produced and no burst is launched from that time on (unreleased energy is dropped; bursts in flight are still delivered). The remnant runs themselves were not run. See the example README.
 
 ## Differences from arepobh
 

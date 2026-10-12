@@ -131,6 +131,14 @@ void bh_jet_prepare(void)
     terminate("BURST_MODE needs BhJetBurstMass > 0 and BhJetVelocity > 0");
 #endif
 
+#ifdef BH_JET_STOP_TIME
+  /* after the stop time the jet is off: no energy is produced, nothing is launched and the unreleased reservoir is dropped.
+   * Bursts already in flight (BH_JET_LAUNCH_POINT) are still delivered. */
+  const int jet_on = All.Time < All.BhJetStopTime;
+#else
+  const int jet_on = 1;
+#endif
+
   double sums[3] = {0, 0, 0}, glob[3]; /* produced, released, reservoir (code energy) */
   long long cnt[2] = {0, 0}, cnt_glob[2]; /* active BHs, BHs releasing */
 
@@ -168,7 +176,10 @@ void bh_jet_prepare(void)
 #endif
 
       /* --- energy: produce, then decide what to release --- */
-      double e_new = bh_jet_step_energy_cgs(i) / All.cf_UnitEnergy_in_cgs;
+      double e_new = jet_on ? bh_jet_step_energy_cgs(i) / All.cf_UnitEnergy_in_cgs : 0.0;
+
+      if(!jet_on)
+        BhP[i].JetEnergyReservoir = 0;
 
       BhP[i].JetEnergyReservoir += e_new;
       BhP[i].JetEnergyRelease = 0;
@@ -181,7 +192,7 @@ void bh_jet_prepare(void)
 
       double release = 0;
 
-      if(launch && BhP[i].JetEnergyReservoir > 0)
+      if(jet_on && launch && BhP[i].JetEnergyReservoir > 0)
         {
 #ifdef BURST_MODE
           double nb = floor(BhP[i].JetEnergyReservoir / e_burst);

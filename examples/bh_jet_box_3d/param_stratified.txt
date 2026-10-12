@@ -114,6 +114,7 @@ BhJetAxisZ                            1
 BhJetTimestepFactor                   0.3     % cells in an active jet region: dt <= factor * R / (v_jet + c_s)
 BhJetPower                            1e45    % erg/s     (BH_JET_FIXED_POWER)
 BhJetBurstMass                        1e6     % Msun; burst energy = BhJetBurstMass * v_jet^2 = 2e57 erg  (BURST_MODE)
+%BhJetStopTime                         0.045   % BH_JET_STOP_TIME: 44 Myr, as in the paper's remnant runs
 BhJetLaunchRadius                     5.0     % kpc        (BH_JET_LAUNCH_POINT)
 BhJetDesNgb                           8       % injection sphere holds (8 +- 2) * TargetGasMass
 BhJetDesDev                           2

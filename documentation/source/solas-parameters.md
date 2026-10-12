@@ -126,6 +126,7 @@ downstream. Additionally:
 | `BhJetTimestepFactor` | `BH_JET_FEEDBACK` | REAL | ✅ dimensionless | Cells in an active jet region get `dt ≤ factor R / (v_jet + c_s)`. 0.3 is a reasonable start. |
 | `BhJetPower` | `BH_JET_FIXED_POWER` | REAL | ✅ erg/s | Fixed jet power; replaces the accretion-driven power. |
 | `BhJetBurstMass` | `BURST_MODE` | REAL | ✅ Msun | A burst releases `BhJetBurstMass × v_jet²` of energy (arepobh's `JetParticleMass`, which is in units of 1e6 Msun there). |
+| `BhJetStopTime` | `BH_JET_STOP_TIME` | REAL | ✅ code time (`All.Time`; scale factor if comoving) | From this time on no jet energy is produced or launched. Bursts in flight are delivered. |
 | `BhJetLaunchRadius` | `BH_JET_LAUNCH_POINT` | REAL | ✅ kpc, physical | Distance from the BH to the injection points along ±axis (10 in the arepobh runs). |
 | `BhJetDesNgb`, `BhJetDesDev` | `BH_JET_LAUNCH_POINT` | REAL | ✅ in units of `TargetGasMass` (cell counts without `REFINEMENT`) | Each injection sphere holds `(DesNgb ± DesDev) × TargetGasMass` of gas. |
 

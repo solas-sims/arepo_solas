@@ -6,7 +6,7 @@ usage: python3 check.py <simulation_directory> [True|False for plots]
 Checks, using the snapshots (full precision) and log.txt (write the run's stdout there: mpirun ... > log.txt):
   1. total energy gain between snapshots equals the jet energy taken up by the gas, to 1e-3 relative (1e-2 with the beta-model
      potential, where the energy includes the potential energy of the gas, read from the constants in Config.sh)
-  2. net momentum is below 1% of the sum of |p| (the lobes are launched symmetrically, but the kick depends on each
+  2. the change in net momentum is below 1% of the sum of |p| (the lobes are launched symmetrically, but the kick depends on each
      cell's own momentum, so it is not exactly zero)
   3. the jet tracer is set, and only around the launch radius / jet axis
 """
@@ -110,11 +110,12 @@ if tk <= 0 or rel > tol:
     print("FAILED: energy does not close")
     ok = False
 
-p = np.sum(last["mass"][:, None] * last["vel"], axis=0)
+# change in net momentum since the IC (a relaxed IC has some net momentum already)
+p = np.sum(last["mass"][:, None] * last["vel"], axis=0) - np.sum(first["mass"][:, None] * first["vel"], axis=0)
 pabs = np.sum(last["mass"] * np.sqrt(np.sum(last["vel"] ** 2, axis=1)))
-print("net momentum %s, sum |p| = %.4g" % (p, pabs))
+print("change in net momentum %s, sum |p| = %.4g" % (p, pabs))
 if pabs > 0 and np.max(np.abs(p)) / pabs > 1e-2:
-    print("FAILED: net momentum is not small")
+    print("FAILED: the net momentum changed by more than 1 per cent of sum |p|")
     ok = False
 
 if "tracer" in last:

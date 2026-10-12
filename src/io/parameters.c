@@ -758,6 +758,12 @@ void read_parameter_file(char *fname)
       id[nt++] = REAL;
 #endif
 
+#ifdef BH_JET_STOP_TIME
+      strcpy(tag[nt], "BhJetStopTime");
+      addr[nt] = &All.BhJetStopTime;
+      id[nt++] = REAL;
+#endif
+
 #ifdef BH_JET_LAUNCH_POINT
       strcpy(tag[nt], "BhJetLaunchRadius");
       addr[nt] = &All.BhJetLaunchRadius;

@@ -26,6 +26,7 @@ BH_JET_FIXED_POWER             # fixed power BhJetPower [erg/s] instead of Epsil
 BH_JET_LAUNCH_POINT            # arepobh geometry: bursts are deposited in gas spheres at BhJetLaunchRadius along +-axis
 BURST_MODE                     # release the energy in bursts of BhJetBurstMass * v_jet^2
 JET_TRACER                     # passive tracer = 1 in cells that receive jet material; such cells are not de-refined
+#BH_JET_STOP_TIME             # optional: switch the jet off at BhJetStopTime (the paper's remnant runs)
 #BH_JET_PRESSURE_TRIGGER       # optional: only launch if the jet ram pressure exceeds BhJetPressureFactor * ambient pressure
 #BH_JET_SPIN                   # optional: jet axis follows the accreted angular momentum instead of BhJetAxisX/Y/Z
 

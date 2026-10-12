@@ -96,6 +96,8 @@
                         # BhJetOpeningAngle of the axis, reproducible) for the flight time R/v_jet and is then deposited in the gas
                         # sphere around BH +- R d, whose radius holds (BhJetDesNgb +- BhJetDesDev) * TargetGasMass; kick along +-d.
                         # Params: BhJetLaunchRadius [kpc], BhJetDesNgb, BhJetDesDev. Replaces the BH-centred cone injection.
+#BH_JET_STOP_TIME       # Requires BH_JET_FEEDBACK; param BhJetStopTime [All.Time]: from that time on no jet energy is produced and nothing is launched
+                        # (unreleased energy is dropped; bursts already in flight are still delivered). For the paper's remnant runs.
 #BH_JET_SPIN            # Requires BH_JET_FEEDBACK; jet axis follows a spin proxy J = M_BH * BhJetAxis + sum(accreted mass *
                         # unit gas angular momentum direction in the BH kernel). Without it the axis is fixed at BhJetAxisX/Y/Z.
 #BH_JET_PRESSURE_TRIGGER # Requires BH_THERMAL_FEEDBACK or BH_JET_FEEDBACK; sets BhP[].JetLaunchFlag = 1 only when the jet

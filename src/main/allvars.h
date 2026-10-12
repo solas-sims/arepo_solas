@@ -1580,6 +1580,9 @@ double InitMetallicityinSolar;
 #ifdef BURST_MODE
   double BhJetBurstMass;       /* a burst releases energy BhJetBurstMass * v_jet^2; mass in Msun */
 #endif
+#ifdef BH_JET_STOP_TIME
+  double BhJetStopTime;        /* no jet energy is produced or launched from this time on (All.Time; the scale factor if comoving) */
+#endif
 #ifdef BH_JET_LAUNCH_POINT
   double BhJetLaunchRadius;    /* distance from the BH to the injection points along +-axis [kpc, physical] */
   double BhJetDesNgb;          /* injection sphere holds (BhJetDesNgb +- BhJetDesDev) * TargetGasMass of gas */

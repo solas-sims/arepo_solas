@@ -15,6 +15,9 @@ It does **not** plug into `test.sh`; run it by hand as described below.
 | `param.txt` | Runtime parameters |
 | `create.py` | Writes `IC.hdf5` (needs `numpy` and `h5py`) |
 | `check.py` | Post-run checks (energy accounting, momentum, tracer); optional plot |
+| `Config_stratified.sh`, `param_stratified.txt` | The stratified (beta-model) variant, see below |
+| `Config_relax.sh`, `param_relax.txt` | Relaxation of that atmosphere without the black hole |
+| `add_bh.py` | Adds the black hole to a relaxed snapshot to make the jet run's ICs |
 
 ## The set-up
 
@@ -149,9 +152,26 @@ change in thermal plus kinetic plus potential energy of the gas differs from tha
 (a few 1e6 against the jet's 3.4e9), so it comes from the gravity coupling and from evaluating the potential at the mesh-generating points rather than from the
 injection, but this was not separated more finely.
 
-Not set up: the paper relaxes the sampled atmosphere for 200 Myr with the potential on before launching the jet, which removes the sampling noise. The ICs here are
-not relaxed. To relax, run the `nobh` IC with a Config that has the potential and no black hole, and add the black hole to the final snapshot; that last step is not scripted.
-The remnant runs (the paper's section 4.6: a 900 x 900 x 1200 kpc box, a 44 Myr jet, then 152 Myr with the jet off) also need a time at which the jet switches off, which the code does not have.
+## Relaxation, and switching the jet off
+
+**Relaxation.** The paper relaxes the sampled atmosphere for 200 Myr with the potential on, before the jet starts, which removes the noise of the random sampling.
+
+1. `python3 create.py relax 32 beta nobh`, copy `Config_relax.sh` and `param_relax.txt` into `relax/` as `Config.sh` and `param.txt`, build and run as above. It writes
+   snapshots every 49 Myr; `snap_004.hdf5` is at t = 0.2 (196 Myr). No black hole and no jet.
+2. `python3 add_bh.py relax/output/snap_004.hdf5 run/IC.hdf5` writes the jet run's ICs: the relaxed gas as it is (including its leftover motions) plus the black hole
+   at the box centre, with the header time reset to 0. The BH mass is an optional third argument (default 1, which is 1e6 Msun). `LONG_Z` in the script must match `Config.sh`.
+3. Run the jet with `Config_stratified.sh` and `param_stratified.txt`.
+
+This chain was run once at the 32-cell resolution (196 Myr relaxation, 65,708 cells, then the jet). The relaxed gas has random motions of about 25 km/s rms, so `check.py` compares
+the *change* in net momentum with the first snapshot, not its absolute value.
+
+**Switching the jet off** (the paper's remnant runs). Add `BH_JET_STOP_TIME` to `Config.sh` and `BhJetStopTime` to `param.txt` (code time; 0.045 is 44 Myr). From that time
+on no jet energy is produced and no burst is launched, and the unreleased energy is dropped. Bursts already in flight are still delivered, since they were launched before
+the switch-off. In a test with `BhJetStopTime 0.0015` in a run to 0.003, bursts were launched at t = 0.00075 and 0.001125 (17 in all), the last was delivered at 0.0019, and nothing was produced after
+0.0015; the energy given and taken up by the gas were equal (1.7e9, 17 bursts).
+
+The paper's remnant runs (its section 4.6) use a 900 x 900 x 1200 kpc box with 1.8e7 elements of 10^6 Msun, a 44 Myr jet with `m_j = 2e4 Msun` (`BhJetBurstMass 2e4`), and a total run of 196 Myr
+(`TimeMax 0.2`). That would need `BoxSize 900` and `LONG_Z` = 4/3 (a non-integer value, which has not been tried here), and has not been run.
 
 ## Variations
 
