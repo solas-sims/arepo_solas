@@ -42,6 +42,7 @@
  *                void InitCool(void)
  *                void cooling_only(void)
  *                void cool_cell(int i)
+ *                void cool_active_cells(void)
  *
  *
  * \par Major modifications and contributions:
@@ -883,22 +884,37 @@ void InitCool(void)
  */
 void cooling_only(void) /* normal cooling routine when star formation is disabled */
 {
-  int idx, i;
-
   CPU_Step[CPU_MISC] += measure_time();
 
-  for(idx = 0; idx < TimeBinsHydro.NActiveParticles; idx++)
+  cool_active_cells();
+
+  CPU_Step[CPU_COOLINGSFR] += measure_time();
+}
+
+/*! \brief Apply cooling to all active gas cells.
+ *
+ *  With Grackle the cells are passed to the library as arrays (one call per time bin, see GrackleCoolActive()); otherwise this
+ *  loops over cool_cell(). Swallowed or eliminated cells (Mass == 0) are skipped.
+ *
+ *  \return void
+ */
+void cool_active_cells(void)
+{
+#ifdef USE_GRACKLE
+  GrackleCoolActive();
+#else
+  for(int idx = 0; idx < TimeBinsHydro.NActiveParticles; idx++)
     {
-      i = TimeBinsHydro.ActiveParticleList[idx];
+      int i = TimeBinsHydro.ActiveParticleList[idx];
       if(i >= 0)
         {
-          if(P[i].Mass == 0 && P[i].ID == 0)
+          if(P[i].Mass == 0)
             continue; /* skip cells that have been swallowed or eliminated */
 
           cool_cell(i);
         }
     }
-  CPU_Step[CPU_COOLINGSFR] += measure_time();
+#endif
 }
 
 /*! \brief Apply the isochoric cooling to a given gas cell.
