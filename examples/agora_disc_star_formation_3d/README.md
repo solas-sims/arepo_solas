@@ -136,6 +136,29 @@ package if installed, otherwise falls back to a self-contained `h5py`-based
 reader — see the script's docstring for the full set of options
 (`--mask-radius`, `--ngrid`, `--save-data`, etc).
 
+### Making the grid images smoother
+
+The grid images deposit particles onto a 3D grid (CIC), smooth it with a Gaussian
+and plot the log of the line-of-sight projection. If the result looks pixelated,
+speckled, or shows individual particles or white holes, the grid is finer than the
+particle sampling. Tune:
+
+| Option | Default | Effect |
+|---|---|---|
+| `--ngrid` | 256 | Cells per axis. Lower it (128-256) when particles are sparse. |
+| `--smooth-sigma` | 3.0 | Gaussian width in cells. Should be at least the inter-particle spacing; raise to 4-6 for sparse regions. |
+| `--interp` | `bilinear` | `imshow` interpolation (`nearest` for raw cells, `bicubic`/`gaussian` for smoother). |
+| `--dex-range` | 5 | Colour scale spans this many dex below the maximum; empty cells are floored rather than drawn white. |
+| `--projection` | `mean` | Line-of-sight reduction (`mean`, `sum`, `max`). `sum` gives a surface density. |
+| `--cmap` | `viridis` | Colormap. |
+
+For example, a sparse low-resolution run:
+
+```bash
+python agora_disc_diagnostics.py --snapshot output/snap_010.hdf5 \
+    --ngrid 128 --smooth-sigma 3 --dex-range 4
+```
+
 ## Known gaps / things to revisit
 
 - `InitMetallicityinSolar = 0.1` (required by `METALS`) is an assumed

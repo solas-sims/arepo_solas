@@ -101,6 +101,11 @@ mpiexec -np <N> ./Arepo ./param_lowres.txt       # or ./param_medres.txt
 Diagnostics: `agora_disc_diagnostics.py`, as in the parent example. BH quantities are in the
 `PartType5` block of the snapshots and in the `BLACKHOLES:` lines of the log.
 
+The grid-image options (`--ngrid`, `--smooth-sigma`, `--interp`, `--dex-range`,
+`--projection`, `--cmap`) are described under "Making the grid images smoother" in the
+[parent example's README](../agora_disc_star_formation_3d/README.md#5-diagnostics). If the images look
+pixelated, lower `--ngrid` and/or raise `--smooth-sigma`.
+
 ## What has and has not been checked
 
 Checked:

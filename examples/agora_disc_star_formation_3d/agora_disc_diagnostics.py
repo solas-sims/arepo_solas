@@ -473,12 +473,33 @@ def parse_args():
         help="Half-height [kpc] of the mask box above/below the midplane "
              "(only used with --mask-radius). Default: 2.5",
     )
-    parser.add_argument("--ngrid", type=int, default=512, help="Grid resolution per axis")
     parser.add_argument(
-        "--smooth-sigma", type=float, default=2.0,
-        help="Gaussian smoothing width [grid cells] applied to the CIC-deposited "
-             "grid before plotting. Default: 2.0",
+        "--ngrid", type=int, default=256,
+        help="Grid resolution per axis. Keep this low enough that cells hold several "
+             "particles, otherwise the image shows individual particles. Default: 256",
     )
+    parser.add_argument(
+        "--smooth-sigma", type=float, default=3.0,
+        help="Gaussian smoothing width [grid cells] applied to the CIC-deposited "
+             "grid before plotting. Should be at least the typical inter-particle "
+             "spacing in cells; increase if the image looks speckled or has holes. "
+             "Default: 3.0",
+    )
+    parser.add_argument(
+        "--projection", choices=["mean", "sum", "max"], default="mean",
+        help="Line-of-sight reduction for the grid images. Default: mean",
+    )
+    parser.add_argument(
+        "--interp", default="bilinear",
+        help="matplotlib imshow interpolation for the grid images (e.g. nearest, "
+             "bilinear, bicubic, gaussian). Default: bilinear",
+    )
+    parser.add_argument(
+        "--dex-range", type=float, default=5.0,
+        help="Dynamic range of the grid colour scale in dex below the maximum; "
+             "fainter pixels (including empty cells) are clipped. Default: 5",
+    )
+    parser.add_argument("--cmap", default="viridis", help="Colormap for the grid images. Default: viridis")
     parser.add_argument("--lgrid", type=float, default=10.0, help="Grid half-extent in x/y [kpc]")
     parser.add_argument(
         "--lzgrid", type=float, default=None,
@@ -610,6 +631,37 @@ def plot_overlaid_profiles(results, output):
     plt.close(fig)
     log.info("Saved %s", output)
 
+def plot_projections(grid, limits, projection="mean", cmap="viridis",
+                     interpolation="bilinear", dex_range=5.0):
+    """XY / XZ / YZ line-of-sight projections of a 3D grid on a shared-style
+    log colour scale. Empty cells are floored (not drawn white) and the colour
+    range is clipped to `dex_range` below the maximum so a few faint or empty
+    pixels don't compress the dynamic range."""
+    reduce = {"mean": np.mean, "sum": np.sum, "max": np.max}[projection]
+    views = [  # (label, reduction axis, extent, xlabel, ylabel)
+        ("XY", 2, [limits[0], limits[1], limits[2], limits[3]], "X", "Y"),
+        ("XZ", 1, [limits[0], limits[1], limits[4], limits[5]], "X", "Z"),
+        ("YZ", 0, [limits[2], limits[3], limits[4], limits[5]], "Y", "Z"),
+    ]
+    fig, axes = plt.subplots(1, 3, figsize=(12, 4))
+    for ax, (label, axis, extent, xlabel, ylabel) in zip(axes, views):
+        data = reduce(grid, axis=axis)
+        positive = data[data > 0]
+        if positive.size == 0:
+            log.warning("%s projection is empty, skipping", label)
+            continue
+        logdata = np.log10(np.maximum(data, positive.min()))
+        vmax = logdata.max()
+        im = ax.imshow(logdata.T, origin="lower", extent=extent, cmap=cmap, aspect="auto",
+                       interpolation=interpolation, vmin=vmax - dex_range, vmax=vmax)
+        ax.set_title(label)
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel(ylabel)
+        fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+    fig.tight_layout()
+    return fig
+
+
 def plot_grid(pos, mass, centre, args, output_path):
     """Smoothed-grid projection plot for a single snapshot. Always run,
     regardless of --mask-radius (uses the full particle set, like the
@@ -639,7 +691,10 @@ def plot_grid(pos, mass, centre, args, output_path):
         sigma=args.smooth_sigma,
     )
 
-    fig, _ = gridding.plot_3d_projections(smoothed_grid, grid_limits, projection="mean")
+    fig = plot_projections(
+        smoothed_grid, grid_limits, projection=args.projection, cmap=args.cmap,
+        interpolation=args.interp, dex_range=args.dex_range,
+    )
     fig.savefig(output_path, dpi=200)
     plt.close(fig)
     log.info("Saved %s", output_path)
