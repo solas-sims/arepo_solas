@@ -243,12 +243,16 @@ void star_prep(void)
       
       /* Advance timestep and age */
       MyDouble star_timestep = (SP[i].TimeBinStar ? (((integertime)1) << SP[i].TimeBinStar) : 0) * All.Timebase_interval;
-      SP[i].Age = All.Time - SP[i].Birthtime;
 
-      /* Convert properties to yr and msun */
+      /* Convert properties to yr and msun. Birthtime/All.Time are scale factors in comoving runs,
+       * so the age must come from the cosmic-time difference rather than All.Time - Birthtime;
+       * get_time_difference_in_Gyr() handles both cases (and includes the 1/h conversion) */
       MyDouble star_mass_msun = SP[i].MassOfStar * All.cf_UnitMass_in_Msun;
       MyDouble star_timestep_yr = star_timestep * All.cf_UnitTime_in_yr;
-      MyDouble star_age_yr = SP[i].Age * All.cf_UnitTime_in_yr; 
+      MyDouble star_age_yr = get_time_difference_in_Gyr(SP[i].Birthtime, All.Time) * 1.0e9;
+
+      /* Age is kept in the same (dln a, if comoving) units as star_timestep */
+      SP[i].Age = star_age_yr / All.cf_UnitTime_in_yr;
 
 #ifdef METALS 
       MyDouble star_metallicity = SP[i].Metallicity;

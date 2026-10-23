@@ -152,7 +152,9 @@ static void SN_compute(int ev, int h, double alpha, double beta, double gamma, d
                 * pow(n_H, -2.0 / 17.0)
                 * pow(Zsol, -0.14);
   
-  p_term /= (All.cf_UnitMass_in_Msun * All.cf_UnitVelocity_in_cm_per_s / 1.0e5);
+  /* Msun km/s -> cgs, then to code momentum; cf_UnitMomentum_in_cgs carries the 1/a so the
+   * cap is in the same canonical (a * p_phys) convention as p_SN */
+  p_term *= SOLAR_MASS * 1.0e5 / All.cf_UnitMomentum_in_cgs;
 
   if(p_SN > p_term)
     p_SN = p_term;

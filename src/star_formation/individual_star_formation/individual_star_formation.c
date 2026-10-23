@@ -91,7 +91,10 @@ void individual_starbystar_formation(void)
       dt = (P[i].TimeBinHydro ? (((integertime)1) << P[i].TimeBinHydro) : 0) * All.Timebase_interval;
       dt /= All.cf_hubble_a;
 
-      dtff = sqrt(3.0 * M_PI / 32 / All.G / SphP[i].Density);
+      /* Density is stored comoving, so convert to physical density (* cf_a3inv) before
+       * using it in a physical free-fall time -- dtff is compared against the physical
+       * dt above */
+      dtff = sqrt(3.0 * M_PI / 32 / All.G / (SphP[i].Density * All.cf_a3inv));
           
       p = 0;
       prob = 0;

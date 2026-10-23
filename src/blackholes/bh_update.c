@@ -283,8 +283,9 @@ void bh_perform_end_of_step_physics(void)
                     
           //pj = sqrt(2 * P[i].Mass * (SphP[i].Energy - (P[i].Mass-SphP[i].MassLoading)*SphP[i].Utherm*All.cf_atime*All.cf_atime)) - p0;
 
-          // Update total energy 
-          SphP[i].Energy += SphP[i].BhThermalFeed;
+          // Update total energy (BhThermalFeed is a physical energy; conserved Energy
+          // needs the cf_atime^2 factor, as at every other thermal-injection site)
+          SphP[i].Energy += All.cf_atime * All.cf_atime * SphP[i].BhThermalFeed;
           All.BhFeedbackLocal[1] += SphP[i].BhThermalFeed;
           // Update momentum 
           //SphP[i].Momentum[0] += kick_vector[0] * pj / sqrt(pow(kick_vector[0], 2) + pow(kick_vector[1], 2) + pow(kick_vector[2], 2));

@@ -347,10 +347,12 @@ static int bh_accretion_evaluate(int target, int mode, int threadid)
 
       MyDouble dvx, dvy, dvz;  
 
-     /* Compute bh->cell velocity vector */
-      dvx = P[i].Vel[0] - vel[0]; 
-      dvy = P[i].Vel[1] - vel[1];
-      dvz = P[i].Vel[2] - vel[2];
+     /* Compute bh->cell velocity vector. P[].Vel is stored canonical (a*v_peculiar);
+      * convert to peculiar velocity (/ cf_atime) before combining with the physical
+      * sound speed in the Bondi denominator below (cf_atime = 1 when not comoving). */
+      dvx = (P[i].Vel[0] - vel[0]) / All.cf_atime;
+      dvy = (P[i].Vel[1] - vel[1]) / All.cf_atime;
+      dvz = (P[i].Vel[2] - vel[2]) / All.cf_atime;
 
       r2 = dx * dx + dy * dy + dz * dz;
 
