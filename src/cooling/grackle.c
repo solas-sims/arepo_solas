@@ -383,7 +383,8 @@ void GrackleCoolActive(void)
         terminate("GRACKLE: Error in calculate_cooling_time.\n");
       for(int k = 0; k < n; k++)
         {
-          double t                 = (tcool[k] >= 0) ? 0.0 : tcool[k] / All.UnitTime_in_s;
+          /* Grackle's cooling time is in its code time_units (negative = cooling) */
+          double t                 = (tcool[k] >= 0) ? 0.0 : tcool[k];
           SphP[c[k]].CoolingTimestep = (t != 0) ? All.CoolingTimestepFactor * fabs(t) : 0;
         }
       myfree(tcool);

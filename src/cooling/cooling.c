@@ -214,7 +214,9 @@ double GetCoolingTime(double u_old, double rho, double *ne_guess, int i)
   if(LambdaNet >= 0) 
       LambdaNet = 0.0;
     
-  coolingtime =  LambdaNet / All.UnitTime_in_s;
+  /* Grackle returns the cooling time in its code time_units, which is already the code time
+   * unit (negative = cooling), so no further conversion */
+  coolingtime =  LambdaNet;
   return coolingtime;
 
 #endif /* ifdef USE_GRACKLE */
