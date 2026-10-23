@@ -470,10 +470,20 @@ integertime get_timestep_hydro(int p)
 
 #ifdef PHOTOIONIZATION
   double dt_rad = SphP[p].RT_Timestep;
-  
-  if(dt_rad != 0 && dt_rad < dt) 
+
+  if(dt_rad != 0 && dt_rad < dt)
     dt = dt_rad;
 #endif
+
+#ifdef COOLING_TIMESTEP_LIMITER
+  /* SphP[p].CoolingTimestep = CoolingTimestepFactor * |cooling time|, evaluated once per
+   * active step in cool_cell() from the pre-cooling state; 0 means "no constraint" (net
+   * heating, or the cell has not been through cool_cell() yet) */
+  double dt_cool = SphP[p].CoolingTimestep;
+
+  if(dt_cool > 0 && dt_cool < dt)
+    dt = dt_cool;
+#endif /* #ifdef COOLING_TIMESTEP_LIMITER */
 
   /* convert the physical timestep to dloga if needed. Note: If comoving integration has not been selected,
      All.cf_hubble_a=1.

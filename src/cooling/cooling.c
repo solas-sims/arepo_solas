@@ -942,6 +942,17 @@ void cool_cell(int i)
   dtcool = dtime;
 
   ne = SphP[i].Ne; /* electron abundance (gives ionization state and mean molecular weight) */
+
+#ifdef COOLING_TIMESTEP_LIMITER
+  /* evaluated from the pre-cooling state so it constrains the *next* step, mirroring how
+   * RT_Timestep is computed once per active step and read back in get_timestep_hydro();
+   * a throwaway copy of ne is used so this diagnostic call cannot perturb the actual
+   * thermochemistry state advanced by DoCooling() below */
+  double ne_for_tcool = ne;
+  double tcool         = GetCoolingTime(dmax(All.MinEgySpec, SphP[i].Utherm), dens * All.cf_a3inv, &ne_for_tcool, i);
+  SphP[i].CoolingTimestep = (tcool != 0) ? All.CoolingTimestepFactor * fabs(tcool) : 0;
+#endif /* #ifdef COOLING_TIMESTEP_LIMITER */
+
   unew = DoCooling(dmax(All.MinEgySpec, SphP[i].Utherm), dens * All.cf_a3inv, dtcool, &ne, i);
   SphP[i].Ne = ne;
 

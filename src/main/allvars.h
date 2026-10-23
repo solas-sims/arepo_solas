@@ -1498,6 +1498,12 @@ double InitMetallicityinSolar;
   double RTIonizationTimestepFraction;
 #endif
 
+#ifdef COOLING_TIMESTEP_LIMITER
+  double CoolingTimestepFactor; /*!< dt_cool = CoolingTimestepFactor * |t_cool|; timestep is
+                                  * capped at dt_cool wherever it is shorter than the other
+                                  * hydro timestep criteria (see get_timestep_hydro()) */
+#endif
+
 #if defined (BH_ACCRETION_ACTIVE) || defined(BH_FEEDBACK_ACTIVE)
   /* for parameter file */
 #ifdef BH_CONSTANT_RADIUS
@@ -1846,9 +1852,16 @@ extern struct sph_particle_data
   MyDouble HeII_IonizationRate;
 
   MyDouble RT_Timestep;
-#endif 
+#endif
 
-/* Blackholes */    
+#ifdef COOLING_TIMESTEP_LIMITER
+  MyDouble CoolingTimestep; /*!< All.CoolingTimestepFactor * |cooling time|, evaluated in
+                              * cool_cell() from the pre-cooling Utherm/density; 0 means
+                              * "no constraint" (net heating, or not yet evaluated), mirroring
+                              * RT_Timestep's convention */
+#endif
+
+/* Blackholes */
 #ifdef BH_ACCRETION_ACTIVE
   MyDouble BhMassDrain;
 #endif

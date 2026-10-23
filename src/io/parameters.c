@@ -649,7 +649,13 @@ void read_parameter_file(char *fname)
       strcpy(tag[nt], "RTIonizationTimestepFraction");
       addr[nt] = &All.RTIonizationTimestepFraction;
       id[nt++] = REAL;
-#endif  
+#endif
+
+#ifdef COOLING_TIMESTEP_LIMITER
+      strcpy(tag[nt], "CoolingTimestepFactor");
+      addr[nt] = &All.CoolingTimestepFactor;
+      id[nt++] = REAL;
+#endif
 
 #ifdef BH_ACTIVE
 #ifdef BH_CONSTANT_RADIUS

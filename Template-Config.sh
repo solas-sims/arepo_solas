@@ -111,6 +111,13 @@
 #USE_GRACKLE         # Use the Grackle cooling/chemistry library instead of the simple primordial cooling
 #GRACKLE_CHEMISTRY=0 # Curretly only grackle mode=0 (lookup tables) with no chemistry network is supported
 #NOUVBACKGROUND      # Disables the UV background in the main run loop's cooling/star-formation step
+#COOLING_TIMESTEP_LIMITER # Requires COOLING; caps a gas cell's hydro timestep at
+                          # CoolingTimestepFactor (param.txt) x its local cooling time, evaluated
+                          # once per active step in cool_cell() from the pre-cooling state. Adds
+                          # one extra GetCoolingTime() call per active cell per step (an extra
+                          # Grackle single-cell solve, with its per-call allocation overhead, if
+                          # USE_GRACKLE is also set) -- opt in only where under-resolved cooling
+                          # in rapidly-cooling gas (e.g. resolved SN remnants) is a concern.
 
 #--------------------------------------- Metal parameters
 #METALS # Advect all metals, ie metal mass fraction, as a PASSIVE_SCALARS.
