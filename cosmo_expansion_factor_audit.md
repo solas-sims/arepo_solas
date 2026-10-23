@@ -171,3 +171,6 @@ B1 first (silent, large), then B2/B3, then B4. B5-B7 are decisions or checks.
 
 ## E. Fix status (2026-10-23, later)
 B1 (stellar age), B2 (SN momentum cap) and B3 (SN lead time) are fixed; see `documentation/source/cosmological_units.md` for the conventions. B4-B7 remain open. Nothing has been compiled or run in a comoving configuration yet.
+
+## F. Fix status (2026-10-23, final)
+B4 (h2/hinv in `bh_feedback.c`), B5 (`BhRadius` now physical, `BH_RADIUS_CODE`) and B7 (extra `HubbleParam` removed from RT rates) are fixed. B6 (jets) is documented in-file but not rewritten: the path is dead code. New finding B8, fixed: Bondi accretion used comoving density and a per-code-time rate multiplied by a d ln a timestep (`bh_accretion.c`). All untested; nothing compiled.
