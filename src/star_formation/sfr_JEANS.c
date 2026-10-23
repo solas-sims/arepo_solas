@@ -56,11 +56,14 @@
  */
 double get_jeans_length(int i)
 {
-  double sound_speed, jeans_length;
+  double sound_speed, jeans_length, rho_phys;
 
   sound_speed = get_sound_speed(i);
   
-  jeans_length = sqrt(M_PI / All.G / SphP[i].Density) * sound_speed;
+  /* The sound speed is physical; convert the proper Jeans length to the
+   * comoving code length used by the mesh. */
+  rho_phys = SphP[i].Density * All.cf_a3inv;
+  jeans_length = sqrt(M_PI / All.G / rho_phys) * sound_speed / All.cf_atime;
 
   return jeans_length;
 }
@@ -73,11 +76,12 @@ double get_jeans_length(int i)
  */
 double get_jeans_mass(int i)
 {
-  double sound_speed, jeans_mass;
+  double sound_speed, jeans_mass, rho_phys;
 
   sound_speed = get_sound_speed(i);
   
-  jeans_mass = pow(M_PI, 2.5) * pow(sound_speed, 3.) / 6. / pow(All.G, 1.5) / sqrt(SphP[i].Density);
+  rho_phys = SphP[i].Density * All.cf_a3inv;
+  jeans_mass = pow(M_PI, 2.5) * pow(sound_speed, 3.) / 6. / pow(All.G, 1.5) / sqrt(rho_phys);
 
   return jeans_mass;
 }
@@ -190,13 +194,14 @@ double get_starformation_rate(int i)
   if(RestartFlag == 3)
     return SphP[i].Sfr;
 
-  double rateOfSF, t_freefall;
+  double rateOfSF, t_freefall, rho_phys;
 
   if(!sf_criteria(i))
     return 0;
     
-  /* freefall time in code units */
-  t_freefall = sqrt(3.0 * M_PI / 32 / All.G / SphP[i].Density); 
+  /* Freefall time in proper code-time units.  Density is stored comoving. */
+  rho_phys = SphP[i].Density * All.cf_a3inv;
+  t_freefall = sqrt(3.0 * M_PI / 32 / All.G / rho_phys);
 
   rateOfSF = All.StarFormationEfficiency * P[i].Mass / t_freefall;
 

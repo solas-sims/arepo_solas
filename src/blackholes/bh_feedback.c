@@ -174,7 +174,10 @@ static int bh_feedback_evaluate(int target, int mode, int threadid)
   accretion = target_data->Accretion;
 
   mass_feed = All.Mload * All.Epsilon_r * accretion; 
-  energy_feed = All.Epsilon_f * (1.0 - All.Mload) * All.Epsilon_r  * accretion * (CLIGHT*CLIGHT / (All.cf_UnitVelocity_in_cm_per_s*All.cf_UnitVelocity_in_cm_per_s));
+  /* Convert the physical rest-mass energy to the canonical gas-energy units.
+   * cf_UnitEnergy_in_cgs includes the cosmological a^(-2) factor. */
+  energy_feed = All.Epsilon_f * (1.0 - All.Mload) * All.Epsilon_r * accretion * All.cf_UnitMass_in_g * CLIGHT * CLIGHT /
+                All.cf_UnitEnergy_in_cgs;
 
   //MyDouble hinv, hinv3, hinv4, u, dwk;
 
