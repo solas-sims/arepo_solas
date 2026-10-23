@@ -152,7 +152,25 @@ particle sampling. Tune:
 | `--projection` | `mean` | Line-of-sight reduction (`mean`, `sum`, `max`). `sum` gives a surface density. |
 | `--cmap` | `viridis` | Colormap. |
 
-For example, a sparse low-resolution run:
+### Gas images with vortrace
+
+For gas (`--ptype 0`) you can skip the particle-to-grid step entirely and ray-trace
+the simulation's own Voronoi mesh with [vortrace](https://vortrace.readthedocs.io):
+
+```bash
+pip install vortrace
+python agora_disc_diagnostics.py --snapshot output/snap_010.hdf5 --vortrace --ngrid 512
+```
+
+This gives a true column density (the integral of `Density` along the line of sight),
+so it has no lattice or empty-cell artefacts and `--ngrid` can be raised freely. It uses
+every gas cell, including the background-grid cells, and needs `Density` and `Masses`
+in `PartType0`. `--smooth-sigma` and `--projection` are ignored; `--interp`,
+`--dex-range` and `--cmap` still apply. Other particle types, and the radial profiles,
+are unchanged. Building the mesh and tracing 3 x `ngrid`^2 rays takes longer than the
+grid deposit. Large background-grid cells can show up as streaks away from the disc.
+
+For example, a sparse low-resolution run without vortrace:
 
 ```bash
 python agora_disc_diagnostics.py --snapshot output/snap_010.hdf5 \

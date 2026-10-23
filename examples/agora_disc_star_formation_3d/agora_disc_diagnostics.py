@@ -26,6 +26,10 @@ Examples:
     # single snapshot
     python agora_disc_diagnostics.py --snapshot snap_200.hdf5
 
+    # gas grid images via ray-traced projections through the Voronoi mesh
+    # (needs the vortrace package; gas only, profiles unaffected)
+    python agora_disc_diagnostics.py --snapshot snap_100.hdf5 --vortrace
+
     # multiple snapshots, overlaid profiles + per-snapshot grid images
     python agora_disc_diagnostics.py \
         --snapshot snap_100.hdf5 snap_150.hdf5 snap_200.hdf5 \
@@ -499,6 +503,14 @@ def parse_args():
         help="Dynamic range of the grid colour scale in dex below the maximum; "
              "fainter pixels (including empty cells) are clipped. Default: 5",
     )
+    parser.add_argument(
+        "--vortrace", action="store_true",
+        help="Make the gas (--ptype 0) grid images with vortrace: ray-traced column "
+             "density through the Voronoi mesh instead of a CIC-deposited grid. "
+             "Requires `pip install vortrace`. Ignored with a warning for other "
+             "particle types. --ngrid sets the pixels per axis; --smooth-sigma and "
+             "--projection do not apply.",
+    )
     parser.add_argument("--cmap", default="viridis", help="Colormap for the grid images. Default: viridis")
     parser.add_argument("--lgrid", type=float, default=10.0, help="Grid half-extent in x/y [kpc]")
     parser.add_argument(
@@ -631,21 +643,14 @@ def plot_overlaid_profiles(results, output):
     plt.close(fig)
     log.info("Saved %s", output)
 
-def plot_projections(grid, limits, projection="mean", cmap="viridis",
-                     interpolation="bilinear", dex_range=5.0):
-    """XY / XZ / YZ line-of-sight projections of a 3D grid on a shared-style
-    log colour scale. Empty cells are floored (not drawn white) and the colour
-    range is clipped to `dex_range` below the maximum so a few faint or empty
-    pixels don't compress the dynamic range."""
-    reduce = {"mean": np.mean, "sum": np.sum, "max": np.max}[projection]
-    views = [  # (label, reduction axis, extent, xlabel, ylabel)
-        ("XY", 2, [limits[0], limits[1], limits[2], limits[3]], "X", "Y"),
-        ("XZ", 1, [limits[0], limits[1], limits[4], limits[5]], "X", "Z"),
-        ("YZ", 0, [limits[2], limits[3], limits[4], limits[5]], "Y", "Z"),
-    ]
-    fig, axes = plt.subplots(1, 3, figsize=(12, 4))
-    for ax, (label, axis, extent, xlabel, ylabel) in zip(axes, views):
-        data = reduce(grid, axis=axis)
+def plot_images(images, cmap="viridis", interpolation="bilinear", dex_range=5.0):
+    """Plot a row of 2D maps on a log colour scale. `images` is a list of
+    (label, data[axis0, axis1], extent, xlabel, ylabel). Empty cells are
+    floored (not drawn white) and the colour range is clipped to `dex_range`
+    below the maximum so a few faint or empty pixels don't compress the
+    dynamic range."""
+    fig, axes = plt.subplots(1, len(images), figsize=(4 * len(images), 4))
+    for ax, (label, data, extent, xlabel, ylabel) in zip(np.atleast_1d(axes), images):
         positive = data[data > 0]
         if positive.size == 0:
             log.warning("%s projection is empty, skipping", label)
@@ -662,11 +667,77 @@ def plot_projections(grid, limits, projection="mean", cmap="viridis",
     return fig
 
 
-def plot_grid(pos, mass, centre, args, output_path):
+def projection_views(limits):
+    """(label, line-of-sight axis, extent, xlabel, ylabel) for XY / XZ / YZ."""
+    return [
+        ("XY", 2, [limits[0], limits[1], limits[2], limits[3]], "X", "Y"),
+        ("XZ", 1, [limits[0], limits[1], limits[4], limits[5]], "X", "Z"),
+        ("YZ", 0, [limits[2], limits[3], limits[4], limits[5]], "Y", "Z"),
+    ]
+
+
+def plot_projections(grid, limits, projection="mean", cmap="viridis",
+                     interpolation="bilinear", dex_range=5.0):
+    """XY / XZ / YZ line-of-sight projections of a 3D grid."""
+    reduce = {"mean": np.mean, "sum": np.sum, "max": np.max}[projection]
+    images = [(label, reduce(grid, axis=axis), extent, xl, yl)
+              for label, axis, extent, xl, yl in projection_views(limits)]
+    return plot_images(images, cmap=cmap, interpolation=interpolation, dex_range=dex_range)
+
+
+def read_gas_cells_h5py(path):
+    """Gas cell positions, density and volume (mass/density) from an Arepo
+    HDF5 snapshot, plus the box size, for building the Voronoi mesh."""
+    import h5py
+
+    with h5py.File(path, "r") as f:
+        boxsize = float(np.ravel(f["Header"].attrs["BoxSize"])[0])
+        grp = f["PartType0"]
+        pos = grp["Coordinates"][()].astype(np.float64)
+        rho = grp["Density"][()].astype(np.float64)
+        mass = grp["Masses"][()].astype(np.float64)
+    return pos, rho, mass / rho, boxsize
+
+
+def vortrace_projections(snapshot_path, centre, limits, args):
+    """Column-density maps of the gas ray-traced through the Voronoi mesh.
+    Every gas cell, including background-grid cells, is used so the mesh is
+    the simulation's own. Each view is rotated about `centre` with the
+    plane extent and line-of-sight bounds expressed relative to it."""
+    try:
+        import vortrace as vt
+    except ImportError:
+        log.error("--vortrace needs the vortrace package (pip install vortrace)")
+        sys.exit(1)
+
+    pos, rho, vol, boxsize = read_gas_cells_h5py(snapshot_path)
+    log.info("Building Voronoi mesh from %d gas cells", len(pos))
+    cloud = vt.ProjectionCloud(pos, rho, vol=vol, boundbox=[0, boxsize] * 3, periodic=True)
+
+    half = [(limits[2 * i + 1] - limits[2 * i]) / 2 for i in range(3)]
+    images = []
+    for label, los, extent, xl, yl in projection_views(limits):
+        a, b = [i for i in range(3) if i != los]
+        data = cloud.grid_projection(
+            [[centre[a] - half[a], centre[a] + half[a]],
+             [centre[b] - half[b], centre[b] + half[b]]],
+            args.ngrid,
+            [centre[los] - half[los], centre[los] + half[los]],
+            centre,
+            proj="xyz"[a] + "xyz"[b],
+        )
+        images.append((label, data, extent, xl, yl))
+    return images
+
+
+def plot_grid(pos, mass, centre, args, output_path, snapshot_path=None):
     """Smoothed-grid projection plot for a single snapshot. Always run,
     regardless of --mask-radius (uses the full particle set, like the
     source notebook)."""
     gridding = GriddingTools()
+
+    if args.vortrace and args.ptype != 0:
+        log.warning("--vortrace only applies to gas (--ptype 0); using the CIC grid instead")
 
     lzgrid = args.lzgrid if args.lzgrid is not None else args.lgrid / 4
     grid_size = args.ngrid * np.ones(3, dtype=np.int64)
@@ -675,6 +746,15 @@ def plot_grid(pos, mass, centre, args, output_path):
         centre[1] - args.lgrid, centre[1] + args.lgrid,
         centre[2] - lzgrid, centre[2] + lzgrid,
     ])
+
+    if args.vortrace and args.ptype == 0:
+        images = vortrace_projections(snapshot_path, centre, grid_limits, args)
+        fig = plot_images(images, cmap=args.cmap, interpolation=args.interp,
+                          dex_range=args.dex_range)
+        fig.savefig(output_path, dpi=200)
+        plt.close(fig)
+        log.info("Saved %s", output_path)
+        return
 
     box_mask = (
         (pos[:, 0] >= grid_limits[0]) & (pos[:, 0] < grid_limits[1]) &
@@ -731,7 +811,7 @@ def main():
         pos, vel, mass, centre = load_particles(snapshot_path, args)
 
         grid_out = format_output_path(args.grid_output, name, index)
-        plot_grid(pos, mass, centre, args, grid_out)
+        plot_grid(pos, mass, centre, args, grid_out, snapshot_path)
 
         pos_m, vel_m, mass_m = apply_mask(pos, vel, mass, centre, args)
         sigma, hz, sigmaz = compute_profiles(pos_m, vel_m, mass_m, centre, args)
