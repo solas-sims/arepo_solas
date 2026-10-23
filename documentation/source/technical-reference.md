@@ -174,8 +174,9 @@ metals quantities at every stage — see §1.7 for the full data-flow trace.
   machinery rather than just flipping a flag. Called from `star_prep()` (line 271) when
   `StarFeedback.State == -1`.
 - **`star_prep()`** (lines 224–347) — on activation (`Active == STAR_UNBORN`, lines 235–242),
-  sets `Age = 0.0; Birthtime = All.Time;`; every subsequent call recomputes `Age = All.Time -
-  Birthtime` (line 246) rather than accumulating `Age += star_timestep` incrementally. The old
+  sets `Age = 0.0; Birthtime = All.Time;`; every subsequent call recomputes the age from `Birthtime`
+  (`get_time_difference_in_Gyr(Birthtime, All.Time)`, i.e. cosmic time in comoving runs, where
+  `All.Time` is the scale factor; see `cosmological_units.md`) rather than accumulating `Age += star_timestep` incrementally. The old
   incremental scheme could drift or double-count across timestep changes or repeated `star_prep`
   calls within a step; the new one is idempotent and exact.
 - **H/He feed-buffer flush** (lines 390–408, from `e906c22`, part of §1.7): at end-of-step,
@@ -231,7 +232,8 @@ New parameter **`All.SN_LeadTime`** (`src/main/allvars.h:1448`, registered
 `src/io/parameters.c:603–604`, default `40` in `param.txt`, units Myr). In
 `star_density_evaluate2()` (`star_density.c:543–563`), rather than the old scheme of blending
 `SphP[i].Utherm` toward a post-SN internal energy over the fraction of a star's *entire
-lifetime*, the code now computes `sn_lead_time = All.SN_LeadTime / All.UnitTime_in_Megayears`
+lifetime*, the code now computes `sn_lead_time = All.SN_LeadTime * 1e6 / All.cf_UnitTime_in_yr`
+(the same units as `TimeToSN`, which is divided by `cf_UnitTime_in_yr` in `units_for_feedback()`)
 and, only in the last `SN_LeadTime` Myr before the explosion (`time_to_sn < sn_lead_time`), ramps
 a signal speed `SphP[i].Csn = max(Csn, sqrt(GAMMA*GAMMA_MINUS1*E_inject_code/Mass) * f)` where
 `f = 1 - time_to_sn/sn_lead_time`. This modifies the local Courant-like signal speed used for
