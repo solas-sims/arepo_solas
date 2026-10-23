@@ -709,7 +709,7 @@ static void radiation_feedback(void)
 
       double N_abs_H2 = SphP[i].Absorbed[LYMAN_WERNER].Photons;
 
-      SphP[i].H2_DissociationRate += n_H2 > 0 ? (F_DISS * N_abs_H2 / (dt/All.cf_hubble_a/All.HubbleParam) / V) / n_H2 : 0.0;
+      SphP[i].H2_DissociationRate += n_H2 > 0 ? (F_DISS * N_abs_H2 / (dt/All.cf_hubble_a) / V) / n_H2 : 0.0;
 #endif
 
 #ifdef PHOTOIONIZATION
@@ -753,12 +753,13 @@ static void radiation_feedback(void)
       if(n_HeII_cgs)
         SphP[i].HeII_HeatingRate += (E_abs_HeII - E_threshold_HeII) > 0 ? ((E_abs_HeII - E_threshold_HeII) / dt_cgs / V_cgs) / n_HeII_cgs : 0.0;
 
-      /* RT_ionization_rate: 1 / (time Units) */
-      SphP[i].HI_IonizationRate += n_HI > 0 ? (N_abs_HI / (dt/All.cf_hubble_a/All.HubbleParam) / V) / n_HI : 0.0;     
+      /* RT_ionization_rate: 1 / (time Units). Grackle time_units = UnitTime/h already absorbs h, so the
+       * interval in those units is dt/H (dt = d ln a), with no further HubbleParam factor */
+      SphP[i].HI_IonizationRate += n_HI > 0 ? (N_abs_HI / (dt/All.cf_hubble_a) / V) / n_HI : 0.0;     
       
-      SphP[i].HeI_IonizationRate += n_HeI > 0 ? (N_abs_HeI / (dt/All.cf_hubble_a/All.HubbleParam) / V) / n_HeI : 0.0;
+      SphP[i].HeI_IonizationRate += n_HeI > 0 ? (N_abs_HeI / (dt/All.cf_hubble_a) / V) / n_HeI : 0.0;
 
-      SphP[i].HeII_IonizationRate += n_HeII > 0 ? (N_abs_HeII / (dt/All.cf_hubble_a/All.HubbleParam) / V) / n_HeII : 0.0;
+      SphP[i].HeII_IonizationRate += n_HeII > 0 ? (N_abs_HeII / (dt/All.cf_hubble_a) / V) / n_HeII : 0.0;
 #endif
 
       for(w = 0; w < WAVEBANDS; w++)

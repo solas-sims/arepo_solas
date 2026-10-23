@@ -328,7 +328,7 @@ static int bh_accretion_evaluate(int target, int mode, int threadid)
   hinv4 = hinv3 * hinv;
 
 #ifdef BH_CONSTANT_RADIUS
-  int nfound = ngb_treefind_variable_threads(pos, All.BhRadius, target, mode, threadid, numnodes, firstnode);
+  int nfound = ngb_treefind_variable_threads(pos, BH_RADIUS_CODE, target, mode, threadid, numnodes, firstnode);
 #else
   int nfound = ngb_treefind_variable_threads(pos, h, target, mode, threadid, numnodes, firstnode);
 #endif
@@ -357,7 +357,7 @@ static int bh_accretion_evaluate(int target, int mode, int threadid)
       r2 = dx * dx + dy * dy + dz * dz;
 
 #ifdef BH_CONSTANT_RADIUS
-      if(r2 < All.BhRadius*All.BhRadius)
+      if(r2 < BH_RADIUS_CODE*BH_RADIUS_CODE)
 #else
       if(r2 < h2)
 #endif
@@ -482,7 +482,8 @@ static void bh_accretion_rate(void)
       /* Get pressure */
       if(BhP[i].GasDensity > 0)
         {  
-          gas_density = BhP[i].GasDensity;
+          /* kernel-summed density is comoving; Bondi needs the physical density */
+          gas_density = BhP[i].GasDensity * All.cf_a3inv;
           gas_pressure = GAMMA_MINUS1 * gas_density * BhP[i].GasInternalEnergy;
 
           /* Get soundspeed */
@@ -497,6 +498,10 @@ static void bh_accretion_rate(void)
               denominator_inv = 1. / sqrt(denominator);
               BondiRate = 4.0 * M_PI * All.G * All.G * PPB(i).Mass * PPB(i).Mass * gas_density 
               * denominator_inv*denominator_inv*denominator_inv;
+
+              /* rate above is per code time; the timestep below is d ln a (dt = dlna / H), as for
+               * the Eddington rate (cf_hubble_a = 1 when not comoving) */
+              BondiRate /= All.cf_hubble_a;
             }
           else
             {
@@ -562,7 +567,7 @@ static void bh_accretion_rate(void)
       f_d = BhP[i].TorqueFd; // Disk fraction
 
 #ifdef BH_CONSTANT_RADIUS
-      R0 = All.BhRadius; 
+      R0 = BH_RADIUS_CODE; 
 #else
       R0 = BhP[i].Hsml;
 #endif

@@ -67,13 +67,19 @@ root. Fixed in this series:
 - SN terminal-momentum cap (`star_feedback.c`) uses `cf_UnitMomentum_in_cgs`.
 - SN lead time (`star_density.c`) is converted with `cf_UnitTime_in_yr`, the same units as
   `TimeToSN`.
+- Bondi accretion (`bh_accretion.c`): kernel-summed gas density is converted to physical density
+  (`* cf_a3inv`), and the rate, which is per code time, is divided by `cf_hubble_a` so that
+  `rate * bh_timestep` (a `d ln a` interval) is a mass, as for the Eddington rate.
+- `BH_CONSTANT_RADIUS` (`bh.h`, `BH_RADIUS_CODE`): `All.BhRadius` is now a *physical* radius and is
+  converted to comoving code length (`/ cf_atime`) at every use.
+- `star_radiation.c`: the RT ionisation and dissociation rates divide by `dt / cf_hubble_a` only.
+  Grackle's `time_units = UnitTime/h` already absorbs `h`, so the extra `HubbleParam` was removed.
+- `bh_feedback.c`: `h2` is now initialised and the unused `u = r * hinv` was removed (the file did
+  not compile as written).
 
 ## Open items
 
-- `BH_CONSTANT_RADIUS`: `All.BhRadius` is used as a comoving length; decide whether it should be
-  physical.
-- `bh_jet_feedback.c` has no cosmology handling; the injection that would consume it is
-  currently commented out.
-- `star_radiation.c` divides by `HubbleParam` in the RT rate conversions (`dt / cf_hubble_a /
-  HubbleParam`); check whether `h` is double counted.
-- These changes are untested in a comoving run with stars and SNe.
+- `bh_jet_feedback.c` has no cosmology handling, and the consuming injection is commented out
+  (the code also references fields such as `KineticFeed` that are not in `SphP`). A note in the
+  file lists what a re-enabled path needs: `cf_atime^2` on the energy and a canonical kick.
+- These changes are untested in a comoving run with stars, SNe and black holes.
