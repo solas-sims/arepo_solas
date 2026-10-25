@@ -111,6 +111,8 @@
 #USE_GRACKLE         # Use the Grackle cooling/chemistry library instead of the simple primordial cooling
 #GRACKLE_CHEMISTRY=0 # Curretly only grackle mode=0 (lookup tables) with no chemistry network is supported
 #NOUVBACKGROUND      # Disables the UV background in the main run loop's cooling/star-formation step
+#GRACKLE_PER_CELL    # Requires USE_GRACKLE; debugging/testing aid: call Grackle one cell at a time (the old behaviour)
+                     # instead of in arrays grouped by time bin. Results should be identical either way; use for A/B tests.
 #COOLING_TIMESTEP_LIMITER # Requires COOLING; caps a gas cell's hydro timestep at
                           # CoolingTimestepFactor (param.txt) x its local cooling time, evaluated
                           # once per active step in cool_cell() from the pre-cooling state. Adds

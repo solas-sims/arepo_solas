@@ -41,3 +41,10 @@ uses-machines.txt
 #Python notebook stuff
 **/*ipynb
 .ipynb*
+
+# example data downloaded by get_ics.sh / get_tables.sh and A/B test output
+examples/*/ICs/
+examples/*/grackle_data/
+examples/*/star_tables/
+examples/*/ab/
+examples/*/output/

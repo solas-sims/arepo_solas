@@ -154,7 +154,7 @@ void cooling_and_starformation(void)
     }
 
   /* pass 2: cooling time of the hot phase of all above-threshold cells -> egyeff */
-#ifdef USE_GRACKLE
+#if defined(USE_GRACKLE) && !defined(GRACKLE_PER_CELL)
   GrackleCoolingTimes(neos, eos_cell, eos_u, eos_rho, eos_tc);
 #else
   for(k = 0; k < neos; k++)

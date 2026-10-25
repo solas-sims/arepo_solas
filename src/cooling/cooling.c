@@ -896,8 +896,8 @@ void cooling_only(void) /* normal cooling routine when star formation is disable
 
 /*! \brief Apply cooling to a list of gas cells.
  *
- *  With Grackle the cells are passed to the library as arrays (one call per time bin, see GrackleCoolCells()); otherwise this loops
- *  over cool_cell(). Swallowed or eliminated cells (Mass == 0) are skipped.
+ *  With Grackle the cells are passed to the library as arrays (one call per time bin, see GrackleCoolCells()); otherwise (or with
+ *  GRACKLE_PER_CELL, for A/B testing) this loops over cool_cell(). Swallowed or eliminated cells (Mass == 0) are skipped.
  *
  *  \param[in] ncells number of entries in list.
  *  \param[in] list   indices of the gas cells to cool.
@@ -906,7 +906,7 @@ void cooling_only(void) /* normal cooling routine when star formation is disable
  */
 void cool_cells(int ncells, const int *list)
 {
-#ifdef USE_GRACKLE
+#if defined(USE_GRACKLE) && !defined(GRACKLE_PER_CELL)
   GrackleCoolCells(ncells, list);
 #else
   for(int k = 0; k < ncells; k++)
