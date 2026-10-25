@@ -39,3 +39,21 @@ Notes:
 - Particles are matched by `ParticleIDs`. If refinement/derefinement or star formation diverges between runs the particle
   sets differ and the comparison reports it rather than comparing mismatched cells; that is itself the signal of a difference.
 - `ab/` is git-ignored.
+
+## SLURM (OzSTAR/NT)
+
+`slurm/` holds batch scripts built from the `AGORA_LOWRES_TEST` job script. Edit `slurm/ozstar_env.sh` first: it loads
+`gcc/11.2.0 openmpi/4.1.1 hdf5/1.12.1 fftw/3.3.10 gsl/2.7`, and you must add a python with numpy + h5py (for the comparison) and make
+sure the Makefile can find Grackle (`GRACKLE_DIR` in `Makefile.systype`).
+
+```bash
+cd examples/agora_disc_star_formation_3d && ./get_ics.sh && ./get_tables.sh   # on a node with internet access
+ab_tests/slurm/submit_ab.sh base 4 0.01 0.0025                     # build -> batched + per-cell runs -> compare
+ab_tests/slurm/submit_ab.sh chem1 4 0.01 0.0025 -- GRACKLE_CHEMISTRY=1
+SKIP_BUILD=1 ab_tests/slurm/submit_ab.sh base 8 0.01 0.0025        # reuse executables, new task count
+RTOL=1e-10 ab_tests/slurm/submit_ab.sh base 4 0.01                 # allow round-off
+```
+
+`submit_ab.sh` chains the jobs with `--dependency=afterok`. Logs are in `ab/<tag>/slurm_logs/`, the comparison result in
+`ab/<tag>/compare_n<ntasks>.log`. Config overrides after `--` must not contain commas. Run times: `run_ab.sbatch` asks for 4 h
+and 8 GB per task; edit the `#SBATCH` lines for the full 0.5 run.
