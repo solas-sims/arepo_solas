@@ -86,7 +86,7 @@ static void grackle_prepare_block(int n)
 /* Fill the field arrays for the n cells target[0..n-1], using the thermal energies u[] and the (proper) densities rho[]. If
  * consume_rates is set, the accumulated radiation rates stored in SphP are zeroed once they have been passed to Grackle; this must
  * only be done for the call that actually integrates the cell (solve_chemistry), not for diagnostic queries. */
-static void grackle_gather(int n, const int *target, const double *u, const double *rho, int consume_rates)
+static void grackle_gather_impl(int n, const int *target, const double *u, const double *rho, int consume_rates)
 {
   grackle_prepare_block(n);
 
@@ -191,7 +191,7 @@ static void grackle_gather(int n, const int *target, const double *u, const doub
 
 /* Copy the abundances evolved by solve_chemistry() back into SphP (non-eq. chemistry only). Must be called with the same target[]
  * as the preceding grackle_gather(), and before SphP species are modified. */
-static void grackle_scatter_species(int n, const int *target)
+static void grackle_scatter_species_impl(int n, const int *target)
 {
 #if (GRACKLE_CHEMISTRY >= 1)
   for(int k = 0; k < n; k++)
@@ -252,6 +252,22 @@ static void grackle_scatter_species(int n, const int *target)
 #endif /* GRACKLE_CHEMISTRY >= 1 */
 }
 
+static void grackle_gather(int n, const int *target, const double *u, const double *rho, int consume_rates)
+{
+  TIMER_START(CPU_GRACKLE_GATHER);
+  grackle_gather_impl(n, target, u, rho, consume_rates);
+  TIMER_STOP(CPU_GRACKLE_GATHER);
+}
+
+static void grackle_scatter_species(int n, const int *target)
+{
+  TIMER_START(CPU_GRACKLE_SCATTER);
+  grackle_scatter_species_impl(n, target);
+  TIMER_STOP(CPU_GRACKLE_SCATTER);
+}
+
+static void grackle_stats_record(int n);
+
 /* 'mode' -- tells the routine what to do
  *
  *     0 == solve chemistry and assign new abundances
@@ -271,8 +287,11 @@ double CallGrackle(double u_old, double rho, double dt, int target, int mode)
   switch(mode)
     {
       case 0: /* returns the new internal energy; in non-eq run it evolves the abundances */
+        TIMER_START(CPU_GRACKLE_SOLVE);
         if(solve_chemistry(&All.GrackleUnits, &GF, dt) == 0)
           terminate("GRACKLE: Error in solve_chemistry.\n");
+        TIMER_STOP(CPU_GRACKLE_SOLVE);
+        grackle_stats_record(1);
         grackle_scatter_species(1, &target);
         returnval = GF.internal_energy[0];
         break;
@@ -280,7 +299,10 @@ double CallGrackle(double u_old, double rho, double dt, int target, int mode)
       case 1: /* returns the instantaneous cooling time */
         {
           gr_float cooling_time;
-          if(calculate_cooling_time(&All.GrackleUnits, &GF, &cooling_time) == 0)
+          TIMER_START(CPU_GRACKLE_SOLVE);
+          int ok_ = calculate_cooling_time(&All.GrackleUnits, &GF, &cooling_time);
+          TIMER_STOP(CPU_GRACKLE_SOLVE);
+          if(ok_ == 0)
             terminate("GRACKLE: Error in calculate_cooling_time.\n");
           returnval = cooling_time;
           break;
@@ -288,7 +310,10 @@ double CallGrackle(double u_old, double rho, double dt, int target, int mode)
       case 2: /* returns the gas temperature */
         {
           gr_float temperature;
-          if(calculate_temperature(&All.GrackleUnits, &GF, &temperature) == 0)
+          TIMER_START(CPU_GRACKLE_SOLVE);
+          int ok_ = calculate_temperature(&All.GrackleUnits, &GF, &temperature);
+          TIMER_STOP(CPU_GRACKLE_SOLVE);
+          if(ok_ == 0)
             terminate("GRACKLE: Error in calculate_temperature.\n");
           returnval = temperature;
           break;
@@ -296,7 +321,10 @@ double CallGrackle(double u_old, double rho, double dt, int target, int mode)
       case 3: /* returns the gas pressure */
         {
           gr_float pressure;
-          if(calculate_pressure(&All.GrackleUnits, &GF, &pressure) == 0)
+          TIMER_START(CPU_GRACKLE_SOLVE);
+          int ok_ = calculate_pressure(&All.GrackleUnits, &GF, &pressure);
+          TIMER_STOP(CPU_GRACKLE_SOLVE);
+          if(ok_ == 0)
             terminate("GRACKLE: Error in calculate_pressure.\n");
           returnval = pressure;
           break;
@@ -304,7 +332,10 @@ double CallGrackle(double u_old, double rho, double dt, int target, int mode)
       case 4: /* returns gamma (effective adiabatic index) - useful only if molecules (H2,HD) are included */
         {
           gr_float gamma;
-          if(calculate_gamma(&All.GrackleUnits, &GF, &gamma) == 0)
+          TIMER_START(CPU_GRACKLE_SOLVE);
+          int ok_ = calculate_gamma(&All.GrackleUnits, &GF, &gamma);
+          TIMER_STOP(CPU_GRACKLE_SOLVE);
+          if(ok_ == 0)
             terminate("GRACKLE: Error in calculate_gamma.\n");
           returnval = gamma;
           break;
@@ -312,6 +343,48 @@ double CallGrackle(double u_old, double rho, double dt, int target, int mode)
     }
 
   return returnval;
+}
+
+/* Statistics on the size of the blocks passed to solve_chemistry(), to see how much batching there is to gain.
+ * Bucket b holds blocks with 2^(b-1) < n <= 2^b (bucket 0: n = 1). Reported at the end of the run by GrackleReportStats(). */
+#define GRACKLE_NBUCKETS 24
+static long long StatBlocks[GRACKLE_NBUCKETS], StatCells[GRACKLE_NBUCKETS];
+
+static void grackle_stats_record(int n)
+{
+  int b = 0;
+  while(b < GRACKLE_NBUCKETS - 1 && (1 << b) < n)
+    b++;
+  StatBlocks[b]++;
+  StatCells[b] += n;
+}
+
+/*! \brief Print the distribution of Grackle block sizes, summed over all tasks. Collective; call on all tasks. */
+void GrackleReportStats(void)
+{
+  long long blocks[GRACKLE_NBUCKETS], cells[GRACKLE_NBUCKETS];
+  MPI_Reduce(StatBlocks, blocks, GRACKLE_NBUCKETS, MPI_LONG_LONG, MPI_SUM, 0, MPI_COMM_WORLD);
+  MPI_Reduce(StatCells, cells, GRACKLE_NBUCKETS, MPI_LONG_LONG, MPI_SUM, 0, MPI_COMM_WORLD);
+
+  if(ThisTask != 0)
+    return;
+
+  long long tb = 0, tc = 0;
+  for(int b = 0; b < GRACKLE_NBUCKETS; b++)
+    {
+      tb += blocks[b];
+      tc += cells[b];
+    }
+
+  printf("GRACKLE: solve_chemistry blocks (all tasks): %lld blocks, %lld cell-solves, mean %.1f cells/block\n", tb, tc,
+         tb ? (double)tc / tb : 0.0);
+  printf("GRACKLE:   block size      blocks  %%blocks   cells  %%cells\n");
+  for(int b = 0; b < GRACKLE_NBUCKETS; b++)
+    if(blocks[b])
+      {
+        printf("GRACKLE:   %s%-8d %12lld %7.2f %12lld %7.2f\n", b == 0 ? "   " : "<= ", 1 << b, blocks[b], 100.0 * blocks[b] / tb,
+               cells[b], 100.0 * cells[b] / tc);
+      }
 }
 
 /*! \brief Cooling times for n cells at given thermal energies and proper densities, in one Grackle call.
@@ -327,7 +400,10 @@ void GrackleCoolingTimes(int n, const int *cells, const double *u, const double 
   grackle_gather(n, cells, u, rho, 0);
 
   gr_float *t = mymalloc("grackle_tcool", n * sizeof(gr_float));
-  if(calculate_cooling_time(&All.GrackleUnits, &GF, t) == 0)
+  TIMER_START(CPU_GRACKLE_SOLVE);
+  int ok = calculate_cooling_time(&All.GrackleUnits, &GF, t);
+  TIMER_STOP(CPU_GRACKLE_SOLVE);
+  if(ok == 0)
     terminate("GRACKLE: Error in calculate_cooling_time.\n");
 
   for(int k = 0; k < n; k++)
@@ -404,7 +480,10 @@ void GrackleCoolCells(int ncells, const int *list)
 #ifdef COOLING_TIMESTEP_LIMITER
       /* evaluated from the pre-cooling state */
       gr_float *tcool = mymalloc("grackle_tcool", n * sizeof(gr_float));
-      if(calculate_cooling_time(&All.GrackleUnits, &GF, tcool) == 0)
+      TIMER_START(CPU_GRACKLE_SOLVE);
+      int ok = calculate_cooling_time(&All.GrackleUnits, &GF, tcool);
+      TIMER_STOP(CPU_GRACKLE_SOLVE);
+      if(ok == 0)
         terminate("GRACKLE: Error in calculate_cooling_time.\n");
       for(int k = 0; k < n; k++)
         {
@@ -418,8 +497,12 @@ void GrackleCoolCells(int ncells, const int *list)
       /* dt == 0 (very first step): nothing to integrate, Grackle would complain */
       if(dtime > 0)
         {
-          if(solve_chemistry(&All.GrackleUnits, &GF, dtime) == 0)
+          TIMER_START(CPU_GRACKLE_SOLVE);
+          int ok_solve = solve_chemistry(&All.GrackleUnits, &GF, dtime);
+          TIMER_STOP(CPU_GRACKLE_SOLVE);
+          if(ok_solve == 0)
             terminate("GRACKLE: Error in solve_chemistry.\n");
+          grackle_stats_record(n);
           grackle_scatter_species(n, c);
         }
 
