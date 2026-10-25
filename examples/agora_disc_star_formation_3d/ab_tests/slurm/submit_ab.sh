@@ -5,6 +5,7 @@
 #   submit_ab.sh base 1 0.01
 #   submit_ab.sh base 4 0.01 0.0025
 #   submit_ab.sh chem1 4 0.01 0.0025 -- GRACKLE_CHEMISTRY=1
+# Set PARAM_OVERRIDES="MinVolume=5e-4 ..." to change param.txt entries for both runs (use a new tag so old output is kept).
 # Set SKIP_BUILD=1 to reuse executables from an earlier build with the same tag; RTOL=1e-10 to allow round-off.
 # The example needs ICs/ and tables (get_ics.sh, get_tables.sh) in examples/agora_disc_star_formation_3d first.
 set -e
