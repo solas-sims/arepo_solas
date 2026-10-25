@@ -579,6 +579,7 @@ void swap_header(void);
 #if defined(COOLING)
 void cool_cell(int i);
 void cool_active_cells(void);
+void cool_cells(int ncells, const int *list);
 #endif /* #if defined(COOLING) */
 
 #ifdef EXACT_GRAVITY_FOR_PARTICLE_TYPE

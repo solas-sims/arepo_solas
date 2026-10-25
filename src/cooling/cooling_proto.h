@@ -56,4 +56,6 @@ void SetZeroIonization(void);
 void InitGrackle(void);
 double CallGrackle(double u_old, double rho, double dt, int cell, int mode);
 void GrackleCoolActive(void);
+void GrackleCoolCells(int ncells, const int *list);
+void GrackleCoolingTimes(int n, const int *cells, const double *u, const double *rho, double *tcool);
 #endif // USE_GRACKLE

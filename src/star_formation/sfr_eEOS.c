@@ -45,6 +45,9 @@
 #include "../main/allvars.h"
 #include "../main/proto.h"
 
+static void eeos_hot_phase(double gasdens, double *rho, double *tsfr, double *factorEVP, double *egyhot);
+static double eeos_effective_energy(double egyhot, double tcool, double tsfr, double *x);
+
 #include "../gravity/forcetree.h"
 
 /*! \brief Main driver for star formation and gas cooling.
@@ -62,13 +65,11 @@ void cooling_and_starformation(void)
 {
   TIMER_START(CPU_COOLINGSFR);
 
-  int idx, i, bin, flag;
-  double dt, dtime, ne = 1;
+  int idx, i, bin, flag, k;
+  double dt, dtime, ne;
   double unew, du;
   double cloudmass;
-  double factorEVP, dens;
-  double tsfr;
-  double egyeff, x;
+  double dens;
 
   /* note: assuming FULL ionization */
   double u_to_temp_fac =
@@ -79,8 +80,37 @@ void cooling_and_starformation(void)
     if(TimeBinSynchronized[bin])
       TimeBinSfr[bin] = 0;
 
-  for(idx = 0; idx < TimeBinsHydro.NActiveParticles; idx++)
+  /* The cooling decision for a cell depends on the effective equation of state (egyeff), which in turn needs the cooling time of
+   * the hot phase. To let the cooling be done in batches (with Grackle, one array call per time bin) this is done in passes:
+   *   1. temperature floor; for cells above the SF threshold, set up the hot phase
+   *   2. cooling times of the hot phase for all those cells at once -> egyeff, x, tsfr
+   *   3. cool all cells that are not sitting on/below the eEOS
+   *   4. star formation
+   * All quantities are per cell, so this is equivalent to the old cell-by-cell loop.
+   */
+  int nact = TimeBinsHydro.NActiveParticles;
+  int nmax = nact + 1;
+
+  double *a_thresh = mymalloc("eeos_thresh", nmax * sizeof(double)); /* < 0 marks a cell to be skipped */
+  double *a_egyeff = mymalloc("eeos_egyeff", nmax * sizeof(double));
+  double *a_x      = mymalloc("eeos_x", nmax * sizeof(double));
+  double *a_tsfr   = mymalloc("eeos_tsfr", nmax * sizeof(double));
+  int *eos_cell    = mymalloc("eeos_cell", nmax * sizeof(int));
+  int *eos_idx     = mymalloc("eeos_idx", nmax * sizeof(int));
+  double *eos_u    = mymalloc("eeos_u", nmax * sizeof(double));
+  double *eos_rho  = mymalloc("eeos_rho", nmax * sizeof(double));
+  double *eos_tc   = mymalloc("eeos_tc", nmax * sizeof(double));
+  int *cool_list   = mymalloc("eeos_cool", nmax * sizeof(int));
+  int neos = 0, ncool = 0;
+
+  /* pass 1: temperature floor and hot-phase set-up */
+  for(idx = 0; idx < nact; idx++)
     {
+      a_thresh[idx] = -1;
+      a_egyeff[idx] = 0.;
+      a_x[idx]      = 0.;
+      a_tsfr[idx]   = 0.;
+
       i = TimeBinsHydro.ActiveParticleList[idx];
       if(i < 0)
         continue;
@@ -98,9 +128,7 @@ void cooling_and_starformation(void)
        * documentation/source/sf_threshold_halo_mass.md */
       eos_dens_threshold *= sf_threshold_halo_mass_factor(i);
 #endif /* #ifdef SF_THRESHOLD_HALO_MASS_DEPENDENT */
-
-      dt    = (P[i].TimeBinHydro ? (((integertime)1) << P[i].TimeBinHydro) : 0) * All.Timebase_interval;
-      dtime = All.cf_atime * dt / All.cf_time_hubble_a;
+      a_thresh[idx] = eos_dens_threshold;
 
       /* apply the temperature floor */
 
@@ -113,19 +141,63 @@ void cooling_and_starformation(void)
       SphP[i].Utherm += du;
       SphP[i].Energy += All.cf_atime * All.cf_atime * du * P[i].Mass;
 
-      egyeff = 0.;
-      /* calculate the effective equation of state for gas above the density threshold */
+      /* effective equation of state for gas above the density threshold: first the hot phase */
       if(dens * All.cf_a3inv >= eos_dens_threshold)
         {
-          ne     = SphP[i].Ne;
-          egyeff = calc_egyeff(i, dens * All.cf_a3inv, &ne, &x, &tsfr, &factorEVP);
+          double rho, factorEVP;
+          eeos_hot_phase(dens * All.cf_a3inv, &rho, &a_tsfr[idx], &factorEVP, &eos_u[neos]);
+          eos_rho[neos]  = rho;
+          eos_cell[neos] = i;
+          eos_idx[neos]  = idx;
+          neos++;
         }
+    }
 
-      /* do cooling, except for gas above the EOS density threshold that is colder than the eEOS */
-      if(dens * All.cf_a3inv < eos_dens_threshold || (dens * All.cf_a3inv >= eos_dens_threshold && SphP[i].Utherm > egyeff))
-        {
-          cool_cell(i);
-        }
+  /* pass 2: cooling time of the hot phase of all above-threshold cells -> egyeff */
+#ifdef USE_GRACKLE
+  GrackleCoolingTimes(neos, eos_cell, eos_u, eos_rho, eos_tc);
+#else
+  for(k = 0; k < neos; k++)
+    {
+      ne        = SphP[eos_cell[k]].Ne; /* local copy: only used as a starting guess */
+      eos_tc[k] = GetCoolingTime(eos_u[k], eos_rho[k], &ne, eos_cell[k]);
+    }
+#endif
+  for(k = 0; k < neos; k++)
+    a_egyeff[eos_idx[k]] = eeos_effective_energy(eos_u[k], eos_tc[k], a_tsfr[eos_idx[k]], &a_x[eos_idx[k]]);
+
+  /* pass 3: do cooling, except for gas above the EOS density threshold that is colder than the eEOS */
+  for(idx = 0; idx < nact; idx++)
+    {
+      if(a_thresh[idx] < 0)
+        continue;
+
+      i    = TimeBinsHydro.ActiveParticleList[idx];
+      dens = SphP[i].Density;
+
+      if(dens * All.cf_a3inv < a_thresh[idx] || SphP[i].Utherm > a_egyeff[idx])
+        cool_list[ncool++] = i;
+    }
+
+  cool_cells(ncool, cool_list);
+
+  /* pass 4: star formation */
+  for(idx = 0; idx < nact; idx++)
+    {
+      if(a_thresh[idx] < 0)
+        continue;
+
+      i = TimeBinsHydro.ActiveParticleList[idx];
+
+      double eos_dens_threshold = a_thresh[idx];
+      double egyeff             = a_egyeff[idx];
+      double x                  = a_x[idx];
+      double tsfr               = a_tsfr[idx];
+
+      dens = SphP[i].Density;
+
+      dt    = (P[i].TimeBinHydro ? (((integertime)1) << P[i].TimeBinHydro) : 0) * All.Timebase_interval;
+      dtime = All.cf_atime * dt / All.cf_time_hubble_a;
 
       /* check whether conditions for star formation are fulfilled.
        * f=1  normal cooling
@@ -191,7 +263,18 @@ void cooling_and_starformation(void)
 
           TimeBinSfr[P[i].TimeBinHydro] += SphP[i].Sfr;
         }
-    } /* end of main loop over active particles */
+    } /* end of star formation loop over active particles */
+
+  myfree(cool_list);
+  myfree(eos_tc);
+  myfree(eos_rho);
+  myfree(eos_u);
+  myfree(eos_idx);
+  myfree(eos_cell);
+  myfree(a_tsfr);
+  myfree(a_x);
+  myfree(a_egyeff);
+  myfree(a_thresh);
 
   TIMER_STOP(CPU_COOLINGSFR);
 }
@@ -513,6 +596,44 @@ void set_units_sfr(void)
   All.EgySpecSN *= All.UnitMass_in_g / All.UnitEnergy_in_cgs;
 }
 
+/*! \brief Hot phase of the effective multi-phase model at a given density.
+ *
+ *  \param[in] gasdens gas density.
+ *  \param[out] rho density used (gasdens, but at least All.PhysDensThresh).
+ *  \param[out] tsfr Star formation timescale.
+ *  \param[out] factorEVP Supernova evaporation factor for given density.
+ *  \param[out] egyhot Specific energy of the hot phase.
+ */
+static void eeos_hot_phase(double gasdens, double *rho, double *tsfr, double *factorEVP, double *egyhot)
+{
+  *rho = dmax(gasdens, All.PhysDensThresh);
+
+  *tsfr = sqrt(All.PhysDensThresh / *rho) * All.MaxSfrTimescale;
+
+  *factorEVP = pow(*rho / All.PhysDensThresh, -0.8) * All.FactorEVP;
+
+  *egyhot = All.EgySpecSN / (1 + *factorEVP) + All.EgySpecCold;
+}
+
+/*! \brief Effective energy of the multi-phase model, given the cooling time of the hot phase.
+ *
+ *  \param[in] egyhot Specific energy of the hot phase.
+ *  \param[in] tcool Cooling time of the hot phase (0 for net heating). Only the magnitude is used, since Grackle returns negative
+ *             cooling times for cooling.
+ *  \param[in] tsfr Star formation timescale.
+ *  \param[out] x Fraction cold gas within model.
+ *
+ *  \return The effective specific energy.
+ */
+static double eeos_effective_energy(double egyhot, double tcool, double tsfr, double *x)
+{
+  double y = tsfr / fabs(tcool) * egyhot / (All.FactorSN * All.EgySpecSN - (1 - All.FactorSN) * All.EgySpecCold);
+
+  *x = 1 + 1 / (2 * y) - sqrt(1 / y + 1 / (4 * y * y));
+
+  return egyhot * (1 - *x) + All.EgySpecCold * (*x);
+}
+
 /*! \brief Calculate the effective energy of the multi-phase model.
  *
  *  \param[in] i (unused)
@@ -524,24 +645,13 @@ void set_units_sfr(void)
  */
 double calc_egyeff(int i, double gasdens, double *ne, double *x, double *tsfr, double *factorEVP)
 {
-  double egyhot, egyeff, tcool, y;
-  double rho = gasdens;
+  double rho, egyhot, tcool;
 
-  rho = dmax(rho, All.PhysDensThresh);
+  eeos_hot_phase(gasdens, &rho, tsfr, factorEVP, &egyhot);
 
-  *tsfr = sqrt(All.PhysDensThresh / rho) * All.MaxSfrTimescale;
+  /* the cooling time of the hot phase depends on the composition of the cell; index 0 is a dummy for cell-independent calls
+   * (i = -1, e.g. from init_clouds()) */
+  tcool = GetCoolingTime(egyhot, rho, ne, (i >= 0) ? i : 0);
 
-  *factorEVP = pow(rho / All.PhysDensThresh, -0.8) * All.FactorEVP;
-
-  egyhot = All.EgySpecSN / (1 + *factorEVP) + All.EgySpecCold;
-
-  tcool = GetCoolingTime(egyhot, rho, ne, 0); /* 0 is a dummy for when running the SH03 model */
-
-  y = *tsfr / tcool * egyhot / (All.FactorSN * All.EgySpecSN - (1 - All.FactorSN) * All.EgySpecCold);
-
-  *x = 1 + 1 / (2 * y) - sqrt(1 / y + 1 / (4 * y * y));
-
-  egyeff = egyhot * (1 - *x) + All.EgySpecCold * (*x);
-
-  return egyeff;
+  return eeos_effective_energy(egyhot, tcool, *tsfr, x);
 }

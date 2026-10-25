@@ -83,9 +83,10 @@ static void grackle_prepare_block(int n)
   All.GrackleUnits.a_value = All.cf_atime;
 }
 
-/* Fill the field arrays for the n cells target[0..n-1], using the thermal energies u[] and the (proper) densities rho[]. This also
- * consumes (zeroes) the accumulated radiation rates stored in SphP. */
-static void grackle_gather(int n, const int *target, const double *u, const double *rho)
+/* Fill the field arrays for the n cells target[0..n-1], using the thermal energies u[] and the (proper) densities rho[]. If
+ * consume_rates is set, the accumulated radiation rates stored in SphP are zeroed once they have been passed to Grackle; this must
+ * only be done for the call that actually integrates the cell (solve_chemistry), not for diagnostic queries. */
+static void grackle_gather(int n, const int *target, const double *u, const double *rho, int consume_rates)
 {
   grackle_prepare_block(n);
 
@@ -151,14 +152,16 @@ static void grackle_gather(int n, const int *target, const double *u, const doub
        * [erg s^-1 cm^-3] / n; ionization rates in [1/time_units]; specific heating rate in [erg s^-1 g^-1] */
 #ifdef PHOTOELECTRIC_HEATING
       GF.volumetric_heating_rate[k] = (gr_float)(SphP[i].PE_VolHeatingRate);
-      SphP[i].PE_VolHeatingRate     = 0;
+      if(consume_rates)
+        SphP[i].PE_VolHeatingRate = 0;
 #else
       GF.volumetric_heating_rate[k] = 0;
 #endif
 
 #ifdef DISSOCIATION
       GF.RT_H2_dissociation_rate[k] = (gr_float)(SphP[i].H2_DissociationRate);
-      SphP[i].H2_DissociationRate   = 0;
+      if(consume_rates)
+        SphP[i].H2_DissociationRate = 0;
 #else
       GF.RT_H2_dissociation_rate[k] = 0;
 #endif
@@ -170,8 +173,9 @@ static void grackle_gather(int n, const int *target, const double *u, const doub
       GF.RT_HI_ionization_rate[k]   = (gr_float)(SphP[i].HI_IonizationRate);
       GF.RT_HeI_ionization_rate[k]  = (gr_float)(SphP[i].HeI_IonizationRate);
       GF.RT_HeII_ionization_rate[k] = (gr_float)(SphP[i].HeII_IonizationRate);
-      SphP[i].HI_HeatingRate = SphP[i].HeI_HeatingRate = SphP[i].HeII_HeatingRate = SphP[i].HI_IonizationRate =
-          SphP[i].HeI_IonizationRate = SphP[i].HeII_IonizationRate = 0;
+      if(consume_rates)
+        SphP[i].HI_HeatingRate = SphP[i].HeI_HeatingRate = SphP[i].HeII_HeatingRate = SphP[i].HI_IonizationRate =
+            SphP[i].HeI_IonizationRate = SphP[i].HeII_IonizationRate = 0;
 #else
       GF.RT_HI_heating_rate[k]      = 0;
       GF.RT_HeI_heating_rate[k]     = 0;
@@ -262,7 +266,7 @@ double CallGrackle(double u_old, double rho, double dt, int target, int mode)
 {
   gr_float returnval = 0.0;
 
-  grackle_gather(1, &target, &u_old, &rho);
+  grackle_gather(1, &target, &u_old, &rho, mode == 0);
 
   switch(mode)
     {
@@ -310,28 +314,49 @@ double CallGrackle(double u_old, double rho, double dt, int target, int mode)
   return returnval;
 }
 
-/*! \brief Apply Grackle cooling to all active gas cells, batched per time bin.
+/*! \brief Cooling times for n cells at given thermal energies and proper densities, in one Grackle call.
+ *
+ *  Batched equivalent of calling GetCoolingTime() for each cell: tcool[k] is 0 for heating, otherwise Grackle's cooling time
+ *  (negative = cooling; same convention as GetCoolingTime()). The radiation rates in SphP are left untouched.
+ */
+void GrackleCoolingTimes(int n, const int *cells, const double *u, const double *rho, double *tcool)
+{
+  if(n == 0)
+    return;
+
+  grackle_gather(n, cells, u, rho, 0);
+
+  gr_float *t = mymalloc("grackle_tcool", n * sizeof(gr_float));
+  if(calculate_cooling_time(&All.GrackleUnits, &GF, t) == 0)
+    terminate("GRACKLE: Error in calculate_cooling_time.\n");
+
+  for(int k = 0; k < n; k++)
+    tcool[k] = (t[k] >= 0) ? 0.0 : t[k];
+
+  myfree(t);
+}
+
+/*! \brief Apply Grackle cooling to a list of gas cells, batched per time bin.
  *
  *  Replaces the per-cell chain cool_cell() -> DoCooling() -> CallGrackle(). solve_chemistry() takes one scalar dt, and the cooling
- *  step of a cell is set by its hydro time bin, so the active cells are grouped by TimeBinHydro and each non-empty bin is passed to
+ *  step of a cell is set by its hydro time bin, so the cells are grouped by TimeBinHydro and each non-empty bin is passed to
  *  Grackle as a single array. Per cell, the update of Utherm/Energy/pressure is identical to cool_cell().
  *
  *  Cells with Mass == 0 (swallowed/eliminated) are skipped. The thermal energy floor All.MinEgySpec is applied to the Grackle input
  *  exactly as in cool_cell().
+ *
+ *  \param[in] ncells number of entries in list
+ *  \param[in] list   indices of the gas cells to cool
  */
-void GrackleCoolActive(void)
+void GrackleCoolCells(int ncells, const int *list)
 {
-  int nactive = TimeBinsHydro.NActiveParticles;
-  if(nactive == 0)
-    return;
-
-  /* counting sort of the active cells by hydro time bin */
+  /* counting sort of the cells by hydro time bin */
   int count[TIMEBINS + 1];
   memset(count, 0, sizeof(count));
 
-  for(int idx = 0; idx < nactive; idx++)
+  for(int k = 0; k < ncells; k++)
     {
-      int i = TimeBinsHydro.ActiveParticleList[idx];
+      int i = list[k];
       if(i >= 0 && P[i].Mass != 0)
         count[P[i].TimeBinHydro + 1]++;
     }
@@ -348,9 +373,9 @@ void GrackleCoolActive(void)
   int *fill   = mymalloc("grackle_fill", (TIMEBINS + 1) * sizeof(int));
   memcpy(fill, count, (TIMEBINS + 1) * sizeof(int));
 
-  for(int idx = 0; idx < nactive; idx++)
+  for(int k = 0; k < ncells; k++)
     {
-      int i = TimeBinsHydro.ActiveParticleList[idx];
+      int i = list[k];
       if(i >= 0 && P[i].Mass != 0)
         cell[fill[P[i].TimeBinHydro]++] = i;
     }
@@ -374,17 +399,17 @@ void GrackleCoolActive(void)
           rb[k] = SphP[c[k]].Density * All.cf_a3inv;
         }
 
-      grackle_gather(n, c, ub, rb);
+      grackle_gather(n, c, ub, rb, 1);
 
 #ifdef COOLING_TIMESTEP_LIMITER
-      /* evaluated from the pre-cooling state; same conversion as GetCoolingTime() */
+      /* evaluated from the pre-cooling state */
       gr_float *tcool = mymalloc("grackle_tcool", n * sizeof(gr_float));
       if(calculate_cooling_time(&All.GrackleUnits, &GF, tcool) == 0)
         terminate("GRACKLE: Error in calculate_cooling_time.\n");
       for(int k = 0; k < n; k++)
         {
           /* Grackle's cooling time is in its code time_units (negative = cooling) */
-          double t                 = (tcool[k] >= 0) ? 0.0 : tcool[k];
+          double t                   = (tcool[k] >= 0) ? 0.0 : tcool[k];
           SphP[c[k]].CoolingTimestep = (t != 0) ? All.CoolingTimestepFactor * fabs(t) : 0;
         }
       myfree(tcool);
@@ -400,7 +425,7 @@ void GrackleCoolActive(void)
 
       for(int k = 0; k < n; k++)
         {
-          int i      = c[k];
+          int i       = c[k];
           double unew = (dtime > 0) ? GF.internal_energy[k] : ub[k];
 
           if(unew < 0)
@@ -425,6 +450,12 @@ void GrackleCoolActive(void)
   myfree(rho);
   myfree(u);
   myfree(cell);
+}
+
+/*! \brief Apply Grackle cooling to all active gas cells; see GrackleCoolCells(). */
+void GrackleCoolActive(void)
+{
+  GrackleCoolCells(TimeBinsHydro.NActiveParticles, TimeBinsHydro.ActiveParticleList);
 }
 
 /* Function that initialises Grackle */
