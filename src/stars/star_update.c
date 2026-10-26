@@ -350,6 +350,13 @@ void star_prep(void)
   TIMER_STOP(CPU_STARS_PREP);
 }
 
+/*! Fraction of a host cell's mass that must survive the net removal by SN host sweeping (matches the 0.1 floor used when the
+ *  removal is sized in star_feedback.c). */
+#define STAR_FEEDBACK_MIN_HOST_MASS_FRACTION 0.1
+
+/*! Cumulative host-removal limiter statistics (this task): [0] cells limited, [1] mass, [2] energy not removed. */
+static double FeedbackLimiter[3] = {0, 0, 0};
+
 void star_perform_end_of_step_physics(void)
 {
   int idx, i;
@@ -386,6 +393,34 @@ void star_perform_end_of_step_physics(void)
         continue;
 
 #if defined(WINDS) || defined(SUPERNOVAE)
+      /* The host-cell removal of an SN event (star_feedback.c) is sized from the cell's mass at the time of the event, but it only
+       * reaches the cell here, when the cell is next active. A cell on a long time step exchanges fluxes with its short-step
+       * neighbours in between and can have lost mass, so the pending net removal can exceed what is left (and momentum and energy
+       * go negative with it). Limit the net removal so that at least STAR_FEEDBACK_MIN_HOST_MASS_FRACTION of the cell survives,
+       * scaling all pending components together so the surviving gas keeps its specific momentum and energy.
+       * This is not conservative -- the neighbours have already received the full amounts -- so the mass, momentum and energy
+       * that are not removed are accumulated and reported in the STARS log lines. */
+      if(SphP[i].StarMassFeed < 0 && P[i].Mass + SphP[i].StarMassFeed < STAR_FEEDBACK_MIN_HOST_MASS_FRACTION * P[i].Mass)
+        {
+          double s = (1.0 - STAR_FEEDBACK_MIN_HOST_MASS_FRACTION) * P[i].Mass / (-SphP[i].StarMassFeed);
+
+          FeedbackLimiter[0] += 1;
+          FeedbackLimiter[1] += (1.0 - s) * (-SphP[i].StarMassFeed);
+          FeedbackLimiter[2] += (1.0 - s) * (-SphP[i].StarEnergyFeed);
+
+          SphP[i].StarMassFeed *= s;
+          SphP[i].StarEnergyFeed *= s;
+          for(int k = 0; k < 3; k++)
+            SphP[i].StarMomentumFeed[k] *= s;
+#ifdef METALS
+          SphP[i].StarMetalsFeed *= s;
+#endif
+#if GRACKLE_CHEMISTRY >= 1
+          for(int sp = 0; sp < GRACKLE_SPECIES_NUMBER; sp++)
+            SphP[i].StarChemFeed[sp] *= s;
+#endif
+        }
+
       /* Add mass */
       double old_mass_before_feed = P[i].Mass;
       P[i].Mass += SphP[i].StarMassFeed;
@@ -486,4 +521,10 @@ void star_perform_end_of_step_physics(void)
     All.StarFeedbackGlobal[1], All.StarFeedbackGlobal[4]);
     mpi_printf("STARS: Energy given by StarParts = %e, Energy taken up by gas particles = %e \n",
     All.StarFeedbackGlobal[2], All.StarFeedbackGlobal[5]);
+
+    double limiter_global[3];
+    MPI_Allreduce(FeedbackLimiter, limiter_global, 3, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+    if(limiter_global[0] > 0)
+      mpi_printf("STARS: host-removal limiter (cumulative): %.0f cells limited, mass not removed = %e, energy not removed = %e \n",
+                 limiter_global[0], limiter_global[1], limiter_global[2]);
 } 
