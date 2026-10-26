@@ -357,6 +357,119 @@ void star_prep(void)
 /*! Cumulative host-removal limiter statistics (this task): [0] cells limited, [1] mass, [2] energy not removed. */
 static double FeedbackLimiter[3] = {0, 0, 0};
 
+/* The host-cell removal of an SN event (star_feedback.c) is sized from the cell's mass at the time of the event, but without
+ * STAR_FEEDBACK_IMMEDIATE_DEPOSIT it only reaches the cell when the cell is next active. A cell on a long time step exchanges
+ * fluxes with its short-step neighbours in between and can have lost mass, so the pending net removal can exceed what is left
+ * (and momentum and energy go negative with it). Limit the net removal so that at least STAR_FEEDBACK_MIN_HOST_MASS_FRACTION of
+ * the cell survives, scaling all pending components together so the surviving gas keeps its specific momentum and energy.
+ * This is not conservative -- the neighbours have already received the full amounts -- so the mass and energy that are not
+ * removed are accumulated and reported in the STARS log lines. */
+static void limit_host_removal(int i)
+{
+  if(SphP[i].StarMassFeed < 0 && P[i].Mass + SphP[i].StarMassFeed < STAR_FEEDBACK_MIN_HOST_MASS_FRACTION * P[i].Mass)
+    {
+      double s = (1.0 - STAR_FEEDBACK_MIN_HOST_MASS_FRACTION) * P[i].Mass / (-SphP[i].StarMassFeed);
+
+      FeedbackLimiter[0] += 1;
+      FeedbackLimiter[1] += (1.0 - s) * (-SphP[i].StarMassFeed);
+      FeedbackLimiter[2] += (1.0 - s) * (-SphP[i].StarEnergyFeed);
+
+      SphP[i].StarMassFeed *= s;
+      SphP[i].StarEnergyFeed *= s;
+      for(int k = 0; k < 3; k++)
+        SphP[i].StarMomentumFeed[k] *= s;
+#ifdef METALS
+      SphP[i].StarMetalsFeed *= s;
+#endif
+#if GRACKLE_CHEMISTRY >= 1
+      for(int sp = 0; sp < GRACKLE_SPECIES_NUMBER; sp++)
+        SphP[i].StarChemFeed[sp] *= s;
+#endif
+    }
+}
+
+#ifdef STAR_FEEDBACK_IMMEDIATE_DEPOSIT
+/*! \brief Apply the pending wind/SN feed of the given cells to their conserved variables right away.
+ *
+ *  Called at the end of star_feedback(), for every cell that received a kick. Unlike the end-of-step application in
+ *  star_perform_end_of_step_physics() (which only reaches active cells), this updates the conserved variables (Mass, Momentum,
+ *  Energy, metals, chemical species) of the cell whether or not it is active, exactly as the hydro flux exchange does. Primitive
+ *  variables are left alone: active cells get them from update_primitive_variables(), inactive ones when they are next active.
+ *  Removals are therefore evaluated against the same cell content they were sized from and cannot overshoot.
+ *
+ *  \param[in] n    number of entries in list
+ *  \param[in] list local gas cell indices (duplicates are harmless)
+ */
+void star_flush_pending_feed(int n, const int *list)
+{
+  for(int k = 0; k < n; k++)
+    {
+      int i = list[k];
+      if(i < 0 || i >= NumGas)
+        continue;
+
+      int pending = (SphP[i].StarMassFeed != 0 || SphP[i].StarEnergyFeed != 0 || SphP[i].StarMomentumFeed[0] != 0 ||
+                     SphP[i].StarMomentumFeed[1] != 0 || SphP[i].StarMomentumFeed[2] != 0);
+#ifdef METALS
+      pending |= (SphP[i].StarMetalsFeed != 0);
+#endif
+      if(!pending)
+        continue;
+
+      limit_host_removal(i);
+
+      /* Add mass */
+      double old_mass_before_feed = P[i].Mass;
+      P[i].Mass += SphP[i].StarMassFeed;
+
+      if(P[i].Mass <= 0)
+        {
+          double floor_mass = fmax(1.0e-3 * All.TargetGasMass, 1.0e-3 * old_mass_before_feed);
+          if(floor_mass <= 0)
+            floor_mass = 1.0e-3 * All.TargetGasMass;
+
+          printf("WARNING: STAR_FEEDBACK: cell ID=%lld (task=%d) driven to non-positive mass by immediate feedback deposition (old "
+                 "Mass=%g, StarMassFeed=%g, resulting Mass=%g) -- clamping to %g\n",
+                 (long long)P[i].ID, ThisTask, old_mass_before_feed, SphP[i].StarMassFeed, P[i].Mass, floor_mass);
+          myflush(stdout);
+
+          P[i].Mass = floor_mass;
+        }
+
+      All.StarFeedbackLocal[3] += SphP[i].StarMassFeed;
+      SphP[i].StarMassFeed = 0;
+
+#if GRACKLE_CHEMISTRY >= 1
+      for(int sp = 0; sp < GRACKLE_SPECIES_NUMBER; sp++)
+        {
+          SphP[i].GrackleSpeciesConserved(GRACKLE_SPECIES_INDEX + sp) += SphP[i].StarChemFeed[sp];
+          SphP[i].StarChemFeed[sp] = 0;
+        }
+#endif
+#ifdef METALS
+      SphP[i].GasMetals += SphP[i].StarMetalsFeed;
+      All.StarFeedbackLocal[4] += SphP[i].StarMetalsFeed;
+      SphP[i].StarMetalsFeed = 0;
+#endif
+
+      for(int d = 0; d < 3; d++)
+        {
+          SphP[i].Momentum[d] += SphP[i].StarMomentumFeed[d];
+          SphP[i].StarMomentumFeed[d] = 0;
+        }
+
+      SphP[i].Energy += SphP[i].StarEnergyFeed;
+      All.StarFeedbackLocal[5] += SphP[i].StarEnergyFeed;
+      SphP[i].StarEnergyFeed = 0;
+
+      /* OldMass bounds the mass a face may transport (face_limit_fluxes); keep it consistent with a lowered mass, as
+       * done in the primitive-variable exchange */
+      if(P[i].Mass < SphP[i].OldMass)
+        SphP[i].OldMass = P[i].Mass;
+    }
+}
+#endif /* #ifdef STAR_FEEDBACK_IMMEDIATE_DEPOSIT */
+
 void star_perform_end_of_step_physics(void)
 {
   int idx, i;
@@ -393,33 +506,7 @@ void star_perform_end_of_step_physics(void)
         continue;
 
 #if defined(WINDS) || defined(SUPERNOVAE)
-      /* The host-cell removal of an SN event (star_feedback.c) is sized from the cell's mass at the time of the event, but it only
-       * reaches the cell here, when the cell is next active. A cell on a long time step exchanges fluxes with its short-step
-       * neighbours in between and can have lost mass, so the pending net removal can exceed what is left (and momentum and energy
-       * go negative with it). Limit the net removal so that at least STAR_FEEDBACK_MIN_HOST_MASS_FRACTION of the cell survives,
-       * scaling all pending components together so the surviving gas keeps its specific momentum and energy.
-       * This is not conservative -- the neighbours have already received the full amounts -- so the mass, momentum and energy
-       * that are not removed are accumulated and reported in the STARS log lines. */
-      if(SphP[i].StarMassFeed < 0 && P[i].Mass + SphP[i].StarMassFeed < STAR_FEEDBACK_MIN_HOST_MASS_FRACTION * P[i].Mass)
-        {
-          double s = (1.0 - STAR_FEEDBACK_MIN_HOST_MASS_FRACTION) * P[i].Mass / (-SphP[i].StarMassFeed);
-
-          FeedbackLimiter[0] += 1;
-          FeedbackLimiter[1] += (1.0 - s) * (-SphP[i].StarMassFeed);
-          FeedbackLimiter[2] += (1.0 - s) * (-SphP[i].StarEnergyFeed);
-
-          SphP[i].StarMassFeed *= s;
-          SphP[i].StarEnergyFeed *= s;
-          for(int k = 0; k < 3; k++)
-            SphP[i].StarMomentumFeed[k] *= s;
-#ifdef METALS
-          SphP[i].StarMetalsFeed *= s;
-#endif
-#if GRACKLE_CHEMISTRY >= 1
-          for(int sp = 0; sp < GRACKLE_SPECIES_NUMBER; sp++)
-            SphP[i].StarChemFeed[sp] *= s;
-#endif
-        }
+      limit_host_removal(i);
 
       /* Add mass */
       double old_mass_before_feed = P[i].Mass;

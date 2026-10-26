@@ -54,6 +54,11 @@
 #PHOTOIONIZATION        # Only photoionization
 
 #SUPERNOVAE             # Only supernovae
+#STAR_FEEDBACK_IMMEDIATE_DEPOSIT  # Requires WINDS and/or SUPERNOVAE. Apply the wind/SN mass, momentum, energy, metals and species
+                                  # to the conserved variables of every receiving cell at the end of star_feedback(), instead of when each
+                                  # cell is next active. With hierarchical time steps a long-step cell otherwise exchanges fluxes with
+                                  # its neighbours between the event and the application, so SN host-cell removals can exceed the cell
+                                  # content (negative mass/energy). Default (off) keeps the previous behaviour.
 
 #TREECOLUMN             # Column density estimate through the gravity tree (src/gravity/forcetree.c)
 #RAD_OPENING_ANGLE      # Alternate tree-opening criterion for radiation transport neighbour walks (src/ngbtree/ngbtree.c)

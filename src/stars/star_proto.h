@@ -94,6 +94,9 @@ void star_feedback(void);
 
 #if defined(WINDS) || defined(RADIATION_PRESSURE) || defined(SUPERNOVAE)
 void star_perform_end_of_step_physics(void);
+#ifdef STAR_FEEDBACK_IMMEDIATE_DEPOSIT
+void star_flush_pending_feed(int n, const int *list);
+#endif
 #endif
 
 #ifdef STAR_FEEDBACK_ACTIVE
