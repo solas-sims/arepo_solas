@@ -19,6 +19,7 @@ STAR_PARTICLES=1       # Star particles model flag: set to 0, 1 for massive star
 WINDS                  # Only winds
 #RADIATION              # Full radiation
 SUPERNOVAE             # Only supernovae
+STAR_FEEDBACK_IMMEDIATE_DEPOSIT  # Apply wind/SN feed to conserved variables at the event (robust with hierarchical time steps)
 
 #STAR_HOST_REFINEMENT
 
