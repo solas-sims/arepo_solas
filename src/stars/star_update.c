@@ -401,6 +401,26 @@ void star_perform_end_of_step_physics(void)
               "feedback deposition (old Mass=%g, StarMassFeed=%g, resulting Mass=%g) -- clamping to %g\n",
               (long long)P[i].ID, ThisTask, P[i].Pos[0], P[i].Pos[1], P[i].Pos[2], old_mass_before_feed,
               SphP[i].StarMassFeed, P[i].Mass, floor_mass);
+          /* diagnostic: state that is left behind when only the mass is clamped (momentum and energy are not rescaled) */
+          {
+            double p_after[3], mom2 = 0;
+            for(int k = 0; k < 3; k++)
+              {
+                p_after[k] = SphP[i].Momentum[k] + SphP[i].StarMomentumFeed[k];
+                mom2 += p_after[k] * p_after[k];
+              }
+            double E_after = SphP[i].Energy + SphP[i].StarEnergyFeed;
+            printf(
+                "WARNING: STAR_FEEDBACK:   cell ID=%lld TimeBinHydro=%d Volume=%g  before feed: Momentum=%g|%g|%g Energy=%g  pending feed: "
+                "Momentum=%g|%g|%g Energy=%g  => after clamp |v|=%g specific energy=%g (old: |v|=%g, E/m=%g)\n",
+                (long long)P[i].ID, P[i].TimeBinHydro, SphP[i].Volume, SphP[i].Momentum[0], SphP[i].Momentum[1], SphP[i].Momentum[2],
+                SphP[i].Energy, SphP[i].StarMomentumFeed[0], SphP[i].StarMomentumFeed[1], SphP[i].StarMomentumFeed[2],
+                SphP[i].StarEnergyFeed, sqrt(mom2) / floor_mass, E_after / floor_mass,
+                old_mass_before_feed > 0 ? sqrt(SphP[i].Momentum[0] * SphP[i].Momentum[0] + SphP[i].Momentum[1] * SphP[i].Momentum[1] +
+                                                SphP[i].Momentum[2] * SphP[i].Momentum[2]) / old_mass_before_feed
+                                         : 0.0,
+                old_mass_before_feed > 0 ? SphP[i].Energy / old_mass_before_feed : 0.0);
+          }
           myflush(stdout);
 
           P[i].Mass = floor_mass;
