@@ -3,7 +3,14 @@ Arepo_SOLAS version
 
 Modified from the AREPO public version for the SOLAS project.
 
-Details of the physical models implemented can be found in this [high level description](https://github.com/solas-sims/arepo_solas/wiki/Code) and in [these technical details](https://github.com/solas-sims/arepo_solas/wiki/Parameters).
+Documentation is in `documentation/source/` (Sphinx):
+
+- [SOLAS parameter reference](documentation/source/solas-parameters.md)
+- [SIDM](documentation/source/sidm.md)
+- [Examples](documentation/source/examples.md)
+- [Technical reference](documentation/source/technical-reference.md)
+
+The [wiki](https://github.com/solas-sims/arepo_solas/wiki) has an older high-level description ([Code](https://github.com/solas-sims/arepo_solas/wiki/Code), [Parameters](https://github.com/solas-sims/arepo_solas/wiki/Parameters)); where it disagrees with the in-repo documentation, the in-repo documentation is current.
 
 How to contribute
 =================

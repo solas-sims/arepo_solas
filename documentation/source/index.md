@@ -23,6 +23,13 @@ with further development by Rüdiger Pakmor
 (www.arepo-code.org/people).  The public version of the code was
 compiled by Rainer Weinberger (rweinberger@aip.de).
 
+SOLAS fork
+==========
+
+This is the SOLAS version of Arepo: public Arepo plus star formation and stellar feedback, radiation,
+black holes, Grackle cooling, dark-matter modules (SIDM) and halo seeding. SOLAS-specific parameters are in
+``solas-parameters.md``, SIDM is in ``sidm.md`` and the examples are listed in ``examples.md``.
+
 Overview
 ========
 
@@ -92,3 +99,7 @@ Table of contents
   development.md
   technical-reference.md
   fof_halo_seeding.md
+  solas-parameters.md
+  sf_threshold_halo_mass.md
+  sidm.md
+  examples.md
