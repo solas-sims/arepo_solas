@@ -116,7 +116,6 @@ TreecoolFile                            ../../TREECOOL_ep
 
 %---- Grackle (USE_GRACKLE)
 GrackleDataFile                         ./grackle_data/cloudy_metals_2008_3D.h5
-GrackleSpeciesState                     0       % not read by this build; kept for consistency with the reference runs
 
 %---- Star formation (AGORA_SF)
 CritOverDensity                         57.7    % inert here: only used when ComovingIntegrationOn=1
@@ -131,10 +130,6 @@ IMF                                     1   % 0 = Kroupa, 1 = Chabrier, 2 = Salp
 StarTablesFile                          ./star_tables/star_feedback_tables.hdf5
 SN_LeadTime                             40   % Myr, time between star formation and first SN (TREE_BASED_TIMESTEPS+SUPERNOVAE)
 SN_HostShellSweepFrac                   0.1   % dimensionless, internally capped at 0.9 (src/stars/star_feedback.c)
-
-%---- Ray tracing (inert here: RADIATION is off in Config.sh)
-RaySplitFactor                          2
-RayMaxDistance                          100
 
 %---- Black holes (BLACKHOLES + BONDI_ACCRETION + BH_THERMAL_FEEDBACK); one central SMBH, read from the IC as PartType5
 BhDesNgb                                32      % target mass-weighted neighbour number for the BH smoothing length (value from the cosmo examples, untuned for a disc)

@@ -71,9 +71,9 @@ not from the parent:
 | `UnitLength_in_cm` | 3.08568e21 | 3.085678e21 | |
 | `MeanVolume` | 52734.4 | 536377 | both resolutions |
 
-`GrackleSpeciesState`, `RaySplitFactor` and `RayMaxDistance` are present in the param files for
-consistency with the reference files but are not used by this build (`RADIATION` is off;
-`GrackleSpeciesState` and `RayMaxDistance` are not read by this checkout at all).
+`GrackleSpeciesState`, `RaySplitFactor` and `RayMaxDistance` appear in the reference files but are **not** in the
+param files here: this build rejects tags it does not know (`Tag '...' not allowed`), and none of the three is
+registered with the `Config.sh` flags used here.
 `BoxSize` stays at each IC's header value (the reference files say 1300 for both).
 
 ### Resolution-dependent values
