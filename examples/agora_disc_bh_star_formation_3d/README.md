@@ -79,16 +79,17 @@ registered with the `Config.sh` flags used here.
 
 | | low-res | med-res |
 |---|---|---|
-| gas / halo / disc / bulge particles | 1e5 / 1e5 / 1e5 / 1.25e4 | 1e6 / 1e6 / 1e6 / 1.25e5 |
-| gas particle mass | 8.6e4 Msun | 8.6e3 Msun |
+| gas cells (incl. background grid) | 748,935 | 7,412,650 |
+| PartType1 / 2 / 3 | 100,000 / 100,000 / 12,500 | 1,000,000 / 1,000,000 / 125,000 |
+| `ReferenceGasPartMass` as gas particle mass | 8.6e4 Msun | 8.6e3 Msun |
 | `BoxSize` | 1300 kpc | 1300 kpc |
 | softenings (all types) | 0.08 kpc | 0.04 kpc |
 | `MinimumComovingHydroSoftening` | 0.08 | 0.04 |
 | `ReferenceGasPartMass` | 8.59322e-05 | 8.59322e-06 |
 | `MinVolume` | 5.12e-4 (dx >= 80 pc) | 6.40e-5 (dx >= 40 pc) |
 
-Particle counts and gas masses are those of the parent's low-res IC and the previous medium-res IC;
-they have not been re-checked against the current downloads.
+Particle counts are `Header/NumPart_Total` of the current ICs. Gas cell masses vary, because `ADDBACKGROUNDGRID`
+adds background-grid cells of different mass; `ReferenceGasPartMass` is the mass of the original gas particles.
 
 Common to both (from the parent): non-cosmological (`ComovingIntegrationOn=0`,
 `PeriodicBoundariesOn=0`); units 1 kpc, 1e9 Msun (`UnitMass_in_g=1.989e42`; not the 1e10 Msun of
@@ -108,7 +109,7 @@ Requires `python3` with `h5py` and `numpy`. The ICs are **not** committed (`.git
 Downloads `agora_lowres_arepo_ic-with-grid.hdf5` from Dropbox into `./ICs/` and writes
 `./ICs/agora_lowres_arepo_ic_with_bh.hdf5`. This is the AGORA low-resolution disc IC *after* the
 `ADDBACKGROUNDGRID` step (mesh already added), so it is ready to feed into an Arepo physics run.
-The gas `InternalEnergy` (~101 in code units) and the header `UnitMass_in_g` (1.989e42) are used
+The gas `InternalEnergy` (101.529 in code units) and the header `UnitMass_in_g` (1.989e42) are used
 as supplied; the script only appends the BH.
 
 ### Medium resolution
@@ -256,7 +257,7 @@ Not checked:
 - **The new IC downloads and updated param files have not been run.** The new Dropbox URLs and the
   `get_ics.sh` changes (no unit-mass or `InternalEnergy` edits) are untested, and the BH position
   at `BoxSize/2` has not been rechecked against the new low-res IC.
-- **Gas temperature.** Both ICs carry a gas `InternalEnergy` of ~101 (code units), used as supplied,
+- **Gas temperature.** Both ICs carry a gas `InternalEnergy` of 101.529 (code units), used as supplied,
   so `InitGasTemp` in the param files has no effect. How Grackle treats this initial energy is
   untested.
 - **Parameters:** the star-formation, feedback and metallicity values are the reference files'
