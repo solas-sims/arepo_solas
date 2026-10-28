@@ -73,7 +73,7 @@ not from the parent:
 `GrackleSpeciesState`, `RaySplitFactor` and `RayMaxDistance` appear in the reference files but are **not** in the
 param files here: this build rejects tags it does not know (`Tag '...' not allowed`), and none of the three is
 registered with the `Config.sh` flags used here.
-`BoxSize` is 1300 for both resolutions, as in the reference files. This differs from the IC headers (see below).
+`BoxSize` is 1300 for both resolutions, matching both IC headers and the reference files.
 
 ### Resolution-dependent values
 
@@ -81,8 +81,7 @@ registered with the `Config.sh` flags used here.
 |---|---|---|
 | gas / halo / disc / bulge particles | 1e5 / 1e5 / 1e5 / 1.25e4 | 1e6 / 1e6 / 1e6 / 1.25e5 |
 | gas particle mass | 8.6e4 Msun | 8.6e3 Msun |
-| `BoxSize` (param file) | 1300 kpc | 1300 kpc |
-| `BoxSize` (IC header) | 1200 kpc | 1523.4424 kpc |
+| `BoxSize` | 1300 kpc | 1300 kpc |
 | softenings (all types) | 0.08 kpc | 0.04 kpc |
 | `MinimumComovingHydroSoftening` | 0.08 | 0.04 |
 | `ReferenceGasPartMass` | 8.59322e-05 | 8.59322e-06 |
@@ -121,12 +120,12 @@ as supplied; the script only appends the BH.
 Downloads `agora_medres_arepo_ic-with-grid.hdf5` (the AGORA medium-resolution IC, also already
 through `ADDBACKGROUNDGRID`) into `./ICs/`. To use a local copy instead, pass its path. As for low
 resolution, units and gas `InternalEnergy` are used as supplied and the script only adds the BH,
-at the IC header's `BoxSize/2` = 761.72 kpc, the disc centre in this file. Other properties of the file:
+at `BoxSize/2` = 650 kpc, the disc centre in this file (assumed, not checked). Other properties of the file:
 
 | | medium-res file | note |
 |---|---|---|
 | disc / halo particle types | PartType1 = stellar disc, PartType2 = halo | **unchanged** (low-res is the reverse) |
-| `BoxSize` | 1523.44 (embedded parameters say 2000) | `param_medres.txt` uses 1300, which differs from the header |
+| `BoxSize` | 1300 (header) | `param_medres.txt` uses 1300 |
 
 The types are not swapped in the file. Softenings are equal for types 1 to 3, so the code is not
 affected, but anything assuming PartType2 is the disc (for example `agora_disc_diagnostics.py`)
@@ -257,7 +256,6 @@ Not checked:
 - **The new IC downloads and updated param files have not been run.** The new Dropbox URLs and the
   `get_ics.sh` changes (no unit-mass or `InternalEnergy` edits) are untested, and the BH position
   at `BoxSize/2` has not been rechecked against the new low-res IC.
-- **`BoxSize = 1300` against the IC headers.** The param file's box is smaller than the medium-res IC's own box (1523.44), and the BH and disc are placed about the header's `BoxSize/2` (600 kpc low-res, 761.72 kpc med-res), not 650. Whether Arepo accepts every particle and background-grid cell inside a 1300 kpc box has not been tested; if it stops with out-of-domain particles, the IC header and param file need to agree.
 - **Gas temperature.** Both ICs carry a gas `InternalEnergy` of ~101 (code units), used as supplied,
   so `InitGasTemp` in the param files has no effect. How Grackle treats this initial energy is
   untested.

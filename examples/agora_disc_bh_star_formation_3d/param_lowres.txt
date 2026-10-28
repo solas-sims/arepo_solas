@@ -30,7 +30,7 @@ Omega0                                  0.0
 OmegaLambda                             0.0
 OmegaBaryon                             0.0
 HubbleParam                             1.0
-BoxSize                                 1300    % kpc; set to 1300 for both resolutions (the IC headers say 1200 low-res, 1523.44 med-res)
+BoxSize                                 1300    % kpc, matches the IC file's /Header; disc centred at BoxSize/2
 
 %---- Output frequency and output parameters
 OutputListOn                            0
