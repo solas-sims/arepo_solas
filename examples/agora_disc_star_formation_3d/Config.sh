@@ -12,7 +12,7 @@ METALS                 # Advect all metals, ie metal mass fraction, as a PASSIVE
 
 #--------------------------------------- Cooling parameters
 USE_GRACKLE
-GRACKLE_CHEMISTRY=3
+GRACKLE_CHEMISTRY=2
 
 #--------------------------------------- Star Formation options
 AGORA_SF               # Agora based SF
