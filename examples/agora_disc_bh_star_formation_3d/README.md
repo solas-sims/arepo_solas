@@ -29,7 +29,7 @@ directory, or from wherever you have copied it.
 | `param_lowres.txt`, `param_medres.txt` | Runtime parameters for the two resolutions (replace the parent's single `param.txt`) |
 | `get_ics.sh` | Downloads the low- or medium-resolution IC into `./ICs/` and adds the central BH |
 | `add_central_bh.py` | Appends one `PartType5` particle at `BoxSize/2` to an IC file (called by `get_ics.sh`) |
-| `get_tables.sh` | Downloads the Grackle cooling table and the stellar feedback table (see section 2 for a caveat) |
+| `get_tables.sh` | Downloads the Grackle cooling table and the stellar feedback table |
 | `agora_disc_diagnostics.py` | Post-processing: radial profiles and smoothed density-grid projections from output snapshots |
 
 ## What differs from the parent example
@@ -63,7 +63,6 @@ not from the parent:
 | `IMF` | 0 (Kroupa) | 1 (Chabrier) | 2 = Salpeter |
 | `SN_LeadTime` | 3 | 40 | Myr |
 | `SN_HostShellSweepFrac` | 0.5 | 0.1 | internally capped at 0.9 |
-| `GrackleDataFile` | `./grackle_data/CloudyData_UVB=FG2011_shielded.h5` | `./grackle_data/cloudy_metals_2008_3D.h5` | fetched by `get_tables.sh` |
 | `TimeBetSnapshot` | 0.02 | 0.01 | ~9.8 Myr |
 | `MaxSizeTimestep` | 0.0005 | 1e-2 | |
 | `TimeBetStatistics` | 0.0234375 | 0 | |
@@ -144,11 +143,12 @@ offset of the stellar-disc centre of mass from the BH as a sanity check.
 
 Downloads two files (gitignored, same pattern as `ICs/`):
 
-### `./grackle_data/cloudy_metals_2008_3D.h5`
+### `./grackle_data/CloudyData_UVB=FG2011_shielded.h5`
 
-Grackle cooling table (Cloudy metals, 2008, 3D), downloaded from Dropbox. The param files point
-`GrackleDataFile` at it. The parent example's `CloudyData_UVB=FG2011_shielded.h5` is no longer
-downloaded here.
+Grackle cooling/UV-background table from
+[grackle_data_files](https://github.com/grackle-project/grackle_data_files) (pinned to commit `9286964`), as in
+the parent example. The reference files use `cloudy_metals_2008_3D.h5` instead, but that table could not be made to
+work here, so `GrackleDataFile` stays on the FG2011 table.
 
 ### `./star_tables/star_feedback_tables.hdf5`
 

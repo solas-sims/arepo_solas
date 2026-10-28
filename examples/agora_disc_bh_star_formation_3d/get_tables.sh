@@ -1,14 +1,14 @@
 #!/bin/bash
 # Downloads the two external data tables this example needs but doesn't
-# ship: a Grackle cooling table (Cloudy metals 2008, 3D) and the stellar feedback lookup table
+# ship: a Grackle cooling/UVB table and the stellar feedback lookup table
 # read by src/stars/star_tables.c. See README.md for what these are and
 # the schema the star tables file must follow.
 
 set -euo pipefail
 
 GRACKLE_DIR="./grackle_data"
-GRACKLE_FILE="${GRACKLE_DIR}/cloudy_metals_2008_3D.h5"
-GRACKLE_URL="https://www.dropbox.com/scl/fi/ggiiqlgucb4dkm4louubj/cloudy_metals_2008_3D.h5?rlkey=x9b9amouxqjfu1m023e8gyv31&dl=1"
+GRACKLE_FILE="${GRACKLE_DIR}/CloudyData_UVB=FG2011_shielded.h5"
+GRACKLE_URL="https://raw.githubusercontent.com/grackle-project/grackle_data_files/928696482fbe15d9bac4382de6134d95568f099c/input/CloudyData_UVB%3DFG2011_shielded.h5"
 
 STAR_TABLES_DIR="./star_tables"
 STAR_TABLES_FILE="${STAR_TABLES_DIR}/star_feedback_tables.hdf5"
@@ -19,7 +19,7 @@ mkdir -p "${GRACKLE_DIR}" "${STAR_TABLES_DIR}"
 if [ -f "${GRACKLE_FILE}" ]; then
   echo "get_tables.sh: ${GRACKLE_FILE} already exists, skipping download."
 else
-  echo "get_tables.sh: downloading Grackle cooling table to ${GRACKLE_FILE} ..."
+  echo "get_tables.sh: downloading Grackle UVB table to ${GRACKLE_FILE} ..."
   curl -sL "${GRACKLE_URL}" -o "${GRACKLE_FILE}"
 fi
 

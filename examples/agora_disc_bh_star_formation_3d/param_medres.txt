@@ -115,7 +115,7 @@ InitMetallicityinSolar                  1.0
 TreecoolFile                            ../../TREECOOL_ep
 
 %---- Grackle (USE_GRACKLE)
-GrackleDataFile                         ./grackle_data/cloudy_metals_2008_3D.h5
+GrackleDataFile                         ./grackle_data/CloudyData_UVB=FG2011_shielded.h5
 
 %---- Star formation (AGORA_SF)
 CritOverDensity                         57.7    % inert here: only used when ComovingIntegrationOn=1
