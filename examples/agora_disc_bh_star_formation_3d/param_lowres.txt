@@ -9,8 +9,8 @@ ICFormat                                3
 SnapFormat                              3
 
 %---- CPU-time limits
-TimeLimitCPU                            93000
-CpuTimeBetRestartFile                   12000
+TimeLimitCPU                            100000
+CpuTimeBetRestartFile                   10000
 ResubmitOn                              0
 ResubmitCommand                         my-scriptfile
 
@@ -34,9 +34,9 @@ BoxSize                                 1200    % kpc, taken from the IC file's 
 
 %---- Output frequency and output parameters
 OutputListOn                            0
-TimeBetSnapshot                         0.02    % ~19.6 Myr between snapshots
+TimeBetSnapshot                         0.01   % ~9.8 Myr between snapshots
 TimeOfFirstSnapshot                     0.0
-TimeBetStatistics                       0.0234375
+TimeBetStatistics                       0.0
 NumFilesPerSnapshot                     1
 NumFilesWrittenInParallel               1
 
@@ -44,11 +44,11 @@ NumFilesWrittenInParallel               1
 TypeOfTimestepCriterion                 0
 ErrTolIntAccuracy                       0.012
 CourantFac                              0.3
-MaxSizeTimestep                         0.0005
+MaxSizeTimestep                         1.0e-2
 MinSizeTimestep                         2.0e-8
 
 %---- Treatment of empty space and temperature limits
-InitGasTemp                             10000     % K; only applies where InternalEnergy=0 in the IC (true for all gas cells here)
+InitGasTemp                             10000     % K; unused here: the ICs carry a non-zero gas InternalEnergy
 MinGasTemp                              10
 MinimumDensityOnStartUp                 1.0e-10
 LimitUBelowThisDensity                  0.0
@@ -68,7 +68,7 @@ DesNumNgb                               64
 MaxNumNgbDeviation                      4
 
 %---- System of units (matches the units baked into the IC file's /Header)
-UnitLength_in_cm                        3.08568e21    %  1.0 kpc
+UnitLength_in_cm                        3.085678e21    %  1.0 kpc
 UnitMass_in_g                           1.989e42      %  1.0e9 solar masses
 UnitVelocity_in_cm_per_s                1e5           %  1 km/sec
 GravityConstantInternal                 0
@@ -93,7 +93,7 @@ SofteningTypeOfPartType3                3    % stellar bulge
 SofteningTypeOfPartType4                3    % new star particles formed during the run
 SofteningTypeOfPartType5                1
 
-MinimumComovingHydroSoftening           1.0
+MinimumComovingHydroSoftening           0.08
 AdaptiveHydroSofteningSpacing           1.2
 
 %----- Mesh regularization options
@@ -103,33 +103,38 @@ ReferenceGasPartMass                    8.59322e-05
 TargetGasMassFactor                     1
 RefinementCriterion                     1
 DerefinementCriterion                   1
-MeanVolume                              52734.4
+MeanVolume                              536377
 MaxVolumeDiff                           10
-MinVolume                               1
+MinVolume                               5.12e-4   % dx >= 80 pc limit
 MaxVolume                               1.0e9
 
 %---- Metallicity (METALS)
-InitMetallicityinSolar                  0.1
+InitMetallicityinSolar                  1.0
 
 %---- Cooling
 TreecoolFile                            ../../TREECOOL_ep
 
 %---- Grackle (USE_GRACKLE)
-GrackleDataFile                         ./grackle_data/CloudyData_UVB=FG2011_shielded.h5
+GrackleDataFile                         ./grackle_data/cloudy_metals_2008_3D.h5
+GrackleSpeciesState                     0       % not read by this build; kept for consistency with the reference runs
 
 %---- Star formation (AGORA_SF)
 CritOverDensity                         57.7    % inert here: only used when ComovingIntegrationOn=1
-NumberDensThreshold                     5.0     % cm^-3, physical density threshold (AGORA fiducial)
+NumberDensThreshold                     100   % cm^-3, physical density threshold
 TemperatureThreshold                    1.0e4   % K
 StarFormationEfficiency                 0.01    % per free-fall time
 
 %---- Star particles (STAR_PARTICLES)
-IMF                                     0       % 0 = Kroupa, 1 = Chabrier, 2 = Salpeter (src/stars/star_particle.c)
+IMF                                     1   % 0 = Kroupa, 1 = Chabrier, 2 = Salpeter (src/stars/star_particle.c)
 
 %---- Star feedback (WINDS + SUPERNOVAE -> STAR_FEEDBACK_ACTIVE)
 StarTablesFile                          ./star_tables/star_feedback_tables.hdf5
-SN_LeadTime                             3.0     % Myr, time between star formation and first SN (TREE_BASED_TIMESTEPS+SUPERNOVAE)
-SN_HostShellSweepFrac                   0.5     % dimensionless, internally capped at 0.9 (src/stars/star_feedback.c)
+SN_LeadTime                             40   % Myr, time between star formation and first SN (TREE_BASED_TIMESTEPS+SUPERNOVAE)
+SN_HostShellSweepFrac                   0.1   % dimensionless, internally capped at 0.9 (src/stars/star_feedback.c)
+
+%---- Ray tracing (inert here: RADIATION is off in Config.sh)
+RaySplitFactor                          2
+RayMaxDistance                          100
 
 %---- Black holes (BLACKHOLES + BONDI_ACCRETION + BH_THERMAL_FEEDBACK); one central SMBH, read from the IC as PartType5
 BhDesNgb                                32      % target mass-weighted neighbour number for the BH smoothing length (value from the cosmo examples, untuned for a disc)
