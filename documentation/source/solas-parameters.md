@@ -74,9 +74,19 @@ downstream. Additionally:
 
 | Parameter | Required flag(s) | Type | Units | Notes |
 |---|---|---|---|---|
-| `IMF` | `STAR_PARTICLES` | **INT**, not string | ❓ presumably an IMF-selector enum | The old `Parameters.md` implied this was a path/name; source says `INT`. `technical-reference.md` mentions stars are "IMF-binned across `NBINS = 114` mass bins" but doesn't give the integer→IMF-model mapping — confirm with whoever wrote `star_particle.c`. |
+| `IMF` | `STAR_PARTICLES` | **INT**, not string | ✅ selector — `imf_popii()` in `src/stars/star_particle.c`: `0` Kroupa, `1` Chabrier, `2` Salpeter; any other value falls back to Kroupa | IMF for ordinary (Pop II) stars, used for star-particle mass sampling over [`MMIN`, `MMAX`] = [0.1, 120] M☉ (`star_particle.h`). The old `Parameters.md` implied this was a path/name; source says `INT`. With `POPIII_SF`, metal-poor stars use `IMFPopIII` instead (see below). |
 | `StarTablesFile` | `STAR_FEEDBACK_ACTIVE` | STRING | path | Stellar-property lookup table, as in the Development Guide. |
 | `SN_LeadTime` | `TREE_BASED_TIMESTEPS` + `SUPERNOVAE` | REAL | ❓ presumably code time units | Only read when both flags are set together — easy to silently omit. |
+
+## `POPIII_SF`
+
+Forms Population III stars from metal-poor gas with a separate IMF. Requires `STAR_PARTICLES` and `METALS` (enforced by the Makefile). The H₂ threshold additionally needs `USE_GRACKLE` with `GRACKLE_CHEMISTRY >= 2`; without it, Pop III is selected by metallicity alone and the Makefile prints a warning. Works with `JEANS_SF`, `AGORA_SF` and `INDIVIDUAL_STAR_BY_STAR_FORMATION`; `EEOS_SF` has no H₂ threshold.
+
+| Parameter | Required flag(s) | Type | Units | Example | Notes |
+|---|---|---|---|---|---|
+| `IMFPopIII` | `POPIII_SF` | INT | ✅ selector — `imf_popiii()` in `src/stars/star_particle.c`: `0` Stacy et al. (2016), dN/dm ∝ m^−1.13; any other value falls back to `0` | `0` | Same mass range [`MMIN`, `MMAX`] = [0.1, 120] M☉ and the same 114 mass bins as the Pop II IMF. Feedback still comes from the same (Z, M) stellar tables as Pop II; only the mass spectrum differs. |
+| `PopIIIMetallicityThresholdinSolar` | `POPIII_SF` | REAL | ✅ units of `SOLAR_METALLICITY` — converted in `init()` to `All.PopIIIMetallicityThreshold = PopIIIMetallicityThresholdinSolar × SOLAR_METALLICITY` (metal mass fraction) | `1.0e-4` | Gas with Z below this forms Pop III stars (`SP[].PopulationType = POPIII`); stars in the ICs below it are tagged Pop III. Setting it to `0` turns the Pop III channel off at run time. |
+| `PopIIIH2FractionThreshold` | `POPIII_SF` + `USE_GRACKLE` + `GRACKLE_CHEMISTRY >= 2` | REAL | ✅ dimensionless H₂ mass fraction, f_H₂ = ρ(H₂) / [ρ(HI) + ρ(HII) + ρ(H₂)] = 2 n(H₂)/n_H (`get_H2_fraction()` in `src/cooling/grackle.c`) | `5.0e-4` | Gas below the metallicity threshold may only form stars if f_H₂ ≥ this value; it is checked in `sf_criteria()` of `sfr_JEANS.c`, `sfr_AGORA.c` and `sfr_starbystar.c`. Metal-enriched gas is unaffected. Not read (and must not be relied on) without `GRACKLE_CHEMISTRY >= 2`. |
 
 ## Stellar feedback
 

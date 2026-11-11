@@ -2193,6 +2193,9 @@ enum iofields
 #ifdef METALS
   IO_STAR_METALS,
 #endif
+#if defined(STAR_PARTICLES) && defined(POPIII_SF)
+  IO_STAR_POPTYPE,
+#endif
 #endif
 #ifdef STAR_FEEDBACK_ACTIVE
   IO_STARHSML,

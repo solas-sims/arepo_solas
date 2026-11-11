@@ -153,7 +153,7 @@ void begrun1(void)
    * compile-time constants and All.IMF (already read by read_parameter_file()
    * above), not on particle data, so set them up here unconditionally rather
    * than in init(), which is skipped entirely when RestartFlag==1 -- leaving
-   * norm/bin_imf/rng permanently zero/NULL on every restart otherwise. */
+   * bin_imf/rng permanently zero/NULL on every restart otherwise. */
   if(ThisTask == 0)
     {
       build_imf_cdf(POPII);
@@ -184,7 +184,6 @@ void begrun1(void)
 #endif
 
 #if STAR_PARTICLES == 0
-  MPI_Bcast(&norm, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
   MPI_Bcast(bin_imf, N_IMF_TYPES*NBINS, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
   rng = gsl_rng_alloc(gsl_rng_mt19937);
