@@ -1,14 +1,53 @@
 #!/usr/bin/env python3
-import sys, yaml
+import os, sys, yaml
 
 if len(sys.argv) != 3:
     print("Usage: python parse_yaml.py <input_yaml> <build_dir>")
     sys.exit(1)
 
+CONFIG_FLAGS_SPEC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "config_flags.yaml")
+
+
+def _load_flag_spec():
+    with open(CONFIG_FLAGS_SPEC) as f:
+        spec = yaml.safe_load(f)
+    return spec.get("master_switches", {}), spec.get("derived_flags", {})
+
+
+def expand_derived_flags(result: dict) -> dict:
+    """Return a copy of the yaml config augmented with master-switch
+    expansions and derived (e.g. BH_ACTIVE) flags computed from
+    config_flags.yaml, mirroring what the Makefile derives for an
+    equivalent Config.sh. These flags must never be set directly in the
+    yaml itself -- see config_flags.yaml for the tier-2/tier-3 rules.
+    """
+    master_switches, derived_flags = _load_flag_spec()
+    active = {k.upper() for k, v in result.items() if v is True}
+
+    changed = True
+    while changed:
+        changed = False
+        for name, expansion in master_switches.items():
+            if name in active:
+                for flag in expansion:
+                    if flag not in active:
+                        active.add(flag)
+                        changed = True
+        for name, triggers in derived_flags.items():
+            if name not in active and any(t in active for t in triggers):
+                active.add(name)
+                changed = True
+
+    augmented = dict(result)
+    for name in active:
+        augmented[name.lower()] = True
+    return augmented
+
+
 def yaml_to_cmake(config_file: str, build_dir: str)-> None:
     output = f"{build_dir}/generated_options.cmake"
     with open(config_file) as stream:
-        result = yaml.safe_load(stream)
+        result = expand_derived_flags(yaml.safe_load(stream))
         with open(output, "w") as f:
             for k,v in result.items():
                 if v is True or v is False:
@@ -73,8 +112,8 @@ H5Tset_size(atype, 1);
 """
 
     with open(config_file) as stream:
-        result = yaml.safe_load(stream)
-    
+        result = expand_derived_flags(yaml.safe_load(stream))
+
     with open(f"{build_dir}/arepoconfig.h", 'w') as arepoconfig_file, \
          open(f"{build_dir}/compile_time_info.c", 'w') as compile_time_info_file, \
          open(f"{build_dir}/compile_time_info_hdf5.c", 'w') as compile_time_info_hdf5_file:

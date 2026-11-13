@@ -3,6 +3,12 @@
 ##################################################
 #  Enable/Disable compile-time options as needed #
 ##################################################
+#
+# Every option below is set directly by the user. Flags that the Makefile
+# computes automatically from other flags (e.g. BH_ACTIVE, STAR_FEEDBACK_ACTIVE)
+# must NOT be added here -- they are never user-settable. See config_flags.yaml
+# at the repo root and documentation/source/config-options.md for the full
+# rules; scripts/validate_config_flags.py enforces this in CI.
 
 #--------------------------------------- SOLAS additions
 #TODO                   # Placeholder, not a real compile-time option; not referenced by the code

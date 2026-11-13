@@ -1,0 +1,31 @@
+name: Validate config flags
+
+on:
+  pull_request:
+    paths:
+      - "config_flags.yaml"
+      - "Makefile"
+      - "Template-Config.sh"
+      - "template_config*.yaml"
+      - "cmake/parse_yaml.py"
+      - "scripts/validate_config_flags.py"
+  push:
+    branches: [main]
+    paths:
+      - "config_flags.yaml"
+      - "Makefile"
+      - "Template-Config.sh"
+      - "template_config*.yaml"
+      - "cmake/parse_yaml.py"
+      - "scripts/validate_config_flags.py"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - run: pip install pyyaml
+      - run: python3 scripts/validate_config_flags.py
