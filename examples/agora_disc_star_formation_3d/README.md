@@ -25,6 +25,7 @@ from wherever you've copied it, e.g. a `test.sh`-style run directory.
 | `get_ics.sh` | Downloads the initial conditions into `./ICs/` |
 | `get_tables.sh` | Downloads the Grackle cooling table and stellar feedback table into `./grackle_data/` and `./star_tables/` |
 | `agora_disc_diagnostics.py` | Post-processing: radial surface density / scale height / vertical velocity dispersion profiles, plus a smoothed density-grid projection, from one or more output snapshots |
+| `check.py` | Sanity checks (not a reference-solution comparison): total metal mass never decreases across snapshots, and every gas cell's `DustMass` stays within `0 <= DustMass <= GasMetals` at every snapshot (skipped with a message if the run wasn't built with `DUST`) |
 
 ## 1. Get the initial conditions
 
@@ -126,7 +127,10 @@ mpiexec -np <N> ./Arepo ./param.txt
 
 ```bash
 python agora_disc_diagnostics.py --snapshot output/snap_000.hdf5 output/snap_010.hdf5 \
-    --output disc_profiles.png --grid-output "disc_grid_{name}.png"
+    --output disc_profiles.png --grid-output "disc_grid_{name}.png" \
+    --metals-grid-output "disc_grid_metals_{name}.png" \
+    --dust-grid-output "disc_grid_dust_{name}.png" \
+    --metals-dust-output "disc_metals_dust_profiles.png"
 ```
 
 Produces overlaid radial surface-density / scale-height / vertical velocity
@@ -135,6 +139,56 @@ density-grid projection image per snapshot. Uses the group's `analysistools`
 package if installed, otherwise falls back to a self-contained `h5py`-based
 reader — see the script's docstring for the full set of options
 (`--mask-radius`, `--ngrid`, `--save-data`, etc).
+
+Also reads each snapshot's gas-cell metal mass (`PassiveScalars`) and, if
+present, dust mass (`DustMass`, only written when `Config.sh` has `DUST`
+enabled) directly from `PartType0`. This produces the same smoothed-grid
+XY/XZ/YZ projection as gas mass gets (`disc_grid_metals_*`/
+`disc_grid_dust_*`), plus a second overlaid-profile figure
+(`disc_metals_dust_profiles.png`) of metal and dust surface density vs.
+radius, mirroring the gas surface-density panel. The dust grid/profile is
+skipped (with a log message, not an error) if the run has no `DustMass`
+field.
+
+## 6. Sanity checks
+
+```bash
+python check.py .
+```
+
+Run from this directory (or pass whatever directory contains your
+`output/`). Five checks, printed per-snapshot and summarized pass/fail:
+
+- **Metals**: total metal mass (gas-phase + whatever's locked into star
+  particles) must never decrease across the run — metals are only ever
+  created by stellar enrichment in this code, never destroyed.
+- **Dust** (only meaningful if `Config.sh` has `DUST` enabled; skipped
+  with a message otherwise): every gas cell's `DustMass` must satisfy
+  `0 <= DustMass <= GasMetals` at every snapshot — dust is a subset of
+  the metal budget it condensed from.
+- **Star formation**: number of star particles must never decrease —
+  stars are only "deactivated" when dead, never removed from the
+  particle list.
+- **Star-forming gas** (informational, no hard pass/fail beyond "did it
+  compute"): mass and mass fraction of gas above the `AGORA_SF` density
+  threshold and below the temperature threshold, using thresholds read
+  from each snapshot's own embedded `/Parameters` group. Temperature
+  uses the same non-Grackle mean-molecular-weight fallback the C code
+  itself uses when `USE_GRACKLE` is off — an approximation of the real
+  (Grackle-chemistry-dependent) trigger condition, not an exact
+  reproduction, so treat this as trend monitoring rather than a precise
+  reconstruction of what actually decided each cell's eligibility.
+- **Stellar spatial extent** (informational, `WARN` rather than `FAIL`):
+  min/median/max cylindrical radius and `|z|`-height of star particles
+  relative to the box centre, flagged if a star approaches the box edge
+  (a sign of numerical ejection rather than staying in the disc).
+
+Not a reference-solution comparison like the `test.sh`-integrated
+examples' `check.py` scripts — there's no golden run for this example
+(external IC/data dependencies), so these are invariant/sanity checks
+only, meant to catch an obviously broken run (mass appearing from
+nowhere, dust exceeding its metal budget) rather than verify exact
+physics.
 
 ## Known gaps / things to revisit
 
@@ -147,5 +201,3 @@ reader — see the script's docstring for the full set of options
   `SN_HostShellSweepFrac=0.5`, `IMF=0` for Kroupa) are literature-typical
   defaults, not values validated against this fork's implementation —
   treat as a starting point.
-- No `check.py`/reference data, unlike the `test.sh`-integrated examples —
-  there's nothing here yet to catch a silent regression automatically.

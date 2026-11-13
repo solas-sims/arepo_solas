@@ -284,12 +284,18 @@ void exchange_primitive_variables(void)
 #ifdef METALS
               tmpPrimExch[off].Metals = SphP[place].GasMetals;
 #endif
+#ifdef DUST
+              tmpPrimExch[off].Dust = SphP[place].GasDustMass;
+#endif
               for(int k = 0; k < 3; k++)
                 tmpPrimExch[off].Momentum[k] = SphP[place].Momentum[k];
 
               tmpPrimExch[off].MassFeed = SphP[place].StarMassFeed;
 #ifdef METALS
               tmpPrimExch[off].MetalsFeed = SphP[place].StarMetalsFeed;
+#endif
+#ifdef DUST
+              tmpPrimExch[off].DustFeed = SphP[place].StarDustFeed;
 #endif
               for(int k = 0; k < 3; k++)
                 tmpPrimExch[off].MomentumFeed[k] = SphP[place].StarMomentumFeed[k];
@@ -409,12 +415,18 @@ void exchange_primitive_variables_and_gradients(void)
 #ifdef METALS
               tmpPrimExch[off].Metals = SphP[place].GasMetals;
 #endif
+#ifdef DUST
+              tmpPrimExch[off].Dust = SphP[place].GasDustMass;
+#endif
               for(int k = 0; k < 3; k++)
                 tmpPrimExch[off].Momentum[k] = SphP[place].Momentum[k];
 
               tmpPrimExch[off].MassFeed = SphP[place].StarMassFeed;
 #ifdef METALS
               tmpPrimExch[off].MetalsFeed = SphP[place].StarMetalsFeed;
+#endif
+#ifdef DUST
+              tmpPrimExch[off].DustFeed = SphP[place].StarDustFeed;
 #endif
               for(int k = 0; k < 3; k++)
                 tmpPrimExch[off].MomentumFeed[k] = SphP[place].StarMomentumFeed[k];

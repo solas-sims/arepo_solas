@@ -749,6 +749,17 @@ void init_io_fields()
   init_units(IO_PASS, 0., 0., 0., 0., 0., 0.0);
 #endif /* #ifdef PASSIVE_SCALARS */
 
+#ifdef METALS
+  /* Dedicated, named alias into the METALS_INDEX slot of PassiveScalars
+   * above -- redundant with it (same pattern IO_DUST_MASS already uses for
+   * DUST_INDEX), so post-processing doesn't need to know the PassiveScalars
+   * array's internal offset ordering to get gas-phase metallicity. Mirrors
+   * IO_STAR_METALS, which stars have always had a dedicated field for. */
+  init_field(IO_GAS_METALS, "GZ  ", "Metallicity", MEM_MY_FLOAT, FILE_MY_IO_FLOAT, FILE_NONE, 1, A_SPHP, &SphP[0].GasMetallicity, 0,
+             GAS_ONLY);
+  init_units(IO_GAS_METALS, 0., 0., 0., 0., 0., 0.);
+#endif
+
   /* OTHER */
 
 #ifdef SAVE_HSML_IN_SNAPSHOT
@@ -896,4 +907,8 @@ void init_io_fields()
   init_units(IO_BH_DONOR_VELOCITY, 0.5, 0., 0., 0., 1., All.UnitVelocity_in_cm_per_s);
   init_snapshot_type(IO_BH_DONOR_VELOCITY, SN_MINI);
 #endif /* #if defined(HALO_SEEDING) && defined(BLACKHOLES) */
+
+#ifdef DUST
+  dust_init_io_fields();
+#endif
 }

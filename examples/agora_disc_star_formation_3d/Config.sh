@@ -10,6 +10,9 @@
 #--------------------------------------- Metal parameters
 METALS                 # Advect all metals, ie metal mass fraction, as a PASSIVE_SCALARS
 
+#--------------------------------------- Dust parameters
+DUST                   # Phase 1: single-species dust mass (SN-channel production/destruction, growth, sputtering)
+
 #--------------------------------------- Cooling parameters
 USE_GRACKLE
 GRACKLE_CHEMISTRY=3

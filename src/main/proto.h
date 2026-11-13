@@ -60,7 +60,11 @@
 
 #if defined(STARS)
 #include "../stars/star_proto.h"
-#endif 
+#endif
+
+#if defined(DUST)
+#include "../dust/dust_proto.h"
+#endif
 
 #ifdef JEANS_SF
 double get_jeans_length(int i);
