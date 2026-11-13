@@ -48,6 +48,11 @@
 static int sf_criteria(int i)
 {
 #ifdef USE_GRACKLE
+#if defined(POPIII_SF) && (GRACKLE_CHEMISTRY >= 2)
+  if(SphP[i].GasMetallicity < All.PopIIIMetallicityThreshold &&
+     get_H2_fraction(i) < All.PopIIIH2FractionThreshold)
+    return 0;
+#endif
   double mu = compute_mu(i);
 #else /* #ifdef USE_GRACKLE */
   /* assume full ionization -- same fallback as sfr_AGORA.c/sfr_eEOS.c use when

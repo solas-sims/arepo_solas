@@ -1483,6 +1483,12 @@ double InitMetallicityinSolar;
 
 #ifdef STAR_PARTICLES
   int IMF;
+#ifdef POPIII_SF
+  int IMFPopIII;
+  double PopIIIMetallicityThresholdinSolar;
+  double PopIIIMetallicityThreshold;
+  double PopIIIH2FractionThreshold;
+#endif
 #endif
 
 #if defined(TREE_BASED_TIMESTEPS) && defined(SUPERNOVAE)
@@ -2186,6 +2192,9 @@ enum iofields
   IO_STARID,
 #ifdef METALS
   IO_STAR_METALS,
+#endif
+#if defined(STAR_PARTICLES) && defined(POPIII_SF)
+  IO_STAR_POPTYPE,
 #endif
 #endif
 #ifdef STAR_FEEDBACK_ACTIVE

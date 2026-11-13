@@ -519,10 +519,12 @@ int ngb_create_empty_nodes(int no, int topnode, int bits, int x, int y, int z)
 void ngb_update_node_recursive(int no, int sib, int father, int *last, int mode)
 {
   int j, jj, k, p, pp, nextsib, suns[8];
+
   MyNgbTreeFloat range_min[3];
   MyNgbTreeFloat range_max[3];
   MyNgbTreeFloat vertex_vmin[3];
   MyNgbTreeFloat vertex_vmax[3];
+
 #ifdef TREE_BASED_TIMESTEPS
   MyNgbTreeFloat vmin[3], vmax[3], maxcsnd;
 #endif /* #ifdef TREE_BASED_TIMESTEPS */

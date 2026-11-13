@@ -41,6 +41,8 @@
 #INDIVIDUAL_STAR_BY_STAR_FORMATION # Form individual resolved stars (need STAR_PARTICLES=2 AND USE_SFR)
 #DIVVEL                 # Enables an alternate one-dimensional velocity-divergence gradient calculation (src/mesh/voronoi/voronoi_gradients_onedims.c)
 
+#POPIII_SF              # form pop-III stars from metal-poor gas using a distinct IMF. Requires METALS. Requires GRACKLE_CHEMISTRY>=2 if using H_2 threshold for SF.
+
 #---------------------------------------- Star options
 #STAR_HOST_REFINEMENT   # Refine cells around star particles (see criterion_refinement.c)
 

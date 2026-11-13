@@ -122,8 +122,13 @@ void individual_starbystar_formation(void)
 
       if(p_decide < prob) /* ok, it is decided to consider star formation */
         {
+#ifdef POPIII_SF
+          int imf_type = (SphP[i].GasMetallicity < All.PopIIIMetallicityThreshold) ? POPIII : POPII;
+#else
+          int imf_type = POPII;
+#endif
           u = get_random_number_aux();
-          mass_of_star = sample_imf(u);
+          mass_of_star = sample_imf(imf_type, u);
           mass_of_star /= All.cf_UnitMass_in_Msun;
           make_individual_star(i, mass_of_star, &local_stars_mass);
         }
@@ -298,6 +303,14 @@ static void spawn_heavy(int igas, double birthtime, int istar, MyDouble mass_of_
   /* Prepare for star forming loop */
   SP[NumStars].MassOfStar = mass_of_star;
   SP[NumStars].Hsml = get_cell_radius(igas);
+
+  /* SP[].Metallicity is only known after the mass drain (sf_massdrain), so classify
+   * from the host cell, as in the IMF choice in individual_starbystar_formation() */
+#ifdef POPIII_SF
+  SP[NumStars].PopulationType = (SphP[igas].GasMetallicity < All.PopIIIMetallicityThreshold) ? POPIII : POPII;
+#else
+  SP[NumStars].PopulationType = POPII;
+#endif
   
 #ifdef STAR_FEEDBACK_ACTIVE
   /* Set timebin */
@@ -375,6 +388,12 @@ static void spawn_light(int igas, double birthtime, int istar, MyDouble mass_of_
 
 #ifdef METALS 
   SP[NumStars].Metallicity = SphP[igas].GasMetals / P[igas].Mass;
+#endif
+
+#ifdef POPIII_SF
+  SP[NumStars].PopulationType = (SphP[igas].GasMetallicity < All.PopIIIMetallicityThreshold) ? POPIII : POPII;
+#else
+  SP[NumStars].PopulationType = POPII;
 #endif
 
 #ifdef STAR_FEEDBACK_ACTIVE

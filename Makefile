@@ -7,9 +7,9 @@ SRC_DIR = src
 
 SYSTYPE ?= LINUX
 
-MAKEFILES = Makefile config-makefile
+AREPO_MAKEFILES = Makefile config-makefile
 ifeq ($(wildcard Makefile.systype), Makefile.systype)
-MAKEFILES += Makefile.systype
+AREPO_MAKEFILES += Makefile.systype
 endif
 
 include config-makefile
@@ -433,6 +433,19 @@ OBJS += star_formation/individual_star_formation/sfr_starbystar.o \
 SUBDIRS += star_formation/individual_star_formation
 endif
 
+#POPIII_SF
+ifneq (,$(filter POPIII_SF,$(CONFIGVARS)))
+ifeq (,$(filter METALS,$(CONFIGVARS)))
+$(error POPIII_SF requires METALS)
+endif
+ifeq (,$(filter STAR_PARTICLES,$(CONFIGVARS)))
+$(error POPIII_SF requires STAR_PARTICLES)
+endif
+ifeq ($(strip $(findstring GRACKLE_CHEMISTRY 2,$(CONFIGVARS))$(findstring GRACKLE_CHEMISTRY 3,$(CONFIGVARS))),)
+$(warning POPIII_SF without USE_GRACKLE and GRACKLE_CHEMISTRY>=2: the H2-fraction star formation threshold is disabled, Pop III is selected by metallicity only)
+endif
+endif
+
 #STARS
 ifneq (,$(filter STARS,$(CONFIGVARS)))
 OBJS += stars/star.o 
@@ -717,16 +730,16 @@ clean:
 	@rm -f $(TO_CHECK) $(CONFIG_CHECK)
 	@rm -rf $(BUILD_DIR)
 
-$(BUILD_DIR)/%.o: $(SRC_DIR)/%.c $(INCL) $(MAKEFILES)
+$(BUILD_DIR)/%.o: $(SRC_DIR)/%.c $(INCL) $(AREPO_MAKEFILES)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(BUILD_DIR)/compile_time_info.o: $(BUILD_DIR)/compile_time_info.c $(MAKEFILES)
+$(BUILD_DIR)/compile_time_info.o: $(BUILD_DIR)/compile_time_info.c $(AREPO_MAKEFILES)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(BUILD_DIR)/compile_time_info_hdf5.o: $(BUILD_DIR)/compile_time_info_hdf5.c $(MAKEFILES)
+$(BUILD_DIR)/compile_time_info_hdf5.o: $(BUILD_DIR)/compile_time_info_hdf5.c $(AREPO_MAKEFILES)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(BUILD_DIR)/%.o: $(SRC_DIR)/%.cu $(INCL) $(MAKEFILES)
+$(BUILD_DIR)/%.o: $(SRC_DIR)/%.cu $(INCL) $(AREPO_MAKEFILES)
 	$(NVCC)  -c $< -o $@
 
 # sanity checks:
