@@ -520,6 +520,11 @@ void domain_exchange(void)
                 BPP(NumPart-1).PID = n;
 #endif
 
+#ifdef SIDM
+              if(P[NumPart-1].Type == 1)
+                DMPS(NumPart-1).PIndex = n;
+#endif
+
               Key[n] = Key[NumPart - 1];
             }
 
