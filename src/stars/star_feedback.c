@@ -540,7 +540,6 @@ void star_feedback(void)
           /* Directed momentum magnitude and thermal budget for this event */
           double p_SN = 0.0;
           double dU_SN_th = 0.0;
-
           /* Ejecta mass */
           double m_ej = MechanicalFeedback->SN_MassLoss;
 
@@ -549,7 +548,6 @@ void star_feedback(void)
 
           /* Approximate SN shell mass */
           double E_SN = MechanicalFeedback->SN_EnergyInject;
-
           double E51 = E_SN * All.cf_UnitEnergy_in_cgs / SN_ENERGY;
 
           double rho = (P[i].Mass + SphP[i].StarMassFeed) / SphP[i].Volume;

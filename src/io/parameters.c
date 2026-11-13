@@ -609,7 +609,22 @@ void read_parameter_file(char *fname)
       strcpy(tag[nt], "IMF");
       addr[nt] = &All.IMF;
       id[nt++] = INT;
-#endif
+#ifdef POPIII_SF
+      strcpy(tag[nt], "IMFPopIII");
+      addr[nt] = &All.IMFPopIII;
+      id[nt++] = INT;
+      strcpy(tag[nt], "PopIIIMetallicityThresholdinSolar");
+      addr[nt] = &All.PopIIIMetallicityThresholdinSolar;
+      id[nt++] = REAL;
+#ifdef USE_GRACKLE
+#if (GRACKLE_CHEMISTRY >= 2)
+      strcpy(tag[nt], "PopIIIH2FractionThreshold");
+      addr[nt] = &All.PopIIIH2FractionThreshold;
+      id[nt++] = REAL;
+#endif /* #if (GRACKLE_CHEMISTRY >= 2) */
+#endif /* #ifdef USE_GRACKLE */
+#endif /* #ifdef POPIII_SF */
+#endif /* #ifdef STAR_PARTICLES */
 
 #if defined(TREE_BASED_TIMESTEPS) && defined(SUPERNOVAE)
       strcpy(tag[nt], "SN_LeadTime");

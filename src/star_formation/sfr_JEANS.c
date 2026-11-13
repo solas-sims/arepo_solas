@@ -97,6 +97,12 @@ static int sf_criteria(int i)
     if(SphP[i].Density < All.OverDensThresh)
       return 0;
 
+#if defined(POPIII_SF) && defined(USE_GRACKLE) && (GRACKLE_CHEMISTRY >= 2)
+  if(SphP[i].GasMetallicity < All.PopIIIMetallicityThreshold &&
+     get_H2_fraction(i) < All.PopIIIH2FractionThreshold)
+    return 0;
+#endif
+
 #ifdef JEANS_MASS_BASED
   double jeans_mass_threshold = All.JeansMassThreshold;
 #ifdef SF_THRESHOLD_HALO_MASS_DEPENDENT

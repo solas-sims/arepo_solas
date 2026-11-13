@@ -9,21 +9,14 @@ increased in complexity. The scope of simulation codes has increased
 accordingly, such that the question on how to organize development
 becomes important for further scientific progress.
 
-This version of Arepo is intended as a basis, providing an efficient
-code structure and state of the art numerical techniques for gravity
-and hydrodynamics. The code is completely documented and should allow
-computational astrophysicists to develop their own specialized modules
-on top of it. Practically, this is best done by hosting an own
-repository for the development, which is occasonally updated from the
-main repository to include latest bugfixes. For this workflow to work
-properly, it is helpful to keep the code-base relatively static. For
-this reason
+This is the SOLAS fork of Arepo, which does extend the public code (star formation and feedback,
+radiation, black holes, SIDM and more). New physics is welcome here; follow the contribution workflow in the
+repository `README.md` (a branch per change, merged through a pull request, stale branches deleted after merging).
+The text below about the public release applies to the upstream code, not to this fork.
 
-**the base version of the code is not meant to be extended in**
-  **functionality.**
-
-This means that only bugfixes as well as updates in the documentation
-and examples will be included in revisions of this public release.
+The public version of Arepo is intended as a basis, providing an efficient code structure and state of the art
+numerical techniques for gravity and hydrodynamics, and does not accept extensions in functionality: only
+bugfixes, documentation and examples are included in revisions of the public release.
 
 Issue reporting
 ===============
@@ -37,7 +30,8 @@ users to report all issues they have, including things that remain
 unclear after reading the documentation. This way we hope to
 constantly improve the qualtiy of the code in all its aspects.
  
-**Please contact Rainer Weinberger by email via rweinberger@aip.de for any issues.**
+Issues with the **public** Arepo release go to Rainer Weinberger (rweinberger@aip.de). Issues specific to this fork
+should be raised on the [arepo_solas issue tracker](https://github.com/solas-sims/arepo_solas/issues).
 
 
 Code extensions 

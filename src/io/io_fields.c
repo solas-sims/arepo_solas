@@ -792,6 +792,14 @@ void init_io_fields()
   init_units(IO_STAR_METALS, 0., 0., 0., 0., 0., 0);
   init_snapshot_type(IO_STAR_METALS, SN_MINI);
 #endif
+#if defined(STAR_PARTICLES) && defined(POPIII_SF)
+  /* 0 = Pop II, 1 = Pop III. The tag is set from the host cell's GasMetallicity at spawn,
+   * which can differ from the stored Metallicity (GasMetals/Mass). */
+  init_field(IO_STAR_POPTYPE, "SPT", "PopulationType", MEM_INT, FILE_INT, FILE_NONE, 1, A_S, &SP[0].PopulationType, 0,
+             STARS_ONLY);
+  init_units(IO_STAR_POPTYPE, 0., 0., 0., 0., 0., 0);
+  init_snapshot_type(IO_STAR_POPTYPE, SN_MINI);
+#endif
 #endif
 
 #ifdef STAR_FEEDBACK_ACTIVE
