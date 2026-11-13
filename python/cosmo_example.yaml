@@ -1,0 +1,15 @@
+# Parameters for make_music_tk.py  (python make_music_tk.py --params cosmo_example.yaml)
+code: camb            # camb | class
+h: 0.6751
+omega_m: 0.3121       # cdm + baryons (not multiplied by h^2)
+omega_b: 0.0491
+ns: 0.9678
+zstart: 99            # must equal MUSIC [setup] zstart
+# As: 2.1e-9          # irrelevant for MUSIC (sigma_8 renormalises)
+# mnu: 0.0
+# neff: 3.046
+kmax: 5000.0         # h/Mpc
+k_per_decade: 100  # finer native k sampling from CAMB (k_per_logint) / CLASS (k_per_decade_for_pk)
+nk: 2000           # resample final table to nk log-spaced points (needs scipy)
+velocities: placeholder   # placeholder (DM-only) | real
+output: tk_camb.dat
