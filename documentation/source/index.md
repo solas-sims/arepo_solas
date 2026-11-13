@@ -85,6 +85,7 @@ Table of contents
   running.md
   simtypes.md
   config-options.md
+  config-pipeline-status.md
   parameterfile.md
   snapshotformat.md
   diagnosticfiles.md
