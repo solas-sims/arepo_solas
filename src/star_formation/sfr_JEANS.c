@@ -59,8 +59,13 @@ double get_jeans_length(int i)
   double sound_speed, jeans_length;
 
   sound_speed = get_sound_speed(i);
-  
-  jeans_length = sqrt(M_PI / All.G / SphP[i].Density) * sound_speed;
+
+  /* Returned in *comoving* code length, since this is compared directly against
+   * get_cell_radius() (comoving) in sf_criteria() below. Density is stored comoving
+   * and Utherm/sound_speed is already physical (a-independent), so the physical
+   * Jeans length sqrt(pi*a^3/(G*rho_comoving))*c_s must be divided by a (comoving
+   * length = physical length / a) to get sqrt(pi*a/(G*rho_comoving))*c_s. */
+  jeans_length = sqrt(M_PI * All.cf_atime / All.G / SphP[i].Density) * sound_speed;
 
   return jeans_length;
 }
@@ -76,8 +81,11 @@ double get_jeans_mass(int i)
   double sound_speed, jeans_mass;
 
   sound_speed = get_sound_speed(i);
-  
-  jeans_mass = pow(M_PI, 2.5) * pow(sound_speed, 3.) / 6. / pow(All.G, 1.5) / sqrt(SphP[i].Density);
+
+  /* Returned in physical mass (a-independent), since this is compared directly
+   * against P[i].Mass (physical) in sf_criteria() below. Density is stored comoving,
+   * so convert to physical density (* cf_a3inv) before using it here. */
+  jeans_mass = pow(M_PI, 2.5) * pow(sound_speed, 3.) / 6. / pow(All.G, 1.5) / sqrt(SphP[i].Density * All.cf_a3inv);
 
   return jeans_mass;
 }
@@ -164,7 +172,17 @@ void cooling_and_starformation(void)
       SphP[i].Utherm += du;
       SphP[i].Energy += All.cf_atime * All.cf_atime * du * P[i].Mass;
 
-      cool_cell(i);
+    } /* end of temperature-floor loop */
+
+  /* cool all active cells in one go (with Grackle: array-based calls, one per time bin) */
+  cool_active_cells();
+
+  /* sf_criteria() only depends on the state of the cell itself, so it can be evaluated after the cooling pass */
+  for(idx = 0; idx < TimeBinsHydro.NActiveParticles; idx++)
+    {
+      i = TimeBinsHydro.ActiveParticleList[idx];
+      if(i < 0 || P[i].Mass == 0)
+        continue;
 
       if(sf_criteria(i))
         {
@@ -174,7 +192,7 @@ void cooling_and_starformation(void)
       else
         SphP[i].Sfr = 0;
 
-    } /* end of main loop over active particles */
+    } /* end of star formation loop over active particles */
 
   TIMER_STOP(CPU_COOLINGSFR);
 }
@@ -195,8 +213,9 @@ double get_starformation_rate(int i)
   if(!sf_criteria(i))
     return 0;
     
-  /* freefall time in code units */
-  t_freefall = sqrt(3.0 * M_PI / 32 / All.G / SphP[i].Density); 
+  /* freefall time in code units; Density is stored comoving, so convert to physical
+   * density (* cf_a3inv) before using it in a physical free-fall time */
+  t_freefall = sqrt(3.0 * M_PI / 32 / All.G / (SphP[i].Density * All.cf_a3inv));
 
   rateOfSF = All.StarFormationEfficiency * P[i].Mass / t_freefall;
 

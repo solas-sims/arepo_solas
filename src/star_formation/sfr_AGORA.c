@@ -127,7 +127,17 @@ void cooling_and_starformation(void)
       SphP[i].Utherm += du;
       SphP[i].Energy += All.cf_atime * All.cf_atime * du * P[i].Mass;
 
-      cool_cell(i);
+    } /* end of temperature-floor loop */
+
+  /* cool all active cells in one go (with Grackle: array-based calls, one per time bin) */
+  cool_active_cells();
+
+  /* sf_criteria() only depends on the state of the cell itself, so it can be evaluated after the cooling pass */
+  for(idx = 0; idx < TimeBinsHydro.NActiveParticles; idx++)
+    {
+      i = TimeBinsHydro.ActiveParticleList[idx];
+      if(i < 0 || P[i].Mass == 0)
+        continue;
 
       if(sf_criteria(i))
         {
@@ -137,7 +147,7 @@ void cooling_and_starformation(void)
       else
         SphP[i].Sfr = 0;
 
-    } /* end of main loop over active particles */
+    } /* end of star formation loop over active particles */
 
   TIMER_STOP(CPU_COOLINGSFR);
 }
@@ -158,8 +168,9 @@ double get_starformation_rate(int i)
   if(!sf_criteria(i))
     return 0;
     
-  /* freefall time in code units */
-  t_freefall = sqrt(3. * M_PI / 32 / All.G / SphP[i].Density); 
+  /* freefall time in code units; Density is stored comoving, so convert to physical
+   * density (* cf_a3inv) before using it in a physical free-fall time */
+  t_freefall = sqrt(3. * M_PI / 32 / All.G / (SphP[i].Density * All.cf_a3inv));
 
   rateOfSF = All.StarFormationEfficiency * P[i].Mass / t_freefall;
 

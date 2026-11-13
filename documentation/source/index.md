@@ -99,6 +99,7 @@ Table of contents
   development.md
   technical-reference.md
   fof_halo_seeding.md
+  cosmological_units.md
   solas-parameters.md
   sf_threshold_halo_mass.md
   sidm.md

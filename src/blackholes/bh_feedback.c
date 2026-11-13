@@ -147,7 +147,7 @@ static int bh_feedback_evaluate(int target, int mode, int threadid)
 {
   int i, n, numnodes, *firstnode; 
   MyDouble xtmp, ytmp, ztmp;   
-  MyDouble h, h2, dx, dy, dz, r2; 
+  MyDouble h, h2, dx, dy, dz, r, r2; 
   MyDouble *pos, ngbsvolume, accretion, mass_feed, energy_feed, factor;
 
   data_in local, *target_data;
@@ -188,7 +188,7 @@ static int bh_feedback_evaluate(int target, int mode, int threadid)
 //  hinv4 = hinv3 * hinv;
 
 #ifdef BH_CONSTANT_RADIUS
-  int nfound = ngb_treefind_variable_threads(pos, All.BhRadius, target, mode, threadid, numnodes, firstnode);
+  int nfound = ngb_treefind_variable_threads(pos, BH_RADIUS_CODE, target, mode, threadid, numnodes, firstnode);
 #else
   int nfound = ngb_treefind_variable_threads(pos, h, target, mode, threadid, numnodes, firstnode);
 #endif
@@ -208,14 +208,12 @@ static int bh_feedback_evaluate(int target, int mode, int threadid)
       r2 = dx * dx + dy * dy + dz * dz;
 
 #ifdef BH_CONSTANT_RADIUS
-      if(r2 < All.BhRadius*All.BhRadius)
+      if(r2 < BH_RADIUS_CODE*BH_RADIUS_CODE)
 #else
       if(r2 < h2)
 #endif
         {
-          //r = sqrt(r2);
-          //u = r * hinv;
-
+          r = sqrt(r2);
           //bh_kernel(u, hinv3, hinv4, &wk, &dwk);
 
           factor = SphP[i].Volume / ngbsvolume;
