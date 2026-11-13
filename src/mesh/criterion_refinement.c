@@ -249,10 +249,13 @@ static int jeans_refinement_criteria(int i)
 #ifdef JEANS_REFINEMENT
   if(can_this_cell_be_split(i))
     {
-      double jeans_number, jeans_length, sound_speed, dx;
+      double jeans_number, jeans_length, sound_speed, dx, rho_phys;
 
       sound_speed  = sqrt(GAMMA * SphP[i].Pressure / SphP[i].Density);
-      jeans_length = sqrt(M_PI / All.G / SphP[i].Density) * sound_speed;
+      /* Convert the proper Jeans length to the comoving code length used by
+       * the cell radius. */
+      rho_phys = SphP[i].Density * All.cf_a3inv;
+      jeans_length = sqrt(M_PI / All.G / rho_phys) * sound_speed / All.cf_atime;
       dx           = 2.0 * get_cell_radius(i);
       jeans_number = jeans_length / dx;
 
