@@ -4,7 +4,12 @@
 #
 # Usage (from the run directory, which holds param.txt, ICs/ and output_list.txt; logs/ is created):
 #   sbatch --account=<project> /path/to/submit_setonix.sbatch
-#   sbatch --account=<project> --export=ALL,EXEC=$PWD/Arepo-CosmoBox,NTASKS=64 submit_setonix.sbatch
+#   sbatch --account=<project> --export=ALL,EXEC=$PWD/Arepo-CosmoBox submit_setonix.sbatch
+# The number of MPI tasks comes from the #SBATCH lines below (1 node x 64 tasks), not from a variable in this script.
+# To change it, pass a Slurm option on the sbatch line, which overrides the header:
+#   sbatch --account=<project> --ntasks-per-node=32 submit_setonix.sbatch      # 32 tasks on one node
+#   sbatch --account=<project> --nodes=2 --ntasks-per-node=64 submit_setonix.sbatch
+# The first line of the job output states the task count that was used.
 #
 # Restarts: the script starts from the ICs if output/restartfiles/restart.0 does not exist, otherwise it
 # restarts from the restart files (RestartFlag 1). Arepo stops cleanly and writes restart files once it has used
