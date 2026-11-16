@@ -102,8 +102,14 @@ integertime star_timestep(int i)
   else 
     dt = TIMEBASE * All.Timebase_interval;
 
-  /* Set a maximum star timestep at 0.01 Myr */
-  double dt_star = 1.0e4 / All.cf_UnitTime_in_yr;
+  /* Maximum star timestep. The 0.01 Myr default suits resolved galaxy simulations, where individual stars and their
+   * feedback events must be followed closely. In a cosmological box it forces every active star particle onto ~10^4 yr
+   * steps for the whole run, which sets the number of global steps (~ cosmic time / 10^4 yr); raise it there with
+   * STAR_MAX_TIMESTEP_MYR=<value> in Config.sh. */
+#ifndef STAR_MAX_TIMESTEP_MYR
+#define STAR_MAX_TIMESTEP_MYR 0.01
+#endif
+  double dt_star = STAR_MAX_TIMESTEP_MYR * 1.0e6 / All.cf_UnitTime_in_yr;
 
   if(dt_star < dt)
     dt = dt_star;

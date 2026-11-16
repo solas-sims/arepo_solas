@@ -49,6 +49,7 @@
 #STARS                  # General stars framework flag
 
 #STAR_PARTICLES=1       # Star particles model flag: set to 0, 1 for massive star particles, set to 2 for resolved individual stars
+#STAR_MAX_TIMESTEP_MYR=0.01  # Requires STAR_FEEDBACK_ACTIVE (STARS). Upper limit on a star particle's timestep in Myr (default 0.01, as for resolved galaxy runs). In cosmological boxes this sets the global step count: raise it (e.g. 1.0), and check SFR and stellar mass against a default run.
 
 #STAR_FEEDBACK          # Include full star feedback (winds + full radiation + supernovae)
 
