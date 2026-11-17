@@ -71,21 +71,7 @@ endif
 GRACKLE_DIR ?= $(HOME)/software/grackle_solas/
 GRACKLE_LIBDIR := $(or $(firstword $(wildcard $(GRACKLE_DIR)/lib64 $(GRACKLE_DIR)/lib)),$(GRACKLE_DIR)/lib)
 
-ifeq (USE_GRACKLE,$(findstring USE_GRACKLE,$(CONFIGVARS)))
-OPTIONS += -DCONFIG_BFLOAT_8
-GRACKLE_INCL = -I$(GRACKLE_DIR)/include
-GRACKLE_LIB = -L$(GRACKLE_LIBDIR) -lgrackle -Wl,-rpath,$(GRACKLE_LIBDIR)
-ifeq ($(SYSTYPE),MACOSX)
-LDFLAGS += -L$(shell brew --prefix gcc)/lib/gcc/current -lgfortran -lquadmath
-else
-LDFLAGS += -lgfortran -lquadmath
-endif
-else
-GRACKLE_INCL =
-GRACKLE_LIB =
-endif
-
-#Mac OS using MacPorts modules for openmpi, fftw, gsl, hdf5 and hwloc
+# Darwin
 ifeq ($(filter Darwin,$(SYSTYPE)),Darwin)
 # compiler and its optimization options
 CC        = mpicc   # sets the C-compiler
@@ -104,6 +90,30 @@ HDF5_LIB  = -L/opt/local/lib
 HWLOC_INCL= -I/opt/local/include
 endif
 # end of Darwin
+
+# CICA-Hercules
+ifeq ($(filter Hercules,$(SYSTYPE)),Hercules)
+# compiler and its optimization options
+CC        = mpicc   # sets the C-compiler
+OPTIMIZE  = -std=c11 -ggdb -g -O0 -fno-omit-frame-pointer -Wall -Wno-format-security -Wno-unknown-pragmas -Wno-unused-function
+
+MPICH_LIB = -lmpi
+GSL_INCL  = -I/opt/local/include
+GSL_LIB   = -L/opt/local/lib -lgsl -lgslcblas
+HWLOC_LIB = -L/opt/local/lib -lhwloc
+
+# libraries that are included on demand, depending on Config.sh options
+FFTW_INCL = -I/opt/local/include -I/usr/local/include
+FFTW_LIBS = -L/opt/local/lib -I/usr/local/lib
+HDF5_INCL = -I/opt/local/include
+HDF5_LIB  = -L/opt/local/lib
+HWLOC_INCL= -I/opt/local/include
+
+GRACKLE_DIR = $(HOME)/models/grackle/
+GRACKLE_LIBDIR := $(or $(firstword $(wildcard $(GRACKLE_DIR)/lib64 $(GRACKLE_DIR)/lib)),$(GRACKLE_DIR)/lib)
+endif
+# end of Hercules
+
 
 #Mac OS using MacPorts modules for openmpi, fftw, gsl, hdf5 and hwloc
 ifeq ($(filter MACOSX,$(SYSTYPE)),MACOSX)
@@ -683,6 +693,20 @@ endif
 ##########################
 #combine compiler options#
 ##########################
+
+ifeq (USE_GRACKLE,$(findstring USE_GRACKLE,$(CONFIGVARS)))
+OPTIONS += -DCONFIG_BFLOAT_8
+GRACKLE_INCL = -I$(GRACKLE_DIR)/include
+GRACKLE_LIB = -L$(GRACKLE_LIBDIR) -lgrackle -Wl,-rpath,$(GRACKLE_LIBDIR)
+ifeq ($(SYSTYPE),MACOSX)
+LDFLAGS += -L$(shell brew --prefix gcc)/lib/gcc/current -lgfortran -lquadmath
+else
+LDFLAGS += -lgfortran -lquadmath
+endif
+else
+GRACKLE_INCL =
+GRACKLE_LIB =
+endif
 
 CFLAGS = $(OPTIMIZE) $(MPICH_INCL) $(HDF5_INCL) -DH5_USE_16_API $(GSL_INCL) $(GMP_INCL) $(FFTW_INCL) $(HWLOC_INCL) $(CELIB_INCL) $(GRACKLE_INCL) -I$(BUILD_DIR)
 
