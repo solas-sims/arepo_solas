@@ -2,27 +2,23 @@
 
 Built directly from `src/io/parameters.c` (parameter names, required Config flags, and REAL/STRING/INT
 type) and from grepping each parameter's usage site in `src/` for units and semantics, against `main`
-as of Aug 2026. This supersedes the parameter tables in `Parameters.md`, `Code.md`, and the
-Development Guide's §5 flag table — please point people here and correct the others to link in
-rather than re-listing values, so there's one place this drifts out of sync from instead of four.
+as of Aug 2026. This is the reference for SOLAS-specific parameters; link here rather than re-listing values elsewhere, so
+there is one place to keep in sync.
 
 **Legend:** ✅ verified against a source usage site · ⚠️ inferred from context, not directly confirmed
 · ❓ genuinely unknown from source alone — needs input from whoever wrote/last touched it.
 
-**Known gap:** no committed example run turns on `AGORA_SF`, `JEANS_SF`, `BLACKHOLES`, `RADIATION`,
-or `HALO_SEEDING` (both shipped examples use plain `EEOS_SF`), so there is no in-repo "known-good"
-value for most of the parameters below. Where a real production value exists, it's quoted with its
-source. Everywhere else, "Recommended" is blank rather than invented — please fill these in as the
-team settles on values, ideally by adding a worked example config rather than only editing this file.
+**Examples that exercise these options:** `agora_disc_star_formation_3d` (`AGORA_SF`, Grackle, winds and
+supernovae), `cosmo_L10N128_star_formation_3d` and `cosmo_zoom_L50N128_star_formation_3d` (cosmological star
+formation); see [examples.md](./examples.md). `JEANS_SF`, `RADIATION` and `HALO_SEEDING` have no committed
+example, so for those there is no in-repo known-good value. Where a real production value exists it is quoted
+with its source; otherwise "Recommended" is blank rather than invented.
 
-**Where this should actually live:** `documentation/source/` already has a working Sphinx setup —
-`index.md`'s `toctree` wires in `parameterfile.md`/`config-options.md` (the untouched public-AREPO
-docs, which is why none of this is in there yet), plus `technical-reference.md` and
-`fof_halo_seeding.md` (SOLAS-specific, already merged into `main`, already in the toctree). This
-file fits that pattern as a new `documentation/source/solas-parameters.md`, added to the `toctree`.
-One more thing while you're in there: `sf_threshold_halo_mass.md` exists in `documentation/source/`
-but is **not** in `index.md`'s toctree — it's built but orphaned, unreachable from the docs
-homepage. Worth a one-line fix alongside this.
+Black-hole flag relationships (from the `Makefile`): `BH_ACCRETION_ACTIVE` is set by any of `BONDI_ACCRETION`,
+`TORQUE_ACCRETION`, `ADP_ACCRETION`; `BH_FEEDBACK_ACTIVE` is set by `BH_THERMAL_FEEDBACK` or
+`BH_JET_FEEDBACK`, and requires an accretion flag (the build stops otherwise). `BH_CONSTANT_RADIUS` does not
+work with `BH_JET_FEEDBACK`. Parameters are only registered when their flag is on, so a parameter file with a
+tag whose flag is off fails at start-up with `Tag '...' not allowed`.
 
 ---
 
@@ -93,6 +89,16 @@ downstream. Additionally:
 | `NodeAspectRatio` | `RAD_OPENING_ANGLE` | REAL | ❓ | |
 | `RTIonizationTimestepFraction` | `PHOTOIONIZATION` | REAL | ✅ dimensionless fraction (`eps_ion` in `star_radiation.c`) | |
 | `IRDtauMomentumBoostCoeff` | `RADIATION_PRESSURE` | REAL | — | **Dead parameter as of this checkout** — read into `All.IRDtauMomentumBoostCoeff` but never referenced anywhere else in `src/`. Flag to the team before anyone tunes it. |
+
+## Black hole flags
+
+| Flag | Effect |
+|---|---|
+| `BLACKHOLES` | Black-hole framework (`PartType5` particles; `BH_ACTIVE` internally). |
+| `BONDI_ACCRETION` | Bondi accretion, capped at the Eddington rate (`src/blackholes/bh_accretion.c`). Sets `BH_ACCRETION_ACTIVE`. |
+| `TORQUE_ACCRETION`, `ADP_ACCRETION` | Alternative accretion models; see the accretion table below. |
+| `BH_THERMAL_FEEDBACK` | Thermal-only feedback: a fraction `Epsilon_f` of the radiated luminosity is deposited as heat. Sets `BH_FEEDBACK_ACTIVE`. |
+| `BH_JET_FEEDBACK` | Jet feedback. Sets `BH_FEEDBACK_ACTIVE` too; do not enable it just to get thermal feedback. |
 
 ## Black holes — density/radius
 
@@ -180,14 +186,15 @@ worth reading before touching either parameter below rather than inferring behav
 
 ---
 
-## How this was built, so it can be regenerated
+## Regenerating this page
+
+The tables are derived from `src/io/parameters.c` (names, required flags, type) and from the usage site of
+each parameter in `src/` (units, semantics):
 
 ```bash
-git clone https://github.com/solas-sims/arepo_solas.git
-cd arepo_solas
-grep -n 'strcpy(tag\[nt\]' src/io/parameters.c        # full parameter list + line numbers
-grep -n 'All\.<ParamName>\b' src/**/*.c                # usage sites, for units/semantics
+grep -n 'strcpy(tag\[nt\]' src/io/parameters.c       # full parameter list + line numbers
+grep -rn 'All\.<ParamName>\b' src                     # usage sites, for units/semantics
 ```
-Everything marked ✅ above was confirmed this way. Everything marked ❓ needs five minutes with the
-same grep against whoever's local checkout has the relevant physics turned on and running — I'd
-rather leave a gap flagged than fill it with a plausible-sounding guess.
+
+✅ means confirmed this way; ⚠️ means inferred from context; ❓ means unknown from source alone and needs input
+from whoever last touched that module. SIDM parameters are in [sidm.md](./sidm.md).

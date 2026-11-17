@@ -47,6 +47,7 @@
 #STARS                  # General stars framework flag
 
 #STAR_PARTICLES=1       # Star particles model flag: set to 0, 1 for massive star particles, set to 2 for resolved individual stars
+#STAR_MAX_TIMESTEP_MYR=0.01  # Requires STAR_FEEDBACK_ACTIVE (STARS). Upper limit on a star particle's timestep in Myr (default 0.01, as for resolved galaxy runs). In cosmological boxes this sets the global step count: raise it (e.g. 1.0), and check SFR and stellar mass against a default run.
 
 #STAR_FEEDBACK          # Include full star feedback (winds + full radiation + supernovae)
 
@@ -61,6 +62,11 @@
 #PHOTOIONIZATION        # Only photoionization
 
 #SUPERNOVAE             # Only supernovae
+#STAR_FEEDBACK_IMMEDIATE_DEPOSIT  # Requires WINDS and/or SUPERNOVAE. Apply the wind/SN mass, momentum, energy, metals and species
+                                  # to the conserved variables of every receiving cell at the end of star_feedback(), instead of when each
+                                  # cell is next active. With hierarchical time steps a long-step cell otherwise exchanges fluxes with
+                                  # its neighbours between the event and the application, so SN host-cell removals can exceed the cell
+                                  # content (negative mass/energy). Default (off) keeps the previous behaviour.
 
 #TREECOLUMN             # Column density estimate through the gravity tree (src/gravity/forcetree.c)
 #RAD_OPENING_ANGLE      # Alternate tree-opening criterion for radiation transport neighbour walks (src/ngbtree/ngbtree.c)
@@ -118,6 +124,15 @@
 #USE_GRACKLE         # Use the Grackle cooling/chemistry library instead of the simple primordial cooling
 #GRACKLE_CHEMISTRY=0 # Curretly only grackle mode=0 (lookup tables) with no chemistry network is supported
 #NOUVBACKGROUND      # Disables the UV background in the main run loop's cooling/star-formation step
+#GRACKLE_PER_CELL    # Requires USE_GRACKLE; debugging/testing aid: call Grackle one cell at a time (the old behaviour)
+                     # instead of in arrays grouped by time bin. Results should be identical either way; use for A/B tests.
+#COOLING_TIMESTEP_LIMITER # Requires COOLING; caps a gas cell's hydro timestep at
+                          # CoolingTimestepFactor (param.txt) x its local cooling time, evaluated
+                          # once per active step in cool_cell() from the pre-cooling state. Adds
+                          # one extra GetCoolingTime() call per active cell per step (an extra
+                          # Grackle single-cell solve, with its per-call allocation overhead, if
+                          # USE_GRACKLE is also set) -- opt in only where under-resolved cooling
+                          # in rapidly-cooling gas (e.g. resolved SN remnants) is a concern.
 
 #--------------------------------------- Metal parameters
 #METALS # Advect all metals, ie metal mass fraction, as a PASSIVE_SCALARS.

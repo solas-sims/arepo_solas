@@ -265,7 +265,12 @@ void run(void)
            * Note that at this place we do not need to store the mesh, not the gravity tree.
            */
           if(check_for_interruption_of_run())
-            return;
+            {
+#ifdef USE_GRACKLE
+              GrackleReportStats();
+#endif
+              return;
+            }
         }
       else
         RestartFlag = 0;
@@ -378,6 +383,10 @@ void run(void)
 #if !defined(PMGRID) && defined(SELFGRAVITY) && !defined(GRAVITY_NOT_PERIODIC) && !defined(ONEDIMS_SPHERICAL)
   ewald_clean();
 #endif /* #if !defined(PMGRID) && defined(SELFGRAVITY) && !defined(GRAVITY_NOT_PERIODIC) && !defined(ONEDIMS_SPHERICAL) */
+
+#ifdef USE_GRACKLE
+  GrackleReportStats();
+#endif
 
   write_cpu_log(); /* output final cpu measurements */
 }

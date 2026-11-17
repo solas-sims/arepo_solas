@@ -6,6 +6,12 @@ extern int NumBhs;
 
 #include "../main/allvars.h"
 
+#ifdef BH_CONSTANT_RADIUS
+/* All.BhRadius is a *physical* radius (code length units); positions and Hsml are comoving, so
+ * convert to comoving code length (cf_atime = 1 when not comoving) */
+#define BH_RADIUS_CODE (All.BhRadius / All.cf_atime)
+#endif
+
 
 extern FILE *FdBlackHoles; 
 

@@ -47,9 +47,28 @@ struct Feedback_Kick
 #endif
 };
 
+#ifdef STAR_FEEDBACK_IMMEDIATE_DEPOSIT
+/* Local cells that received a kick during this call of star_feedback(); flushed to their conserved variables at the end */
+static int *TouchedCells = NULL;
+static int NTouched = 0, MaxTouched = 0;
+
+static void note_touched_cell(int j)
+{
+  if(NTouched >= MaxTouched)
+    {
+      MaxTouched = (MaxTouched > 0) ? 2 * MaxTouched : 1024;
+      TouchedCells = realloc(TouchedCells, MaxTouched * sizeof(int));
+    }
+  TouchedCells[NTouched++] = j;
+}
+#endif /* #ifdef STAR_FEEDBACK_IMMEDIATE_DEPOSIT */
+
 /* Apply a kick packet to a local cell */
 static void apply_kick(int j, const struct Feedback_Kick *Kick)
 {
+#ifdef STAR_FEEDBACK_IMMEDIATE_DEPOSIT
+  note_touched_cell(j);
+#endif
 #ifdef WINDS
   SphP[j].StarMassFeed += Kick->DeltaMass;
   All.StarFeedbackLocal[0] += Kick->DeltaMass;
@@ -154,7 +173,9 @@ static void SN_compute(int ev, int h, double alpha, double beta, double gamma, d
                 * pow(n_H, -2.0 / 17.0)
                 * pow(Zsol, -0.14);
   
-  p_term /= (All.cf_UnitMass_in_Msun * All.cf_UnitVelocity_in_cm_per_s / 1.0e5);
+  /* Msun km/s -> cgs, then to code momentum; cf_UnitMomentum_in_cgs carries the 1/a so the
+   * cap is in the same canonical (a * p_phys) convention as p_SN */
+  p_term *= SOLAR_MASS * 1.0e5 / All.cf_UnitMomentum_in_cgs;
 
   if(p_SN > p_term)
     p_SN = p_term;
@@ -283,6 +304,10 @@ void star_feedback(void)
   int *ExportTask = (int *) mymalloc_movable(&ExportTask, "ExportTask", max_export * sizeof(int));
   struct Feedback_Kick *ExportBuf =
   (struct Feedback_Kick *) mymalloc_movable(&ExportBuf, "ExportBuf", max_export * sizeof(struct Feedback_Kick));
+
+#ifdef STAR_FEEDBACK_IMMEDIATE_DEPOSIT
+  NTouched = 0;
+#endif
 
   /* Act on host cells */
   for(ev = 0; ev < MechanicalFeedbackEvents.NumEvents;)
@@ -912,6 +937,12 @@ void star_feedback(void)
   myfree(RecvDisp); myfree(SendDisp); myfree(RecvCount); myfree(SendCount);
 
   myfree(ExportBuf); myfree(ExportTask);
+
+#ifdef STAR_FEEDBACK_IMMEDIATE_DEPOSIT
+  /* All kicks (local and received) are in the pending fields: put them into the conserved variables now, for active and inactive
+   * cells alike, instead of waiting until each cell is next active */
+  star_flush_pending_feed(NTouched, TouchedCells);
+#endif
  
   TIMER_STOP(CPU_STARS_FEEDBACK);
 }
