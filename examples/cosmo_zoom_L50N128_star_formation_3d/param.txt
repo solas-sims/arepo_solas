@@ -8,9 +8,9 @@ TreecoolFile               ../../data/TREECOOL_ep
 GrackleDataFile            ./grackle_data/CloudyData_UVB=HM2012_high_density.h5
 
 %---- Star Formation options
-StarFormationEfficiency	    5.0e-1
+StarFormationEfficiency	    1.0e-2
 NumberDensThreshold	    1.0e-1
-TemperatureThreshold        1.0e6
+TemperatureThreshold        2.0e4
 CritOverDensity             57.7
 
 %---- Star options
@@ -43,7 +43,7 @@ ErrTolThetaSubfind       0.7
 %----  Arepo public
 
 %----  Relevant files
-InitCondFile                            ./ICs/cosmo_L10N128
+InitCondFile                            ./ICs/L50_N128_z99_Halo381
 OutputDir                               ./output
 SnapshotFileBase                        snap
 OutputListFilename                      ./output_list.txt
@@ -74,7 +74,7 @@ Omega0                                  0.3121
 OmegaLambda                             0.6879
 OmegaBaryon                             0.0486
 HubbleParam                             0.6751
-BoxSize                                 10
+BoxSize                                 50
 
 %---- Output frequency and output parameters
 OutputListOn                            0
@@ -119,19 +119,24 @@ ActivePartFracForNewDomainDecomp        0.1
  GravityConstantInternal                 0
 
  %---- Gravitational softening lengths
- SofteningComovingType0                  0.003
- SofteningComovingType1                  0.003
- SofteningComovingType2                  0.003
- SofteningComovingType3                  0.003
- SofteningComovingType4                  0.003
- SofteningComovingType5                  0.003
+ %% level-9 high-res region (Type0 gas, Type1 DM, Type4 stars): boxsize/2^levelmax/40
+ %%   = 50/512/40 = 0.00244140625 Mpc/h
+ %% level-7 coarse/boundary DM (Type2, per Config.sh INDIVIDUAL_GRAVITY_SOFTENING=4): boxsize/2^levelmin/40
+ %%   = 50/128/40 = 0.009765625 Mpc/h
+ %% Type3/Type5 unused in this Config (no extra coarse mass level, no black holes); given the coarse value.
+ SofteningComovingType0                  0.00244140625
+ SofteningComovingType1                  0.00244140625
+ SofteningComovingType2                  0.009765625
+ SofteningComovingType3                  0.009765625
+ SofteningComovingType4                  0.00244140625
+ SofteningComovingType5                  0.009765625
 
- SofteningMaxPhysType0                   0.003
- SofteningMaxPhysType1                   0.003
- SofteningMaxPhysType2                   0.003
- SofteningMaxPhysType3                   0.003
- SofteningMaxPhysType4                   0.003
- SofteningMaxPhysType5                   0.003
+ SofteningMaxPhysType0                   0.00244140625
+ SofteningMaxPhysType1                   0.00244140625
+ SofteningMaxPhysType2                   0.009765625
+ SofteningMaxPhysType3                   0.009765625
+ SofteningMaxPhysType4                   0.00244140625
+ SofteningMaxPhysType5                   0.009765625
 
  GasSoftFactor                           2.5
 
@@ -139,10 +144,10 @@ ActivePartFracForNewDomainDecomp        0.1
  SofteningTypeOfPartType1                1
  SofteningTypeOfPartType2                2
  SofteningTypeOfPartType3                3
- SofteningTypeOfPartType4                3
- SofteningTypeOfPartType5                1
+ SofteningTypeOfPartType4                4
+ SofteningTypeOfPartType5                5
 
- MinimumComovingHydroSoftening           0.003
+ MinimumComovingHydroSoftening           0.00244140625
  AdaptiveHydroSofteningSpacing           1.2
 
  %---- Mesh regularization options

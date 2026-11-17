@@ -1,9 +1,9 @@
 #!/bin/bash        	# this line only there to enable syntax highlighting in this file
 
-#########################################################
-#  Enable/Disable compile-time options as needed        #
-#  examples/cosmo_L10N128_star_formation_3d/Config.sh   #
-#########################################################
+#############################################################
+#  Enable/Disable compile-time options as needed            #
+#  examples/cosmo_zoom_L50N128_star_formation_3d/Config.sh  #
+#############################################################
 
 #--------------------------------------- Mesh motion and regularization
 REGULARIZE_MESH_CM_DRIFT                # Mesh regularization; Move mesh generating point towards center of mass to make cells rounder.
@@ -66,13 +66,13 @@ SUBFIND                                          # enables substructure finder
 #SUBFIND_EXTENDED_PROPERTIES                      # adds calculation of further quantities related to angular momentum in different components
 
 #--------------------------------------- Testing and Debugging options
-DEBUG # enables core-dumps
+#DEBUG # enables core-dumps; off for production runs (costs run time)
 
 #--------------------------------------- non-standard phyiscs
 #ENFORCE_JEANS_STABILITY_OF_CELLS # this imposes an adaptive floor for the temperature
 COOLING                          # Simple primordial cooling
 USE_GRACKLE			 # Use Grackle library for cooling
-GRACKLE_CHEMISTRY=3
+GRACKLE_CHEMISTRY=1              # atomic 6-species network; H2/HD cooling (levels 2-3) matters only in minihalos below ~1e8 Msun, unresolved here
 #NOUVBACKGROUND			 # Switches off UV background
 USE_SFR                          # Activate star formation
 #EEOS_SF			 # AGORA star formation scheme
@@ -84,8 +84,10 @@ AGORA_SF
 #USE_CELIB
 STARS
 STAR_PARTICLES=0
+STAR_MAX_TIMESTEP_MYR=0.1        # cap on star-particle timesteps [Myr]; default 0.01 is for resolved galaxy runs and dominates the step count in a cosmological run (see README). Needs commit e3b3e3c (grackle-batched-cooling-v2); inert without it.
 WINDS
 SUPERNOVAE
+STAR_FEEDBACK_IMMEDIATE_DEPOSIT  # deposit wind/SN feed into the receiving cells at the event, not when each cell is next active
 #PASSIVE_SCALARS=1
 METALS
 
@@ -99,7 +101,7 @@ METALS
                                  # MAX_HSML_SOFTENING, or MIN_HSML_SOFTENING. Pairs are matched greedily by ascending
                                  # separation (not mutual-nearest-neighbour, which can deadlock 3+ body subsystems).
 
-EVALPOTENTIAL                   # computes gravitational potential; required by BH_SEED_ON_POTENTIAL_POSITION below
+#EVALPOTENTIAL                  # computes gravitational potential; required by BH_SEED_ON_POTENTIAL_POSITION below
 
 #HALO_SEEDING
 #BLACKHOLE_SEEDING
