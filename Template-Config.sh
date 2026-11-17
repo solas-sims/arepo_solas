@@ -251,6 +251,7 @@
 #---------------------------------------- Time integration options
 #FORCE_EQUAL_TIMESTEPS         # variable but global timestep
 #TREE_BASED_TIMESTEPS          # non-local timestep criterion (take 'signal speed' into account)
+#TIMESTEP_LIMITER_DIAGNOSTIC  # Requires TREE_BASED_TIMESTEPS. Print (TIMESTEP_LIMITER: lines) any neighbour whose signal speed limits a cell's timestep to below 1e-3 of the cell's own rad/csnd limit (override with TIMESTEP_LIMITER_DIAGNOSTIC_RATIO=<x>); max 200 lines per task. Silent in a healthy run; for tracking down tiny-timestep crashes.
 #PM_TIMESTEP_BASED_ON_TYPES=2+4  # particle types that should be considered in setting the PM timestep
 #NO_PMFORCE_IN_SHORT_RANGE_TIMESTEP  # PM force is not included in short-range timestep criterion
 #ENLARGE_DYNAMIC_RANGE_IN_TIME # This extends the dynamic range of the integer timeline from 32 to 64 bit

@@ -59,6 +59,9 @@ typedef struct
   MyFloat Csnd;
   MyFloat cellrad;
   MyFloat CurrentMaxTiStep;
+#ifdef TIMESTEP_LIMITER_DIAGNOSTIC
+  MyIDType ID;
+#endif
 
   int Firstnode; /* this is needed as part of the communication alogorithm */
 } data_in;
@@ -87,6 +90,9 @@ static void particle2in(data_in *in, int i, int firstnode)
   in->Csnd             = SphP[i].Csnd;
   in->cellrad          = get_cell_radius(i);
   in->CurrentMaxTiStep = SphP[i].CurrentMaxTiStep;
+#ifdef TIMESTEP_LIMITER_DIAGNOSTIC
+  in->ID = P[i].ID;
+#endif
 
   in->Firstnode = firstnode;
 }
@@ -217,6 +223,53 @@ void tree_based_timesteps(void)
   CPU_Step[CPU_TREE_TIMESTEPS] += measure_time();
 }
 
+#ifdef TIMESTEP_LIMITER_DIAGNOSTIC
+/* Diagnostic: report neighbours that set an implausibly small tree-based timestep.
+ *
+ * A neighbour is reported when the limit (dist + cellrad) / vsig it imposes is below
+ * TIMESTEP_LIMITER_DIAGNOSTIC_RATIO times the cell's own limit cellrad / csnd. Because cellrad is added to the distance,
+ * this can only happen for an unphysically large signal speed vsig (a very hot neighbour, or a huge relative velocity),
+ * not for two nearly coincident mesh points. The neighbour p is local to the task that runs the walk, so everything
+ * about it can be printed here; the target cell is identified by its ID. At most TIMESTEP_LIMITER_DIAGNOSTIC_MAXPRINT
+ * lines per task are written, so a run that has nothing of the kind stays silent and a bad one cannot flood the log. */
+#ifndef TIMESTEP_LIMITER_DIAGNOSTIC_RATIO
+#define TIMESTEP_LIMITER_DIAGNOSTIC_RATIO 1.0e-3
+#endif
+#ifndef TIMESTEP_LIMITER_DIAGNOSTIC_MAXPRINT
+#define TIMESTEP_LIMITER_DIAGNOSTIC_MAXPRINT 200
+#endif
+
+static void timestep_limiter_report(const data_in *target_data, int p, double dist_raw, double vsig, double tlimit)
+{
+  static int nprinted = 0;
+
+  if(target_data->Csnd <= 0 || nprinted >= TIMESTEP_LIMITER_DIAGNOSTIC_MAXPRINT)
+    return;
+
+  double own_limit = target_data->cellrad / target_data->Csnd;
+
+  if(!(tlimit < TIMESTEP_LIMITER_DIAGNOSTIC_RATIO * own_limit))
+    return;
+
+  nprinted++;
+
+  printf(
+      "TIMESTEP_LIMITER: task=%d target ID=%llu cellrad=%g csnd=%g own_limit=%g -> limit %g from neighbour ID=%llu "
+      "(Ti_Current=%lld, TimeBinHydro=%d): dist=%g vsig=%g (neighbour Csnd=%g, |dv|=%g)\n",
+      ThisTask, (unsigned long long)target_data->ID, target_data->cellrad, target_data->Csnd, own_limit, tlimit,
+      (unsigned long long)P[p].ID, (long long)All.Ti_Current, (int)P[p].TimeBinHydro, dist_raw, vsig, SphP[p].Csnd,
+      sqrt(pow(P[p].Vel[0] - target_data->Vel[0], 2) + pow(P[p].Vel[1] - target_data->Vel[1], 2) +
+           pow(P[p].Vel[2] - target_data->Vel[2], 2)));
+  printf("TIMESTEP_LIMITER:   neighbour mass=%g Volume=%g Density=%g Utherm=%g Pressure=%g Energy=%g Pos=(%g|%g|%g)\n", P[p].Mass,
+         SphP[p].Volume, SphP[p].Density, SphP[p].Utherm, SphP[p].Pressure, SphP[p].Energy, P[p].Pos[0], P[p].Pos[1], P[p].Pos[2]);
+#ifdef STAR_FEEDBACK_ACTIVE
+  printf("TIMESTEP_LIMITER:   neighbour pending star feed: mass=%g energy=%g momentum=(%g|%g|%g)\n", SphP[p].StarMassFeed,
+         SphP[p].StarEnergyFeed, SphP[p].StarMomentumFeed[0], SphP[p].StarMomentumFeed[1], SphP[p].StarMomentumFeed[2]);
+#endif
+  myflush(stdout);
+}
+#endif /* #ifdef TIMESTEP_LIMITER_DIAGNOSTIC */
+
 /*! \brief The 'core' of the tree-based timestep computation.
  *
  *  A target particle is specified which may either be local, or reside in the
@@ -323,10 +376,18 @@ int timestep_evaluate(int target, int mode, int threadid)
 
                   if(vsig > 0)
                     {
+#ifdef TIMESTEP_LIMITER_DIAGNOSTIC
+                      double dist_raw = dist;
+#endif
                       dist += cellrad; /* take one cell radius as minimum distance in order to protect against unreasonably small steps
                                           if two mesh-generating points are extremely close */
                       if(out.CurrentMaxTiStep > dist / vsig)
-                        out.CurrentMaxTiStep = dist / vsig;
+                        {
+                          out.CurrentMaxTiStep = dist / vsig;
+#ifdef TIMESTEP_LIMITER_DIAGNOSTIC
+                          timestep_limiter_report(target_data, p, dist_raw, vsig, out.CurrentMaxTiStep);
+#endif
+                        }
                     }
                 }
             }
