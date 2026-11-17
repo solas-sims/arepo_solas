@@ -172,6 +172,13 @@ example's `Config.sh`/`param.txt`:
   resolved here at z=4. H2/HD cooling (levels 2-3) matters in minihalos
   below ~1e8 Msun, which are not resolved. Snapshots and restart files
   are not compatible with chemistry-3 runs.
+- **`REFINEMENT_HIGH_RES_GAS`** is specific to the zoom. It restricts
+  refinement and derefinement to gas that came from the high-res region
+  (`AllowRefinement`), carries a per-cell `HighResMass`, and gives a star
+  formed in a cell with little high-res mass the coarse Type 3 softening.
+  Here all gas is split from the level-9 `PartType1` particles at
+  startup, so every cell starts as high-res and the flag changes little
+  at the start. It adds `HighResGasMass` and `AllowRefinement` to the snapshots.
 - **`DEBUG` and `EVALPOTENTIAL` off.** Neither is needed (no black hole
   seeding), and both cost run time.
 - **Star-formation parameters.** The box example's committed

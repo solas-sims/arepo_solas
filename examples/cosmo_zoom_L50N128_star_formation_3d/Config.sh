@@ -14,6 +14,7 @@ REGULARIZE_MESH_FACE_ANGLE              # Use maximum face angle as roundness cr
 REFINEMENT_SPLIT_CELLS 			 # Refinement
 REFINEMENT_MERGE_CELLS                   # Derefinement
 REFINEMENT_VOLUME_LIMIT
+REFINEMENT_HIGH_RES_GAS                 # Zoom runs: only gas from the high-res region is (de)refined; tracks HighResMass per cell and gives stars formed outside it the coarse softening (Type 3)
 
 #--------------------------------------- Time integration options
 
