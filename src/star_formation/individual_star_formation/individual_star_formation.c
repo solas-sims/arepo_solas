@@ -72,7 +72,7 @@ void individual_starbystar_formation(void)
   TIMER_START(CPU_COOLINGSFR);
 
   int idx, i;
-  double dt, dtff, u;
+  double dt, dtff, u, rho_phys;
   MyDouble mass_of_star;
   double p = 0, prob, p_decide;
   double rate, local_stars_mass, global_stars_mass;
@@ -92,7 +92,10 @@ void individual_starbystar_formation(void)
       dt = (P[i].TimeBinHydro ? (((integertime)1) << P[i].TimeBinHydro) : 0) * All.Timebase_interval;
       dt /= All.cf_hubble_a;
 
-      dtff = sqrt(3.0 * M_PI / 32 / All.G / SphP[i].Density);
+      /* Convert the comoving stored density to physical density before
+       * calculating the proper freefall time. */
+      rho_phys = SphP[i].Density * All.cf_a3inv;
+      dtff = sqrt(3.0 * M_PI / 32 / All.G / rho_phys);
           
       p = 0;
       prob = 0;
