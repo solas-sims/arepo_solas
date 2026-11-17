@@ -7,8 +7,8 @@ Mpc, N128 parent box (Planck-ish cosmology), run from z=99 to z=4
 `FOF`+`SUBFIND`. The high-res region is refined to `levelmax=9` (an
 effective 512^3 grid); everything outside it is the coarse `levelmin=7`
 (128^3) boundary population. Gas is not in the IC file -- it's split off
-from the dark matter at startup via `GENERATE_GAS_IN_ICS`, based on
-`OmegaBaryon`.
+from the dark matter at startup via `GENERATE_GAS_IN_ICS` (both the
+high-res and the coarse dark matter, see below), based on `OmegaBaryon`.
 
 Like `agora_disc_star_formation_3d` and `cosmo_L10N128_star_formation_3d`,
 this example does **not** plug into `test.sh` -- it generates ICs with an
@@ -71,8 +71,9 @@ by default the script looks for one at `../../../MUSIC2/build/MUSIC`
 at your build if it's elsewhere. Not committed to the repo (gitignored,
 same `examples/*/ICs/` rule as the AGORA example).
 
-`Config.sh` enables `GENERATE_GAS_IN_ICS`, which splits each DM particle
-into a DM+gas pair at startup according to `OmegaBaryon`; the code
+`Config.sh` enables `GENERATE_GAS_IN_ICS` with `SPLIT_PARTICLE_TYPE=2+4`,
+which splits each `PartType1` and `PartType2` particle into a DM+gas pair
+at startup according to `OmegaBaryon`; the code
 terminates on startup if the IC already contains gas, so don't feed it a
 file that has `PartType0`.
 
@@ -172,13 +173,27 @@ example's `Config.sh`/`param.txt`:
   resolved here at z=4. H2/HD cooling (levels 2-3) matters in minihalos
   below ~1e8 Msun, which are not resolved. Snapshots and restart files
   are not compatible with chemistry-3 runs.
-- **`REFINEMENT_HIGH_RES_GAS`** is specific to the zoom. It restricts
-  refinement and derefinement to gas that came from the high-res region
-  (`AllowRefinement`), carries a per-cell `HighResMass`, and gives a star
-  formed in a cell with little high-res mass the coarse Type 3 softening.
-  Here all gas is split from the level-9 `PartType1` particles at
-  startup, so every cell starts as high-res and the flag changes little
-  at the start. It adds `HighResGasMass` and `AllowRefinement` to the snapshots.
+- **Gas across the whole box (`SPLIT_PARTICLE_TYPE=2+4`).** A moving-mesh
+  code needs generating points everywhere in the periodic box. With gas
+  only in the high-res patch (the default `GENERATE_GAS_IN_ICS` splits
+  type 1 only), the first mesh build summed to 171x the box volume
+  after 120 `VORONOI` iterations and then segfaulted in the gradient
+  step. `SPLIT_PARTICLE_TYPE=2+4` splits both the level-9 `PartType1`
+  and the coarse `PartType2` (levels 7-8) into gas + DM, so every region
+  has gas at the cosmic baryon fraction. Coarse gas cells are 8-64x
+  heavier than the high-res ones.
+- **Coarse gas must not refine (`REFINEMENT_HIGH_RES_GAS`).** Gas split
+  from type 1 gets `AllowRefinement=2`; gas from any other type gets 0,
+  which blocks target-mass refinement and all derefinement.
+  `REFINEMENT_VOLUME_LIMIT` (`MaxVolumeDiff`) does not check that flag, so
+  `can_this_cell_be_split()` in `src/mesh/criterion_refinement.c` now
+  returns 0 for `AllowRefinement == 0` cells. Without it a coarse cell
+  next to refined gas could be split, and its daughters
+  (`AllowRefinement += 2`) would become refinable. The same flag adds a per-cell
+  `HighResMass`, gives stars formed in mostly low-res cells the coarse
+  Type 3 softening, and adds `HighResGasMass` and `AllowRefinement` to the
+  snapshots. `ReferenceGasPartMass 0` takes the target cell mass from the
+  refinable (high-res) cells only.
 - **`DEBUG` and `EVALPOTENTIAL` off.** Neither is needed (no black hole
   seeding), and both cost run time.
 - **Star-formation parameters.** The box example's committed

@@ -165,10 +165,21 @@ int should_this_cell_be_split(int i)
  *
  *  \param[in] i Index of cell in P and SphP arrays.
  *
+ *  With REFINEMENT_HIGH_RES_GAS, cells with AllowRefinement == 0 (e.g. low-resolution
+ *  background gas in zoom runs) are never split, whichever criterion asks for it.
+ *  This matters for the volume criterion, which does not check AllowRefinement itself;
+ *  without it a coarse cell would be split and its daughters (AllowRefinement += 2)
+ *  would become refinable.
+ *
  *  \return Flag if this cell is allowed to be refined.
  */
 int can_this_cell_be_split(int i)
 {
+#ifdef REFINEMENT_HIGH_RES_GAS
+  if(SphP[i].AllowRefinement == 0)
+    return 0;
+#endif /* #ifdef REFINEMENT_HIGH_RES_GAS */
+
 #ifdef REGULARIZE_MESH_FACE_ANGLE
   if(SphP[i].MaxFaceAngle < 1.5 * All.CellMaxAngleFactor)
     return 1;

@@ -624,12 +624,6 @@ void check_omega(void)
   omega   = masstot / (All.BoxSize * All.BoxSize * All.BoxSize) / (3 * All.Hubble * All.Hubble / (8 * M_PI * All.G));
   omega_b = masstot_b / (All.BoxSize * All.BoxSize * All.BoxSize) / (3 * All.Hubble * All.Hubble / (8 * M_PI * All.G));
 
-#ifdef PLACEHIGHRESREGION
-  /* In a zoom run gas exists only in the high-resolution region, so the box-averaged baryon density is
-   * far below OmegaBaryon by construction. Only the total matter density can be checked against the box. */
-  omega_b = All.OmegaBaryon;
-#endif /* #ifdef PLACEHIGHRESREGION */
-
   if(n_b > 0)
     {
       if(fabs((omega - All.Omega0) / omega) > 1.0e-1 || fabs((omega_b - All.OmegaBaryon) / omega_b) > 1.0e-1)

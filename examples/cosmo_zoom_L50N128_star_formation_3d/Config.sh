@@ -54,6 +54,7 @@ OVERRIDE_PEANOGRID_WARNING  # don't stop if peanogrid is not fine enough
 HAVE_HDF5 # needed when HDF5 I/O support is desired (recommended)
 #INPUT_IN_DOUBLEPRECISION
 GENERATE_GAS_IN_ICS
+SPLIT_PARTICLE_TYPE=2+4       # split types 1 (level-9 high-res DM) and 2 (coarse levels 7-8) into gas+DM: the Voronoi mesh needs gas across the whole periodic box. Only type-1 gas is refinable (REFINEMENT_HIGH_RES_GAS).
 
 #------------------------------------------------ On the fly FOF groupfinder
 FOF                                              # enable FoF output
