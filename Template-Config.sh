@@ -50,6 +50,8 @@
 #STAR_MAX_TIMESTEP_MYR=0.01  # Requires STAR_FEEDBACK_ACTIVE (STARS). Upper limit on a star particle's timestep in Myr (default 0.01, as for resolved galaxy runs). In cosmological boxes this sets the global step count: raise it (e.g. 1.0), and check SFR and stellar mass against a default run.
 #SN_TERMINAL_MOMENTUM_BOOST=1.0  # Requires SUPERNOVAE. Multiplier on the terminal momentum cap of unresolved (mesh-coupled) SNe, default 1 (Kimm & Cen fit). Values above 1 strengthen SN feedback when the cell mass is too large to resolve the remnant; for tests of feedback strength.
 #STAR_FEEDBACK_DIAGNOSTIC  # Requires SUPERNOVAE. Print one SN_DIAG: line per step with SN events: events, SNe per event, how often the momentum cap binds, momentum per SN, kinetic energy delivered / E_SN, thermal temperature rise per neighbour, swept/host mass.
+#GRACKLE_GUARD_RATIO=1.0e3  # Requires USE_GRACKLE. A cell is flagged when the batched Grackle solve returns a thermal energy that is not finite, is negative, or exceeds this factor times the pre-cooling value (default 1e3). Flagged cells are printed (GRACKLE_GUARD: lines) and re-integrated alone in substeps; if that also fails the run stops with the cell state printed. The guard is always active; this only changes the threshold.
+#GRACKLE_GUARD_SUBSTEPS=64  # Requires USE_GRACKLE. Number of substeps for the single-cell re-integration of a flagged cell (default 64).
 
 #STAR_FEEDBACK          # Include full star feedback (winds + full radiation + supernovae)
 
