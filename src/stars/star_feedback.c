@@ -16,6 +16,18 @@
 /* Percent thermal energy in the energy conserving phase (Sedov-Taylor) of an SN */
 #define SN_F_THERMAL 0.72 
 
+/* Multiplier on the terminal momentum cap of unresolved SNe (default 1: the Kimm & Cen fit). Set with
+ * SN_TERMINAL_MOMENTUM_BOOST=<x> in Config.sh. */
+#ifndef SN_TERMINAL_MOMENTUM_BOOST
+#define SN_TERMINAL_MOMENTUM_BOOST 1.0
+#endif
+
+#ifdef STAR_FEEDBACK_DIAGNOSTIC
+/* Accumulated since the last report (this task): unresolved (mesh-coupled) SN events and host-dump events. */
+double SNDiag[12];
+enum { D_NMESH, D_NHOST, D_NSN, D_NCAPPED, D_PSN, D_PE, D_EKIN, D_ESN, D_DTTH, D_MNB, D_MHOST, D_DMH };
+#endif
+
 /* Kick packet sent to remote face-neighbor cells */
 struct Feedback_Kick
 { 
@@ -138,8 +150,11 @@ static void apply_kick_primexch(int particle, const struct Feedback_Kick *Kick)
  *
  * p_SN = (-beta + sqrt(beta^2 - 4 alpha gamma)) / (2 alpha)
  */
-static void SN_compute(int ev, int h, double alpha, double beta, double gamma, double NgbsDensity, double NgbsMetallicity, double *p)
+static void SN_compute(int ev, int h, double alpha, double beta, double gamma, double NgbsDensity, double NgbsMetallicity, double *p,
+                       double *p_energy, double *p_terminal)
 {
+  *p_energy = *p_terminal = 0.0;
+
   if(alpha <= 0.0)
     {
       *p = 0.0;
@@ -175,7 +190,12 @@ static void SN_compute(int ev, int h, double alpha, double beta, double gamma, d
   
   /* Msun km/s -> cgs, then to code momentum; cf_UnitMomentum_in_cgs carries the 1/a so the
    * cap is in the same canonical (a * p_phys) convention as p_SN */
+  p_term *= SN_TERMINAL_MOMENTUM_BOOST;
+
   p_term *= SOLAR_MASS * 1.0e5 / All.cf_UnitMomentum_in_cgs;
+
+  *p_energy = p_SN;
+  *p_terminal = p_term;
 
   if(p_SN > p_term)
     p_SN = p_term;
@@ -357,6 +377,9 @@ void star_feedback(void)
               if(sn_mode != MESH)
                 {
                   SN_feedback_host(i, ev, h, sn_mode);
+#ifdef STAR_FEEDBACK_DIAGNOSTIC
+                  SNDiag[D_NHOST] += 1;
+#endif
                   flag_sn_host = 1;
                 }
             }
@@ -622,6 +645,7 @@ void star_feedback(void)
           /* Per-face state carried from the coefficient pass to deposition */
           double SN_ptilde[MAX_FACES][3]; /* pre-kick momentum m_j v_j + advected */
           double SN_mfj[MAX_FACES];       /* final neighbour mass m_j + |w|m_dep   */
+          double SN_wj[MAX_FACES];        /* |wbar_j|, the share of the event received by face j */
           double SN_KEj[MAX_FACES];       /* initial neighbour kinetic energy      */
           double SN_Dj[MAX_FACES];        /* kinetic energy dissipated in-place    */
 
@@ -702,6 +726,7 @@ void star_feedback(void)
                     SN_ptilde[f][k] = ptilde[k];
                   
                   SN_mfj[f] = mfj;
+                  SN_wj[f] = sqrtsq_wbar;
                   SN_KEj[f] = 0.5 * mj * sq_vj;
                   SN_Dj[f] = D;
 
@@ -725,7 +750,35 @@ void star_feedback(void)
               dU_SN_th = SN_F_THERMAL * E_SN;
               double gamma = dU_SN_th - E_SN;
 
-              SN_compute(ev, h, alpha, beta, gamma, NgbsDensity, NgbsMetallicity, &p_SN);
+              double p_energy, p_terminal;
+              SN_compute(ev, h, alpha, beta, gamma, NgbsDensity, NgbsMetallicity, &p_SN, &p_energy, &p_terminal);
+
+#ifdef STAR_FEEDBACK_DIAGNOSTIC
+              {
+                /* kinetic energy delivered by the coupling: alpha p^2 + beta p (dissipated and advected terms excluded) */
+                double ekin = alpha * p_SN * p_SN + beta * p_SN;
+                /* mean thermal energy per unit mass added to a neighbour (|w_j|-weighted), as a temperature */
+                double u_th = 0.0, wsum = 0.0;
+                for(f = 0; f < n_faces; f++)
+                  {
+                    u_th += SN_wj[f] * (SN_wj[f] * dU_SN_th / SN_mfj[f]);
+                    wsum += SN_wj[f];
+                  }
+                u_th = (wsum > 0.0) ? u_th / wsum : 0.0;
+                u_th *= All.cf_UnitEnergy_in_cgs / (All.cf_UnitMass_in_Msun * SOLAR_MASS);
+                SNDiag[D_DTTH] += GAMMA_MINUS1 * 0.6 * PROTONMASS * u_th / BOLTZMANN;
+                SNDiag[D_MNB] += 1;
+                SNDiag[D_NMESH] += 1;
+                SNDiag[D_NSN] += E51;
+                SNDiag[D_NCAPPED] += (p_energy > p_terminal) ? 1 : 0;
+                SNDiag[D_PSN] += p_SN * All.cf_UnitMomentum_in_cgs / (SOLAR_MASS * 1.0e5);
+                SNDiag[D_PE] += p_energy * All.cf_UnitMomentum_in_cgs / (SOLAR_MASS * 1.0e5);
+                SNDiag[D_EKIN] += ekin;
+                SNDiag[D_ESN] += E_SN;
+                SNDiag[D_DMH] += dm_h * All.cf_UnitMass_in_Msun;
+                SNDiag[D_MHOST] += m_h * All.cf_UnitMass_in_Msun;
+              }
+#endif
             }
 #endif
       
