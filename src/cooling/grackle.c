@@ -85,6 +85,103 @@ static void grackle_prepare_block(int n)
   All.GrackleUnits.a_value = All.cf_atime;
 }
 
+/* Fill slot k of the Grackle field arrays from cell i, with thermal energy u_k and proper density rho_k. */
+static void grackle_gather_cell(int k, int i, double u_k, double rho_k, int consume_rates)
+{
+  GF.x_velocity[k]      = P[i].Vel[0];
+  GF.y_velocity[k]      = P[i].Vel[1];
+  GF.z_velocity[k]      = P[i].Vel[2];
+  GF.density[k]         = rho_k;
+  GF.internal_energy[k] = u_k;
+
+#ifdef METALS
+  double Metallicity = SphP[i].GasMetallicity;
+#else
+  double Metallicity = GRACKLE_TINY;
+#endif
+  GF.metal_density[k] = Metallicity * GF.density[k];
+
+#if (GRACKLE_CHEMISTRY >= 1)
+  /* H and He species */
+  GF.HI_density[k]    = SphP[i].GrackleSpecies(GRACKLE_HI) * GF.density[k];
+  GF.HII_density[k]   = SphP[i].GrackleSpecies(GRACKLE_HII) * GF.density[k];
+  GF.HeI_density[k]   = SphP[i].GrackleSpecies(GRACKLE_HeI) * GF.density[k];
+  GF.HeII_density[k]  = SphP[i].GrackleSpecies(GRACKLE_HeII) * GF.density[k];
+  GF.HeIII_density[k] = SphP[i].GrackleSpecies(GRACKLE_HeIII) * GF.density[k];
+
+  /* molecular H species */
+#if (GRACKLE_CHEMISTRY >= 2)
+  GF.H2I_density[k]  = SphP[i].GrackleSpecies(GRACKLE_H2I) * GF.density[k];
+  GF.H2II_density[k] = SphP[i].GrackleSpecies(GRACKLE_H2II) * GF.density[k];
+  GF.HM_density[k]   = SphP[i].GrackleSpecies(GRACKLE_HM) * GF.density[k];
+#else
+  GF.H2I_density[k]  = GRACKLE_TINY * GF.density[k];
+  GF.H2II_density[k] = GRACKLE_TINY * GF.density[k];
+  GF.HM_density[k]   = GRACKLE_TINY * GF.density[k];
+#endif
+
+  /* deuterium species */
+#if (GRACKLE_CHEMISTRY >= 3)
+  GF.DI_density[k]  = SphP[i].GrackleSpecies(GRACKLE_DI) * GF.density[k];
+  GF.DII_density[k] = SphP[i].GrackleSpecies(GRACKLE_DII) * GF.density[k];
+  GF.HDI_density[k] = SphP[i].GrackleSpecies(GRACKLE_HDI) * GF.density[k];
+#else
+  GF.DI_density[k]  = GRACKLE_TINY * GF.density[k];
+  GF.DII_density[k] = GRACKLE_TINY * GF.density[k];
+  GF.HDI_density[k] = GRACKLE_TINY * GF.density[k];
+#endif
+
+  /* electron density from charge balance */
+  double e_density = GF.HII_density[k] + GF.HeII_density[k] / 4.0 + GF.HeIII_density[k] / 2.0;
+#if (GRACKLE_CHEMISTRY >= 2)
+  e_density += GF.H2II_density[k] / 2.0 - GF.HM_density[k];
+#endif
+#if (GRACKLE_CHEMISTRY >= 3)
+  e_density += GF.DII_density[k] / 2.0;
+#endif
+  GF.e_density[k] = e_density;
+
+  /* Radiation */
+  /* volumetric heating rate in [erg s^-1 cm^-3]; H2 dissociation rate in [1/time_units]; RT heating rates in
+   * [erg s^-1 cm^-3] / n; ionization rates in [1/time_units]; specific heating rate in [erg s^-1 g^-1] */
+#ifdef PHOTOELECTRIC_HEATING
+  GF.volumetric_heating_rate[k] = (gr_float)(SphP[i].PE_VolHeatingRate);
+  if(consume_rates)
+    SphP[i].PE_VolHeatingRate = 0;
+#else
+  GF.volumetric_heating_rate[k] = 0;
+#endif
+
+#ifdef DISSOCIATION
+  GF.RT_H2_dissociation_rate[k] = (gr_float)(SphP[i].H2_DissociationRate);
+  if(consume_rates)
+    SphP[i].H2_DissociationRate = 0;
+#else
+  GF.RT_H2_dissociation_rate[k] = 0;
+#endif
+
+#ifdef PHOTOIONIZATION
+  GF.RT_HI_heating_rate[k]      = (gr_float)(SphP[i].HI_HeatingRate);
+  GF.RT_HeI_heating_rate[k]     = (gr_float)(SphP[i].HeI_HeatingRate);
+  GF.RT_HeII_heating_rate[k]    = (gr_float)(SphP[i].HeII_HeatingRate);
+  GF.RT_HI_ionization_rate[k]   = (gr_float)(SphP[i].HI_IonizationRate);
+  GF.RT_HeI_ionization_rate[k]  = (gr_float)(SphP[i].HeI_IonizationRate);
+  GF.RT_HeII_ionization_rate[k] = (gr_float)(SphP[i].HeII_IonizationRate);
+  if(consume_rates)
+    SphP[i].HI_HeatingRate = SphP[i].HeI_HeatingRate = SphP[i].HeII_HeatingRate = SphP[i].HI_IonizationRate =
+        SphP[i].HeI_IonizationRate = SphP[i].HeII_IonizationRate = 0;
+#else
+  GF.RT_HI_heating_rate[k]      = 0;
+  GF.RT_HeI_heating_rate[k]     = 0;
+  GF.RT_HeII_heating_rate[k]    = 0;
+  GF.RT_HI_ionization_rate[k]   = 0;
+  GF.RT_HeI_ionization_rate[k]  = 0;
+  GF.RT_HeII_ionization_rate[k] = 0;
+#endif
+  GF.specific_heating_rate[k] = 0.0;
+#endif /* GRACKLE_CHEMISTRY >= 1 */
+}
+
 /* Fill the field arrays for the n cells target[0..n-1], using the thermal energies u[] and the (proper) densities rho[]. If
  * consume_rates is set, the accumulated radiation rates stored in SphP are zeroed once they have been passed to Grackle; this must
  * only be done for the call that actually integrates the cell (solve_chemistry), not for diagnostic queries. */
@@ -93,102 +190,7 @@ static void grackle_gather(int n, const int *target, const double *u, const doub
   grackle_prepare_block(n);
 
   for(int k = 0; k < n; k++)
-    {
-      int i = target[k];
-
-      GF.x_velocity[k]      = P[i].Vel[0];
-      GF.y_velocity[k]      = P[i].Vel[1];
-      GF.z_velocity[k]      = P[i].Vel[2];
-      GF.density[k]         = rho[k];
-      GF.internal_energy[k] = u[k];
-
-#ifdef METALS
-      double Metallicity = SphP[i].GasMetallicity;
-#else
-      double Metallicity = GRACKLE_TINY;
-#endif
-      GF.metal_density[k] = Metallicity * GF.density[k];
-
-#if (GRACKLE_CHEMISTRY >= 1)
-      /* H and He species */
-      GF.HI_density[k]    = SphP[i].GrackleSpecies(GRACKLE_HI) * GF.density[k];
-      GF.HII_density[k]   = SphP[i].GrackleSpecies(GRACKLE_HII) * GF.density[k];
-      GF.HeI_density[k]   = SphP[i].GrackleSpecies(GRACKLE_HeI) * GF.density[k];
-      GF.HeII_density[k]  = SphP[i].GrackleSpecies(GRACKLE_HeII) * GF.density[k];
-      GF.HeIII_density[k] = SphP[i].GrackleSpecies(GRACKLE_HeIII) * GF.density[k];
-
-      /* molecular H species */
-#if (GRACKLE_CHEMISTRY >= 2)
-      GF.H2I_density[k]  = SphP[i].GrackleSpecies(GRACKLE_H2I) * GF.density[k];
-      GF.H2II_density[k] = SphP[i].GrackleSpecies(GRACKLE_H2II) * GF.density[k];
-      GF.HM_density[k]   = SphP[i].GrackleSpecies(GRACKLE_HM) * GF.density[k];
-#else
-      GF.H2I_density[k]  = GRACKLE_TINY * GF.density[k];
-      GF.H2II_density[k] = GRACKLE_TINY * GF.density[k];
-      GF.HM_density[k]   = GRACKLE_TINY * GF.density[k];
-#endif
-
-      /* deuterium species */
-#if (GRACKLE_CHEMISTRY >= 3)
-      GF.DI_density[k]  = SphP[i].GrackleSpecies(GRACKLE_DI) * GF.density[k];
-      GF.DII_density[k] = SphP[i].GrackleSpecies(GRACKLE_DII) * GF.density[k];
-      GF.HDI_density[k] = SphP[i].GrackleSpecies(GRACKLE_HDI) * GF.density[k];
-#else
-      GF.DI_density[k]  = GRACKLE_TINY * GF.density[k];
-      GF.DII_density[k] = GRACKLE_TINY * GF.density[k];
-      GF.HDI_density[k] = GRACKLE_TINY * GF.density[k];
-#endif
-
-      /* electron density from charge balance */
-      double e_density = GF.HII_density[k] + GF.HeII_density[k] / 4.0 + GF.HeIII_density[k] / 2.0;
-#if (GRACKLE_CHEMISTRY >= 2)
-      e_density += GF.H2II_density[k] / 2.0 - GF.HM_density[k];
-#endif
-#if (GRACKLE_CHEMISTRY >= 3)
-      e_density += GF.DII_density[k] / 2.0;
-#endif
-      GF.e_density[k] = e_density;
-
-      /* Radiation */
-      /* volumetric heating rate in [erg s^-1 cm^-3]; H2 dissociation rate in [1/time_units]; RT heating rates in
-       * [erg s^-1 cm^-3] / n; ionization rates in [1/time_units]; specific heating rate in [erg s^-1 g^-1] */
-#ifdef PHOTOELECTRIC_HEATING
-      GF.volumetric_heating_rate[k] = (gr_float)(SphP[i].PE_VolHeatingRate);
-      if(consume_rates)
-        SphP[i].PE_VolHeatingRate = 0;
-#else
-      GF.volumetric_heating_rate[k] = 0;
-#endif
-
-#ifdef DISSOCIATION
-      GF.RT_H2_dissociation_rate[k] = (gr_float)(SphP[i].H2_DissociationRate);
-      if(consume_rates)
-        SphP[i].H2_DissociationRate = 0;
-#else
-      GF.RT_H2_dissociation_rate[k] = 0;
-#endif
-
-#ifdef PHOTOIONIZATION
-      GF.RT_HI_heating_rate[k]      = (gr_float)(SphP[i].HI_HeatingRate);
-      GF.RT_HeI_heating_rate[k]     = (gr_float)(SphP[i].HeI_HeatingRate);
-      GF.RT_HeII_heating_rate[k]    = (gr_float)(SphP[i].HeII_HeatingRate);
-      GF.RT_HI_ionization_rate[k]   = (gr_float)(SphP[i].HI_IonizationRate);
-      GF.RT_HeI_ionization_rate[k]  = (gr_float)(SphP[i].HeI_IonizationRate);
-      GF.RT_HeII_ionization_rate[k] = (gr_float)(SphP[i].HeII_IonizationRate);
-      if(consume_rates)
-        SphP[i].HI_HeatingRate = SphP[i].HeI_HeatingRate = SphP[i].HeII_HeatingRate = SphP[i].HI_IonizationRate =
-            SphP[i].HeI_IonizationRate = SphP[i].HeII_IonizationRate = 0;
-#else
-      GF.RT_HI_heating_rate[k]      = 0;
-      GF.RT_HeI_heating_rate[k]     = 0;
-      GF.RT_HeII_heating_rate[k]    = 0;
-      GF.RT_HI_ionization_rate[k]   = 0;
-      GF.RT_HeI_ionization_rate[k]  = 0;
-      GF.RT_HeII_ionization_rate[k] = 0;
-#endif
-      GF.specific_heating_rate[k] = 0.0;
-#endif /* GRACKLE_CHEMISTRY >= 1 */
-    }
+    grackle_gather_cell(k, target[k], u[k], rho[k], consume_rates);
 }
 
 /* Copy the abundances evolved by solve_chemistry() back into SphP (non-eq. chemistry only). Must be called with the same target[]
@@ -252,6 +254,87 @@ static void grackle_scatter_species(int n, const int *target)
 #endif
     }
 #endif /* GRACKLE_CHEMISTRY >= 1 */
+}
+
+/* Guard against a failed Grackle solve. When the cooling solver does not converge ("MULTI_COOL iter > 10000") it can return an
+ * unphysical thermal energy (observed: u ~ 1e20 in code units, ~1e22 K) that then sets a vanishing timestep and terminates the run.
+ * After the batched solve, any cell whose energy is not finite, is negative, or has grown by more than GRACKLE_GUARD_RATIO is
+ * reported with its pre-cooling state and re-integrated on its own in GRACKLE_GUARD_SUBSTEPS substeps. The radiation rates stored in
+ * SphP were consumed by the first call, so the re-integration omits them. If the re-integration still fails the run is stopped with
+ * the cell state printed. */
+#ifndef GRACKLE_GUARD_RATIO
+#define GRACKLE_GUARD_RATIO 1.0e3
+#endif
+#ifndef GRACKLE_GUARD_SUBSTEPS
+#define GRACKLE_GUARD_SUBSTEPS 64
+#endif
+#define GRACKLE_GUARD_MAXPRINT 200
+
+static int GuardTriggered = 0, GuardRecovered = 0;
+
+static int grackle_result_bad(double unew, double uold) { return !isfinite(unew) || unew < 0 || unew > GRACKLE_GUARD_RATIO * uold; }
+
+static void grackle_guard_print(const char *what, int i, int bin, double dtime, double u_old, double rho, double u_new)
+{
+  printf("GRACKLE_GUARD: task=%d %s cell ID=%llu TimeBinHydro=%d dt=%g u_old=%g u_new=%g rho(proper)=%g Pos=(%g|%g|%g)\n", ThisTask, what,
+         (unsigned long long)P[i].ID, bin, dtime, u_old, u_new, rho, P[i].Pos[0], P[i].Pos[1], P[i].Pos[2]);
+#ifdef METALS
+  printf("GRACKLE_GUARD:   metallicity=%g\n", SphP[i].GasMetallicity);
+#endif
+#if (GRACKLE_CHEMISTRY >= 1)
+  printf("GRACKLE_GUARD:   species (pre-solve): HI=%g HII=%g HeI=%g HeII=%g HeIII=%g", SphP[i].GrackleSpecies(GRACKLE_HI),
+         SphP[i].GrackleSpecies(GRACKLE_HII), SphP[i].GrackleSpecies(GRACKLE_HeI), SphP[i].GrackleSpecies(GRACKLE_HeII),
+         SphP[i].GrackleSpecies(GRACKLE_HeIII));
+#if (GRACKLE_CHEMISTRY >= 2)
+  printf(" H2I=%g H2II=%g HM=%g", SphP[i].GrackleSpecies(GRACKLE_H2I), SphP[i].GrackleSpecies(GRACKLE_H2II),
+         SphP[i].GrackleSpecies(GRACKLE_HM));
+#endif
+  printf("\n");
+#endif
+  myflush(stdout);
+}
+
+/* Call between solve_chemistry() and grackle_scatter_species(), with the same block c[0..n-1]. */
+static void grackle_guard(int n, const int *c, const double *ub, const double *rb, double dtime, int bin)
+{
+  for(int k = 0; k < n; k++)
+    {
+      double unew = GF.internal_energy[k];
+
+      if(!grackle_result_bad(unew, ub[k]))
+        continue;
+
+      int i = c[k];
+      GuardTriggered++;
+
+      if(GuardTriggered <= GRACKLE_GUARD_MAXPRINT)
+        grackle_guard_print("batched solve returned a bad energy for", i, bin, dtime, ub[k], rb[k], unew);
+
+      /* re-integrate this cell alone, in substeps, from its pre-cooling state */
+      grackle_gather_cell(k, i, ub[k], rb[k], 0);
+      GF.grid_start[0] = k;
+      GF.grid_end[0]   = k;
+      for(int s = 0; s < GRACKLE_GUARD_SUBSTEPS; s++)
+        if(solve_chemistry(&All.GrackleUnits, &GF, dtime / GRACKLE_GUARD_SUBSTEPS) == 0)
+          terminate("GRACKLE: Error in solve_chemistry (guard re-integration).\n");
+      GF.grid_start[0] = 0;
+      GF.grid_end[0]   = n - 1;
+
+      double urec = GF.internal_energy[k];
+
+      /* still unphysical, or the same huge value reproduced: stop with the state printed */
+      if(!isfinite(urec) || urec < 0 || (urec > GRACKLE_GUARD_RATIO * ub[k] && isfinite(unew) && fabs(urec - unew) <= 0.5 * unew))
+        {
+          grackle_guard_print("re-integration also failed for", i, bin, dtime, ub[k], rb[k], urec);
+          terminate("GRACKLE_GUARD: cell ID=%llu: Grackle gives u=%g from u_old=%g even in %d substeps\n", (unsigned long long)P[i].ID,
+                    urec, ub[k], GRACKLE_GUARD_SUBSTEPS);
+        }
+
+      GuardRecovered++;
+      if(GuardTriggered <= GRACKLE_GUARD_MAXPRINT)
+        printf("GRACKLE_GUARD:   re-integrated in %d substeps: u_new=%g (%d triggered, %d recovered on this task)\n",
+               GRACKLE_GUARD_SUBSTEPS, urec, GuardTriggered, GuardRecovered);
+    }
 }
 
 /* 'mode' -- tells the routine what to do
@@ -422,6 +505,7 @@ void GrackleCoolCells(int ncells, const int *list)
         {
           if(solve_chemistry(&All.GrackleUnits, &GF, dtime) == 0)
             terminate("GRACKLE: Error in solve_chemistry.\n");
+          grackle_guard(n, c, ub, rb, dtime, bin);
           grackle_scatter_species(n, c);
         }
 
