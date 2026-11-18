@@ -48,6 +48,8 @@
 
 #STAR_PARTICLES=1       # Star particles model flag: set to 0, 1 for massive star particles, set to 2 for resolved individual stars
 #STAR_MAX_TIMESTEP_MYR=0.01  # Requires STAR_FEEDBACK_ACTIVE (STARS). Upper limit on a star particle's timestep in Myr (default 0.01, as for resolved galaxy runs). In cosmological boxes this sets the global step count: raise it (e.g. 1.0), and check SFR and stellar mass against a default run.
+#SN_TERMINAL_MOMENTUM_BOOST=1.0  # Requires SUPERNOVAE. Multiplier on the terminal momentum cap of unresolved (mesh-coupled) SNe, default 1 (Kimm & Cen fit). Values above 1 strengthen SN feedback when the cell mass is too large to resolve the remnant; for tests of feedback strength.
+#STAR_FEEDBACK_DIAGNOSTIC  # Requires SUPERNOVAE. Print one SN_DIAG: line per step with SN events: events, SNe per event, how often the momentum cap binds, momentum per SN, kinetic energy delivered / E_SN, thermal temperature rise per neighbour, swept/host mass.
 
 #STAR_FEEDBACK          # Include full star feedback (winds + full radiation + supernovae)
 
