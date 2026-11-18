@@ -251,6 +251,9 @@
 #HQ_DARKFRACTION=0.9           # fraction in dark matter in Hernquist potential
 
 #---------------------------------------- Time integration options
+#TIMESTEP_LIMITER_DIAGNOSTIC_MAXPRINT
+#TIMESTEP_LIMITER_DIAGNOSTIC_RATIO
+
 #FORCE_EQUAL_TIMESTEPS         # variable but global timestep
 #TREE_BASED_TIMESTEPS          # non-local timestep criterion (take 'signal speed' into account)
 #TIMESTEP_LIMITER_DIAGNOSTIC  # Requires TREE_BASED_TIMESTEPS. Print (TIMESTEP_LIMITER: lines) any neighbour whose signal speed limits a cell's timestep to below 1e-3 of the cell's own rad/csnd limit (override with TIMESTEP_LIMITER_DIAGNOSTIC_RATIO=<x>); max 200 lines per task. Silent in a healthy run; for tracking down tiny-timestep crashes.
