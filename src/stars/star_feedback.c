@@ -22,10 +22,22 @@
 #define SN_TERMINAL_MOMENTUM_BOOST 1.0
 #endif
 
+#ifdef SN_STOCHASTIC_THERMAL
+/* Stochastic thermal injection (Dalla Vecchia & Schaye 2012 style) for unresolved SNe. The thermal share of an event goes to
+ * ONE face neighbour, chosen with probability proportional to its weight |wbar_j|, which is heated by a fixed temperature rise
+ * SN_STOCHASTIC_DT [K] with probability p_j = E_th / (m_j du_target); otherwise nothing is heated. The expected energy given to
+ * each neighbour equals the deterministic share. The momentum, ejecta and swept-mass channels are unchanged. */
+#ifndef SN_STOCHASTIC_DT
+#define SN_STOCHASTIC_DT 10.0e6
+#endif
+#endif
+
 #ifdef STAR_FEEDBACK_DIAGNOSTIC
 /* Accumulated since the last report (this task): unresolved (mesh-coupled) SN events and host-dump events. */
-double SNDiag[12];
-enum { D_NMESH, D_NHOST, D_NSN, D_NCAPPED, D_PSN, D_PE, D_EKIN, D_ESN, D_DTTH, D_MNB, D_MHOST, D_DMH };
+#define SNDIAG_N 16
+double SNDiag[SNDIAG_N];
+enum { D_NMESH, D_NHOST, D_NSN, D_NCAPPED, D_PSN, D_PE, D_EKIN, D_ESN, D_DTTH, D_MNB, D_MHOST, D_DMH,
+       D_NHEAT, D_DTHEAT, D_EEXP, D_EREAL };
 #endif
 
 /* Kick packet sent to remote face-neighbor cells */
@@ -588,6 +600,11 @@ void star_feedback(void)
           /* Directed momentum magnitude and thermal budget for this event */
           double p_SN = 0.0;
           double dU_SN_th = 0.0;
+
+          /* Stochastic thermal injection: face that receives the whole thermal budget (-1: none) and the energy it receives */
+          int SN_hot_f = -1;
+          double SN_hot_E = 0.0;
+
           /* Ejecta mass */
           double m_ej = MechanicalFeedback->SN_MassLoss;
 
@@ -753,6 +770,59 @@ void star_feedback(void)
               double p_energy, p_terminal;
               SN_compute(ev, h, alpha, beta, gamma, NgbsDensity, NgbsMetallicity, &p_SN, &p_energy, &p_terminal);
 
+#ifdef SN_STOCHASTIC_THERMAL
+              {
+                /* Target specific energy in code units: du = k dT / ((gamma-1) mu m_p), mu = 0.6 */
+                double du_cgs = BOLTZMANN * SN_STOCHASTIC_DT / (GAMMA_MINUS1 * 0.6 * PROTONMASS);
+                double du_target = du_cgs / (All.cf_UnitEnergy_in_cgs / (All.cf_UnitMass_in_Msun * SOLAR_MASS));
+
+                double wsum_s = 0.0, P_tot = 0.0;
+                double pf_heat[MAX_FACES];
+
+                for(f = 0; f < n_faces; f++)
+                  wsum_s += SN_wj[f];
+
+                /* Heat face f with probability P_f = (w_f/sum w) * p_f, p_f = min(1, E_th/E_need,f), giving it E_th/p_f */
+                for(f = 0; f < n_faces; f++)
+                  {
+                    double E_need = SN_mfj[f] * du_target;
+                    double pj = (E_need > 0.0) ? dU_SN_th / E_need : 1.0;
+                    if(pj > 1.0)
+                      pj = 1.0;
+                    pf_heat[f] = pj;
+                    P_tot += (wsum_s > 0.0) ? SN_wj[f] / wsum_s * pj : 0.0;
+                  }
+
+                double ur = get_random_number_aux();
+
+                if(ur < P_tot)
+                  {
+                    double c = 0.0;
+                    for(f = 0; f < n_faces; f++)
+                      {
+                        c += SN_wj[f] / wsum_s * pf_heat[f];
+                        if(ur < c)
+                          {
+                            SN_hot_f = f;
+                            SN_hot_E = dU_SN_th / pf_heat[f];
+                            break;
+                          }
+                      }
+                  }
+
+#ifdef STAR_FEEDBACK_DIAGNOSTIC
+                SNDiag[D_EEXP] += dU_SN_th;
+                if(SN_hot_f >= 0)
+                  {
+                    SNDiag[D_NHEAT] += 1;
+                    SNDiag[D_EREAL] += SN_hot_E;
+                    SNDiag[D_DTHEAT] += GAMMA_MINUS1 * 0.6 * PROTONMASS * (SN_hot_E / SN_mfj[SN_hot_f]) *
+                                        (All.cf_UnitEnergy_in_cgs / (All.cf_UnitMass_in_Msun * SOLAR_MASS)) / BOLTZMANN;
+                  }
+#endif
+              }
+#endif
+
 #ifdef STAR_FEEDBACK_DIAGNOSTIC
               {
                 /* kinetic energy delivered by the coupling: alpha p^2 + beta p (dissipated and advected terms excluded) */
@@ -862,7 +932,11 @@ void star_feedback(void)
                   double sq_pf = pf[0]*pf[0] + pf[1]*pf[1] + pf[2]*pf[2];
 
                   double DKE = sq_pf / (2.0 * SN_mfj[f]) - SN_KEj[f];
+#ifdef SN_STOCHASTIC_THERMAL
+                  double dU = (U_ej + dU_h) * sqrtsq_wbar + ((f == SN_hot_f) ? SN_hot_E : 0.0) + SN_Dj[f];
+#else
                   double dU = (U_ej + dU_h + dU_SN_th) * sqrtsq_wbar + SN_Dj[f];
+#endif
 
                   Kick.SN_DeltaE = DKE + dU;
                 }

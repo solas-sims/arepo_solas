@@ -618,22 +618,27 @@ void star_perform_end_of_step_physics(void)
 
 #ifdef STAR_FEEDBACK_DIAGNOSTIC
     {
-      extern double SNDiag[12];
-      double g[12];
-      MPI_Allreduce(SNDiag, g, 12, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+      extern double SNDiag[16];
+      double g[16];
+      MPI_Allreduce(SNDiag, g, 16, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
       if(g[0] + g[1] > 0)
         {
           /* indices follow enum in star_feedback.c: 0 mesh events, 1 host events, 2 sum of E51 (SNe), 3 capped events, 4 sum p_SN,
            * 5 sum p_e, 6 kinetic energy, 7 SN energy, 8 sum T_th, 9 count, 10 sum host mass, 11 sum swept mass */
           double nm = fmax(g[0], 1.0);
           mpi_printf("SN_DIAG: a=%g mesh_events=%.0f host_events=%.0f SNe=%.4g (mean %.1f/event) cap_binds=%.1f%% "
-                     "p_SN/SN=%.3g Msun km/s (p_energy/p_SN=%.3g) kinetic/E_SN=%.3g thermal_dT_per_neighbour=%.3g K "
+                     "p_SN/SN=%.3g Msun km/s (p_energy/p_SN=%.3g) kinetic/E_SN=%.3g thermal_dT_if_spread_over_neighbours=%.3g K "
                      "swept/host_mass=%.3g\n",
                      All.Time, g[0], g[1], g[2], g[2] / nm, 100.0 * g[3] / nm, g[4] / fmax(g[2], 1.0), g[5] / fmax(g[4], 1e-300),
                      g[6] * All.cf_UnitEnergy_in_cgs / fmax(g[7] * All.cf_UnitEnergy_in_cgs, 1e-300), g[8] / fmax(g[9], 1.0),
                      g[11] / fmax(g[10], 1e-300));
+#ifdef SN_STOCHASTIC_THERMAL
+          /* 12 events with a heated cell, 13 sum of temperature rise of heated cells, 14 expected thermal energy, 15 realised */
+          mpi_printf("SN_DIAG_STOCH: heated_events=%.0f of %.0f (%.2f%%) mean_dT_heated=%.3g K energy_realised/expected=%.3g\n", g[12],
+                     g[0], 100.0 * g[12] / nm, g[13] / fmax(g[12], 1.0), g[15] / fmax(g[14], 1e-300));
+#endif
         }
-      for(int k = 0; k < 12; k++)
+      for(int k = 0; k < 16; k++)
         SNDiag[k] = 0;
     }
 #endif
