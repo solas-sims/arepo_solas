@@ -800,6 +800,15 @@ void init_io_fields()
   init_units(IO_STAR_POPTYPE, 0., 0., 0., 0., 0., 0);
   init_snapshot_type(IO_STAR_POPTYPE, SN_MINI);
 #endif
+  init_field(IO_STAR_FORMATION_TIME, "SFT ", "StarFormationTime", MEM_MY_FLOAT, FILE_MY_IO_FLOAT, FILE_NONE, 1, A_S, &SP[0].FormationTime, 0,
+             STARS_ONLY);
+  init_units(IO_STAR_FORMATION_TIME, 0., 0., 0., 0., 0., 0.);
+  init_snapshot_type(IO_STAR_FORMATION_TIME, SN_MINI);
+
+  init_field(IO_STAR_FORMATION_DENSITY, "SFD ", "StarFormationDensity", MEM_MY_FLOAT, FILE_MY_IO_FLOAT, FILE_NONE, 1, A_S,
+             &SP[0].FormationDensity, 0, STARS_ONLY);
+  init_units(IO_STAR_FORMATION_DENSITY, -3., 2., -3., 1., 0., All.UnitDensity_in_cgs);
+  init_snapshot_type(IO_STAR_FORMATION_DENSITY, SN_MINI);
 #endif
 
 #ifdef STAR_FEEDBACK_ACTIVE
