@@ -176,6 +176,11 @@ typedef struct Star_Particle_Data
 {
   MyIDType PID;
 
+  /* Properties at the moment of formation, written to snapshots as StarFormationTime (scale factor) and
+   * StarFormationDensity (comoving gas density of the parent cell, code units) */
+  MyDouble FormationTime;
+  MyDouble FormationDensity;
+
 #ifdef METALS
   MyDouble Metallicity;
 #endif
