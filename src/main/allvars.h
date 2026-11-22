@@ -1888,6 +1888,10 @@ extern struct sph_particle_data
   MyDouble RT_Timestep;
 #endif
 
+#ifdef JEANS_ENERGY_FLOOR
+  int JeansFloored; /*!< 1 if the Jeans energy floor raised this cell's internal energy at its last update (see sfr_AGORA.c) */
+#endif
+
 #ifdef COOLING_TIMESTEP_LIMITER
   MyDouble CoolingTimestep; /*!< All.CoolingTimestepFactor * |cooling time|, evaluated in
                               * cool_cell() from the pre-cooling Utherm/density; 0 means

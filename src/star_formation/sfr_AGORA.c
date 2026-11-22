@@ -44,6 +44,72 @@
 
 #ifdef AGORA_SF
 
+#ifdef JEANS_ENERGY_FLOOR
+/* Jeans energy floor (Robertson & Kravtsov 2008, their eqs 7-10 and A2; Truelove et al. 1997 in grid codes).
+ *
+ * A cell whose Jeans mass is below JEANS_FLOOR_NCELLS cell masses has its specific internal energy raised until the Jeans mass reaches that
+ * value. Since m_Jeans = pi^(5/2) c_s^3 / (6 G^(3/2) rho^(1/2)) and c_s^2 = gamma (gamma-1) u, this gives
+ *     u_floor = (6 N M_cell / pi^(5/2))^(2/3) G rho^(1/3) / (gamma (gamma-1)),
+ * which scales as rho^(1/3) at fixed cell mass. All quantities are physical, in code units.
+ *
+ * JEANS_FLOOR_NCELLS: required Jeans mass in units of the cell mass (default 33: Truelove et al.'s lambda_J >= 4 dx; the SPH criterion
+ *   of Robertson & Kravtsov, 2 N_Jeans = 30 kernel masses, corresponds to roughly 420 if a kernel is the cell plus ~13 neighbours).
+ * JEANS_FLOOR_SF_GATE: 0 (default) the temperature gate of the star formation criteria sees the floored energy;
+ *   1 cells whose energy was raised by the floor pass the temperature gate (the gas would be cold without the artificial pressure). */
+#ifndef JEANS_FLOOR_NCELLS
+#define JEANS_FLOOR_NCELLS 33.0
+#endif
+#ifndef JEANS_FLOOR_SF_GATE
+#define JEANS_FLOOR_SF_GATE 0
+#endif
+
+static double JFloorCalls = 0, JFloorActive = 0, JFloorHit = 0, JFloorRatio = 0, JFloorEnergy = 0, JFloorEnergyTot = 0;
+
+static void apply_jeans_energy_floor(void)
+{
+  const double coef = pow(6.0 * JEANS_FLOOR_NCELLS / pow(M_PI, 2.5), 2.0 / 3.0) * All.G / (GAMMA * GAMMA_MINUS1);
+
+  for(int idx = 0; idx < TimeBinsHydro.NActiveParticles; idx++)
+    {
+      int i = TimeBinsHydro.ActiveParticleList[idx];
+      if(i < 0 || P[i].Mass == 0)
+        continue;
+
+      double rho_phys = SphP[i].Density * All.cf_a3inv;
+      double u_floor  = coef * pow(P[i].Mass, 2.0 / 3.0) * cbrt(rho_phys);
+
+      JFloorActive += 1;
+      SphP[i].JeansFloored = 0;
+
+      if(SphP[i].Utherm < u_floor)
+        {
+          double du = u_floor - SphP[i].Utherm;
+
+          JFloorHit += 1;
+          JFloorRatio += u_floor / fmax(SphP[i].Utherm, 1e-300);
+          JFloorEnergy += du * P[i].Mass;
+          JFloorEnergyTot += SphP[i].Energy;
+
+          SphP[i].Utherm += du;
+          SphP[i].Energy += All.cf_atime * All.cf_atime * du * P[i].Mass;
+          SphP[i].JeansFloored = 1;
+          set_pressure_of_cell(i);
+        }
+    }
+
+  /* report every 200 calls: fraction of active cells floored, mean u_floor/u before, energy added in erg */
+  if(++JFloorCalls >= 200)
+    {
+      double loc[4] = {JFloorActive, JFloorHit, JFloorRatio, JFloorEnergy}, glob[4];
+      MPI_Allreduce(loc, glob, 4, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+      mpi_printf("JEANS_FLOOR: a=%g active_cells=%.0f floored=%.2f%% mean(u_floor/u)=%.3g energy_added=%.4g erg (over last %d steps)\n", All.Time,
+                 glob[0], 100.0 * glob[1] / fmax(glob[0], 1.0), glob[2] / fmax(glob[1], 1.0),
+                 glob[3] * All.cf_UnitEnergy_in_cgs, (int)JFloorCalls);
+      JFloorCalls = JFloorActive = JFloorHit = JFloorRatio = JFloorEnergy = JFloorEnergyTot = 0;
+    }
+}
+#endif /* #ifdef JEANS_ENERGY_FLOOR */
+
 /* Function that checks whether a cell i satisfies star formation criteria*/
 static int sf_criteria(int i)
 {
@@ -74,7 +140,15 @@ static int sf_criteria(int i)
     return 0;
   
   if(temp > All.TemperatureThreshold)
-    return 0;
+    {
+#if defined(JEANS_ENERGY_FLOOR) && JEANS_FLOOR_SF_GATE
+      /* the heat of a cell raised by the Jeans floor is artificial pressure, not gas that is too hot to form stars */
+      if(!SphP[i].JeansFloored)
+        return 0;
+#else
+      return 0;
+#endif
+    }
 
 #ifdef DIVVEL
   if(SphP[i].DivVel >= 0)
@@ -131,6 +205,11 @@ void cooling_and_starformation(void)
 
   /* cool all active cells in one go (with Grackle: array-based calls, one per time bin) */
   cool_active_cells();
+
+#ifdef JEANS_ENERGY_FLOOR
+  /* applied after cooling so that the floor is the last word on the internal energy of each active cell */
+  apply_jeans_energy_floor();
+#endif
 
   /* sf_criteria() only depends on the state of the cell itself, so it can be evaluated after the cooling pass */
   for(idx = 0; idx < TimeBinsHydro.NActiveParticles; idx++)
