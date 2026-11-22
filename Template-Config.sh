@@ -192,6 +192,9 @@
 #COOLING                       # Simple primordial cooling
 #LOW_TEMP_COOLING              # Maschenko et al. 2008 # Don't use while USE_GRACKLE
 #ENFORCE_JEANS_STABILITY_OF_CELLS  # this imposes an adaptive floor for the temperature
+#JEANS_ENERGY_FLOOR            # Requires AGORA_SF. Raises the specific internal energy of each active gas cell, after cooling, until its Jeans mass is at least JEANS_FLOOR_NCELLS cell masses (Robertson & Kravtsov 2008, eqs 7-10; Truelove et al. 1997). u_floor scales as rho^(1/3) at fixed cell mass. Energy is added, not conserved. Prints a JEANS_FLOOR: line every 200 steps. Distinct from ENFORCE_JEANS_STABILITY_OF_CELLS, which floors the pressure only and not with density.
+#JEANS_FLOOR_NCELLS=33.0       # Requires JEANS_ENERGY_FLOOR. Required Jeans mass in cell masses. 33 = Truelove (lambda_J >= 4 dx). The SPH criterion of Robertson & Kravtsov (30 kernel masses) is roughly 420 if a kernel is the cell plus ~13 neighbours. For 9e6 Msun cells the floor is about 1.2e5 K (33) or 6.6e5 K (420) at n_H = 100 cm^-3.
+#JEANS_FLOOR_SF_GATE=0         # Requires JEANS_ENERGY_FLOOR. 0: the star formation temperature gate (TemperatureThreshold) sees the floored energy, so floored gas hotter than the threshold cannot form stars. 1: cells whose energy was raised by the floor pass the temperature gate.
 #USE_SFR                       # Star formation model, turning dense gas into collisionless partices
 #SFR_KEEP_CELLS                # Do not distroy cell out of which a star has formed
 
