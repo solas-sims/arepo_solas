@@ -203,6 +203,10 @@
 #JEANS_FLOOR_NCELLS=33.0       # Requires JEANS_ENERGY_FLOOR (modes 0, 1). Required Jeans mass in cell masses. 33 = Truelove (lambda_J >= 4 dx). The SPH criterion of Robertson & Kravtsov (30 kernel masses) is roughly 420 if a kernel is the cell plus ~13 neighbours. For 9e6 Msun cells the floor is about 1.2e4 K at n_H = 0.1 and 1.2e5 K at 100 cm^-3 (33), or 6.7e4 and 6.7e5 K (420).
 #JEANS_FLOOR_MODE=1           # Requires JEANS_ENERGY_FLOOR. 0: raise the energy after the cooling step. 1 (default): as 0, and cells already at the floor are not passed to the cooling solver, so cooling never removes energy from gas on the floor. 2: fixed EAGLE-style EOS, T = JEANS_FLOOR_EOS_T0 (n_H/JEANS_FLOOR_EOS_NH0)^(JEANS_FLOOR_EOS_GAMMA-1) above NH0 (defaults 8000 K, 0.1 cm^-3, 4/3), independent of cell mass; applied as in mode 1.
 #JEANS_FLOOR_NH_MIN=0.1        # Requires JEANS_ENERGY_FLOOR. [cm^-3] no floor below this hydrogen number density (default 0: none).
+#JEANS_FLOOR_EOS_GAMMA=1.3333333  # Requires JEANS_FLOOR_MODE=2. Polytropic index of the EAGLE-style floor, T = T0 (n_H/NH0)^(gamma-1). Default 4/3.
+#JEANS_FLOOR_EOS_NH0=0.1       # Requires JEANS_FLOOR_MODE=2. [cm^-3] density above which the EAGLE-style floor applies. Default 0.1.
+#JEANS_FLOOR_EOS_T0=8000.0     # Requires JEANS_FLOOR_MODE=2. [K] floor temperature at NH0. Default 8000.
+#JEANS_FLOOR_SF_DEX=0.5        # Requires JEANS_FLOOR_SF_GATE=2. Gas with energy within this many dex of the floor may form stars. Default 0.5.
 #JEANS_FLOOR_SF_GATE=2         # Requires JEANS_ENERGY_FLOOR. 0 (default): the star formation temperature gate (TemperatureThreshold) sees the floored energy, so floored gas hotter than the threshold cannot form stars. 1: cells at the floor pass the gate. 2: gas whose energy is within JEANS_FLOOR_SF_DEX (default 0.5) dex of the floor passes the gate (EAGLE-like).
 #USE_SFR                       # Star formation model, turning dense gas into collisionless partices
 #SFR_KEEP_CELLS                # Do not distroy cell out of which a star has formed
