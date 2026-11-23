@@ -65,6 +65,11 @@ DEBUG # enables core-dumps
 
 #--------------------------------------- non-standard phyiscs
 #ENFORCE_JEANS_STABILITY_OF_CELLS # this imposes an adaptive floor for the temperature
+#JEANS_ENERGY_FLOOR               # Jeans-mass energy floor, see Template-Config.sh; recommended settings below
+#JEANS_FLOOR_MODE=1
+#JEANS_FLOOR_NCELLS=33.0
+#JEANS_FLOOR_NH_MIN=0.1
+#JEANS_FLOOR_SF_GATE=2
 COOLING                          # Simple primordial cooling
 USE_GRACKLE			 # Use Grackle library for cooling
 GRACKLE_CHEMISTRY=3
