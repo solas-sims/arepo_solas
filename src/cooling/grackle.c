@@ -209,13 +209,12 @@ static void grackle_scatter_species(int n, const int *target)
 #else
       double Metallicity = GRACKLE_TINY;
 #endif
-      /* H-bearing mass fraction before the solve; these have not yet been overwritten */
+      /* Hydrogen mass fraction before the solve; these have not yet been overwritten. Deuterium is deliberately left out: Grackle
+       * normalises the D species separately, to DeuteriumToHydrogenRatio times the hydrogen mass, in addition to H + He + metals.
+       * Counting D here would move its mass into hydrogen on every call. */
       double X_H = SphP[i].GrackleSpecies(GRACKLE_HI) + SphP[i].GrackleSpecies(GRACKLE_HII);
 #if (GRACKLE_CHEMISTRY >= 2)
       X_H += SphP[i].GrackleSpecies(GRACKLE_H2I) + SphP[i].GrackleSpecies(GRACKLE_H2II) + SphP[i].GrackleSpecies(GRACKLE_HM);
-#endif
-#if (GRACKLE_CHEMISTRY >= 3)
-      X_H += SphP[i].GrackleSpecies(GRACKLE_DI) + SphP[i].GrackleSpecies(GRACKLE_DII) + SphP[i].GrackleSpecies(GRACKLE_HDI);
 #endif
       double Y_He = 1 - X_H - Metallicity;
 
