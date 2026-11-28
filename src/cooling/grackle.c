@@ -486,20 +486,6 @@ void GrackleCoolCells(int ncells, const int *list)
 
       grackle_gather(n, c, ub, rb, 1);
 
-#ifdef COOLING_TIMESTEP_LIMITER
-      /* evaluated from the pre-cooling state */
-      gr_float *tcool = mymalloc("grackle_tcool", n * sizeof(gr_float));
-      if(calculate_cooling_time(&All.GrackleUnits, &GF, tcool) == 0)
-        terminate("GRACKLE: Error in calculate_cooling_time.\n");
-      for(int k = 0; k < n; k++)
-        {
-          /* Grackle's cooling time is in its code time_units (negative = cooling) */
-          double t                   = (tcool[k] >= 0) ? 0.0 : tcool[k];
-          SphP[c[k]].CoolingTimestep = (t != 0) ? All.CoolingTimestepFactor * fabs(t) : 0;
-        }
-      myfree(tcool);
-#endif
-
       /* dt == 0 (very first step): nothing to integrate, Grackle would complain */
       if(dtime > 0)
         {

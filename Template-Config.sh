@@ -257,9 +257,6 @@
 #HQ_DARKFRACTION=0.9           # fraction in dark matter in Hernquist potential
 
 #---------------------------------------- Time integration options
-#TIMESTEP_LIMITER_DIAGNOSTIC_MAXPRINT
-#TIMESTEP_LIMITER_DIAGNOSTIC_RATIO
-
 #FORCE_EQUAL_TIMESTEPS         # variable but global timestep
 #TREE_BASED_TIMESTEPS          # non-local timestep criterion (take 'signal speed' into account)
 #PM_TIMESTEP_BASED_ON_TYPES=2+4  # particle types that should be considered in setting the PM timestep
