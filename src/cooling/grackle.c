@@ -798,4 +798,24 @@ double get_H2_fraction(int i)
   return (denom > 0.0) ? mH2 / denom : 0.0;
 }
 #endif
+
+#if GRACKLE_CHEMISTRY >= 1
+/* Electron abundance n_e / n_H of cell i from the Grackle species, with n_H = HYDROGEN_MASSFRAC * rho / m_H (Arepo's convention
+ * for ElectronAbundance). Species densities are in units of m_H, with He mass fractions carrying 4 m_H per particle. Note that
+ * with molecular hydrogen present this abundance alone does not fix the mean molecular weight; use compute_mu() for that. */
+double compute_electron_abundance(int i)
+{
+  double Xe = (SphP[i].GrackleSpeciesConserved(GRACKLE_HII) + SphP[i].GrackleSpeciesConserved(GRACKLE_HeII) / 4.0 +
+               SphP[i].GrackleSpeciesConserved(GRACKLE_HeIII) / 2.0);
+#if GRACKLE_CHEMISTRY >= 2
+  Xe += SphP[i].GrackleSpeciesConserved(GRACKLE_H2II) / 2.0 - SphP[i].GrackleSpeciesConserved(GRACKLE_HM);
+#endif
+#if GRACKLE_CHEMISTRY >= 3
+  Xe += SphP[i].GrackleSpeciesConserved(GRACKLE_DII) / 2.0;
+#endif
+
+  return (P[i].Mass > 0) ? Xe / P[i].Mass / HYDROGEN_MASSFRAC : 0;
+}
+#endif /* #if GRACKLE_CHEMISTRY >= 1 */
+
 #endif /* #ifdef USE_GRACKLE */

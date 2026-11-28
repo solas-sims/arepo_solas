@@ -352,6 +352,10 @@ static void io_func_ne(int particle, int components, void *buffer, int mode)
 {
   if(mode == 0)
     {
+#if defined(USE_GRACKLE) && (GRACKLE_CHEMISTRY >= 1)
+      /* Grackle evolves the ionisation state in the species fields; SphP.Ne belongs to Arepo's own cooling and is not updated */
+      ((MyOutputFloat *)buffer)[0] = compute_electron_abundance(particle);
+#else
       // normal code path: calculate Ne accounting for GFM options and USE_SFR
       double ne = SphP[particle].Ne;
 
@@ -364,6 +368,7 @@ static void io_func_ne(int particle, int components, void *buffer, int mode)
 #endif /* #if defined(USE_SFR) */
 
       ((MyOutputFloat *)buffer)[0] = ne;
+#endif /* #if defined(USE_GRACKLE) && (GRACKLE_CHEMISTRY >= 1) #else */
     }
   else
     {

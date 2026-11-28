@@ -704,6 +704,9 @@ double compute_mu(int i);
 #if defined(POPIII_SF) && (GRACKLE_CHEMISTRY >= 2)
 double get_H2_fraction(int i);
 #endif
+#if GRACKLE_CHEMISTRY >= 1
+double compute_electron_abundance(int i);
+#endif
 #endif
 
 #endif /* #ifndef PROTO_H */
