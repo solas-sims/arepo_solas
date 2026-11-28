@@ -86,7 +86,7 @@ STARS
 STAR_PARTICLES=0
 WINDS
 SUPERNOVAE
-SN_TERMINAL_MOMENTUM_BOOST=8
+#SN_TERMINAL_MOMENTUM_BOOST=1.0   # multiplier on the terminal momentum of unresolved SNe; leave off unless testing feedback strength
 STAR_FEEDBACK_DIAGNOSTIC
 #PASSIVE_SCALARS=1
 METALS
