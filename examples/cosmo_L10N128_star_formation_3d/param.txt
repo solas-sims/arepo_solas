@@ -98,7 +98,9 @@ MinGasTemp                              1.e2
 MinimumDensityOnStartUp                 1.0e-10  %% very important for this setup!
 LimitUBelowThisDensity                  0.0
 LimitUBelowCertainDensityToThisValue    0.0
-MinEgySpec                              1.0e2
+%% MinEgySpec 0 derives the temperature floor from MinGasTemp. A non-zero value is a floor in (km/s)^2:
+%% 100 holds all gas above roughly 1e4 K.
+MinEgySpec                              0.0
 
 %---- Tree algorithm, force accuracy, domain update frequency
 TypeOfOpeningCriterion                  1
@@ -153,5 +155,7 @@ ActivePartFracForNewDomainDecomp        0.1
  RefinementCriterion                     1
  DerefinementCriterion                   1
  MaxVolumeDiff				 10
- MinVolume				 1.0e-9
+ %% With REFINEMENT_VOLUME_LIMIT, cells smaller than 2*MinVolume are never split. Check that this does not stop
+ %% refinement in dense gas (comoving (Mpc/h)^3).
+ MinVolume				 1.0e-15
  MaxVolume				 1.0e9

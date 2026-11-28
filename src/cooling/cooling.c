@@ -42,6 +42,8 @@
  *                void InitCool(void)
  *                void cooling_only(void)
  *                void cool_cell(int i)
+ *                void cool_cells(int ncells, const int *list)
+ *                void cool_active_cells(void)
  *
  *
  * \par Major modifications and contributions:
@@ -215,7 +217,9 @@ double GetCoolingTime(double u_old, double rho, double *ne_guess, int i)
   if(LambdaNet >= 0) 
       LambdaNet = 0.0;
     
-  coolingtime =  LambdaNet / All.UnitTime_in_s;
+  /* Grackle returns the cooling time in its code time_units, which is already the code time
+   * unit (negative = cooling), so no further conversion */
+  coolingtime =  LambdaNet;
   return coolingtime;
 
 #endif /* ifdef USE_GRACKLE */
@@ -885,22 +889,46 @@ void InitCool(void)
  */
 void cooling_only(void) /* normal cooling routine when star formation is disabled */
 {
-  int idx, i;
-
   CPU_Step[CPU_MISC] += measure_time();
 
-  for(idx = 0; idx < TimeBinsHydro.NActiveParticles; idx++)
+  cool_active_cells();
+
+  CPU_Step[CPU_COOLINGSFR] += measure_time();
+}
+
+/*! \brief Apply cooling to a list of gas cells.
+ *
+ *  With Grackle the cells are passed to the library as arrays (one call per time bin, see GrackleCoolCells()); otherwise this loops
+ *  over cool_cell(). Swallowed or eliminated cells (Mass == 0) are skipped.
+ *
+ *  \param[in] ncells number of entries in list.
+ *  \param[in] list   indices of the gas cells to cool.
+ *
+ *  \return void
+ */
+void cool_cells(int ncells, const int *list)
+{
+#ifdef USE_GRACKLE
+  GrackleCoolCells(ncells, list);
+#else
+  for(int k = 0; k < ncells; k++)
     {
-      i = TimeBinsHydro.ActiveParticleList[idx];
+      int i = list[k];
       if(i >= 0)
         {
-          if(P[i].Mass == 0 && P[i].ID == 0)
+          if(P[i].Mass == 0)
             continue; /* skip cells that have been swallowed or eliminated */
 
           cool_cell(i);
         }
     }
-  CPU_Step[CPU_COOLINGSFR] += measure_time();
+#endif
+}
+
+/*! \brief Apply cooling to all active gas cells; see cool_cells(). */
+void cool_active_cells(void)
+{
+  cool_cells(TimeBinsHydro.NActiveParticles, TimeBinsHydro.ActiveParticleList);
 }
 
 /*! \brief Apply the isochoric cooling to a given gas cell.

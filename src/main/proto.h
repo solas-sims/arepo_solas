@@ -578,6 +578,8 @@ void swap_header(void);
 
 #if defined(COOLING)
 void cool_cell(int i);
+void cool_active_cells(void);
+void cool_cells(int ncells, const int *list);
 #endif /* #if defined(COOLING) */
 
 #ifdef EXACT_GRAVITY_FOR_PARTICLE_TYPE
@@ -701,6 +703,9 @@ void set_overdens_thresh(void);
 double compute_mu(int i);
 #if defined(POPIII_SF) && (GRACKLE_CHEMISTRY >= 2)
 double get_H2_fraction(int i);
+#endif
+#if GRACKLE_CHEMISTRY >= 1
+double compute_electron_abundance(int i);
 #endif
 #endif
 

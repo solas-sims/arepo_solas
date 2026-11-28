@@ -16,6 +16,30 @@
 /* Percent thermal energy in the energy conserving phase (Sedov-Taylor) of an SN */
 #define SN_F_THERMAL 0.72 
 
+/* Multiplier on the terminal momentum cap of unresolved SNe (default 1: the Kimm & Cen fit). Set with
+ * SN_TERMINAL_MOMENTUM_BOOST=<x> in Config.sh. */
+#ifndef SN_TERMINAL_MOMENTUM_BOOST
+#define SN_TERMINAL_MOMENTUM_BOOST 1.0
+#endif
+
+#ifdef SN_STOCHASTIC_THERMAL
+/* Stochastic thermal injection (Dalla Vecchia & Schaye 2012 style) for unresolved SNe. The thermal share of an event goes to
+ * ONE face neighbour, chosen with probability proportional to its weight |wbar_j|, which is heated by a fixed temperature rise
+ * SN_STOCHASTIC_DT [K] with probability p_j = E_th / (m_j du_target); otherwise nothing is heated. The expected energy given to
+ * each neighbour equals the deterministic share. The momentum, ejecta and swept-mass channels are unchanged. */
+#ifndef SN_STOCHASTIC_DT
+#define SN_STOCHASTIC_DT 10.0e6
+#endif
+#endif
+
+#ifdef STAR_FEEDBACK_DIAGNOSTIC
+/* Accumulated since the last report (this task): unresolved (mesh-coupled) SN events and host-dump events. */
+#define SNDIAG_N 16
+double SNDiag[SNDIAG_N];
+enum { D_NMESH, D_NHOST, D_NSN, D_NCAPPED, D_PSN, D_PE, D_EKIN, D_ESN, D_DTTH, D_MNB, D_MHOST, D_DMH,
+       D_NHEAT, D_DTHEAT, D_EEXP, D_EREAL };
+#endif
+
 /* Kick packet sent to remote face-neighbor cells */
 struct Feedback_Kick
 { 
@@ -47,9 +71,28 @@ struct Feedback_Kick
 #endif
 };
 
+#ifdef STAR_FEEDBACK_IMMEDIATE_DEPOSIT
+/* Local cells that received a kick during this call of star_feedback(); flushed to their conserved variables at the end */
+static int *TouchedCells = NULL;
+static int NTouched = 0, MaxTouched = 0;
+
+static void note_touched_cell(int j)
+{
+  if(NTouched >= MaxTouched)
+    {
+      MaxTouched = (MaxTouched > 0) ? 2 * MaxTouched : 1024;
+      TouchedCells = realloc(TouchedCells, MaxTouched * sizeof(int));
+    }
+  TouchedCells[NTouched++] = j;
+}
+#endif /* #ifdef STAR_FEEDBACK_IMMEDIATE_DEPOSIT */
+
 /* Apply a kick packet to a local cell */
 static void apply_kick(int j, const struct Feedback_Kick *Kick)
 {
+#ifdef STAR_FEEDBACK_IMMEDIATE_DEPOSIT
+  note_touched_cell(j);
+#endif
 #ifdef WINDS
   SphP[j].StarMassFeed += Kick->DeltaMass;
   All.StarFeedbackLocal[0] += Kick->DeltaMass;
@@ -119,8 +162,11 @@ static void apply_kick_primexch(int particle, const struct Feedback_Kick *Kick)
  *
  * p_SN = (-beta + sqrt(beta^2 - 4 alpha gamma)) / (2 alpha)
  */
-static void SN_compute(int ev, int h, double alpha, double beta, double gamma, double NgbsDensity, double NgbsMetallicity, double *p)
+static void SN_compute(int ev, int h, double alpha, double beta, double gamma, double NgbsDensity, double NgbsMetallicity, double *p,
+                       double *p_energy, double *p_terminal)
 {
+  *p_energy = *p_terminal = 0.0;
+
   if(alpha <= 0.0)
     {
       *p = 0.0;
@@ -154,7 +200,14 @@ static void SN_compute(int ev, int h, double alpha, double beta, double gamma, d
                 * pow(n_H, -2.0 / 17.0)
                 * pow(Zsol, -0.14);
   
-  p_term /= (All.cf_UnitMass_in_Msun * All.cf_UnitVelocity_in_cm_per_s / 1.0e5);
+  /* Msun km/s -> cgs, then to code momentum; cf_UnitMomentum_in_cgs carries the 1/a so the
+   * cap is in the same canonical (a * p_phys) convention as p_SN */
+  p_term *= SN_TERMINAL_MOMENTUM_BOOST;
+
+  p_term *= SOLAR_MASS * 1.0e5 / All.cf_UnitMomentum_in_cgs;
+
+  *p_energy = p_SN;
+  *p_terminal = p_term;
 
   if(p_SN > p_term)
     p_SN = p_term;
@@ -284,6 +337,10 @@ void star_feedback(void)
   struct Feedback_Kick *ExportBuf =
   (struct Feedback_Kick *) mymalloc_movable(&ExportBuf, "ExportBuf", max_export * sizeof(struct Feedback_Kick));
 
+#ifdef STAR_FEEDBACK_IMMEDIATE_DEPOSIT
+  NTouched = 0;
+#endif
+
   /* Act on host cells */
   for(ev = 0; ev < MechanicalFeedbackEvents.NumEvents;)
     {
@@ -332,6 +389,9 @@ void star_feedback(void)
               if(sn_mode != MESH)
                 {
                   SN_feedback_host(i, ev, h, sn_mode);
+#ifdef STAR_FEEDBACK_DIAGNOSTIC
+                  SNDiag[D_NHOST] += 1;
+#endif
                   flag_sn_host = 1;
                 }
             }
@@ -540,6 +600,11 @@ void star_feedback(void)
           /* Directed momentum magnitude and thermal budget for this event */
           double p_SN = 0.0;
           double dU_SN_th = 0.0;
+
+          /* Stochastic thermal injection: face that receives the whole thermal budget (-1: none) and the energy it receives */
+          int SN_hot_f = -1;
+          double SN_hot_E = 0.0;
+
           /* Ejecta mass */
           double m_ej = MechanicalFeedback->SN_MassLoss;
 
@@ -597,6 +662,7 @@ void star_feedback(void)
           /* Per-face state carried from the coefficient pass to deposition */
           double SN_ptilde[MAX_FACES][3]; /* pre-kick momentum m_j v_j + advected */
           double SN_mfj[MAX_FACES];       /* final neighbour mass m_j + |w|m_dep   */
+          double SN_wj[MAX_FACES];        /* |wbar_j|, the share of the event received by face j */
           double SN_KEj[MAX_FACES];       /* initial neighbour kinetic energy      */
           double SN_Dj[MAX_FACES];        /* kinetic energy dissipated in-place    */
 
@@ -677,6 +743,7 @@ void star_feedback(void)
                     SN_ptilde[f][k] = ptilde[k];
                   
                   SN_mfj[f] = mfj;
+                  SN_wj[f] = sqrtsq_wbar;
                   SN_KEj[f] = 0.5 * mj * sq_vj;
                   SN_Dj[f] = D;
 
@@ -700,7 +767,88 @@ void star_feedback(void)
               dU_SN_th = SN_F_THERMAL * E_SN;
               double gamma = dU_SN_th - E_SN;
 
-              SN_compute(ev, h, alpha, beta, gamma, NgbsDensity, NgbsMetallicity, &p_SN);
+              double p_energy, p_terminal;
+              SN_compute(ev, h, alpha, beta, gamma, NgbsDensity, NgbsMetallicity, &p_SN, &p_energy, &p_terminal);
+
+#ifdef SN_STOCHASTIC_THERMAL
+              {
+                /* Target specific energy in code units: du = k dT / ((gamma-1) mu m_p), mu = 0.6 */
+                double du_cgs = BOLTZMANN * SN_STOCHASTIC_DT / (GAMMA_MINUS1 * 0.6 * PROTONMASS);
+                double du_target = du_cgs / (All.cf_UnitEnergy_in_cgs / (All.cf_UnitMass_in_Msun * SOLAR_MASS));
+
+                double wsum_s = 0.0, P_tot = 0.0;
+                double pf_heat[MAX_FACES];
+
+                for(f = 0; f < n_faces; f++)
+                  wsum_s += SN_wj[f];
+
+                /* Heat face f with probability P_f = (w_f/sum w) * p_f, p_f = min(1, E_th/E_need,f), giving it E_th/p_f */
+                for(f = 0; f < n_faces; f++)
+                  {
+                    double E_need = SN_mfj[f] * du_target;
+                    double pj = (E_need > 0.0) ? dU_SN_th / E_need : 1.0;
+                    if(pj > 1.0)
+                      pj = 1.0;
+                    pf_heat[f] = pj;
+                    P_tot += (wsum_s > 0.0) ? SN_wj[f] / wsum_s * pj : 0.0;
+                  }
+
+                double ur = get_random_number_aux();
+
+                if(ur < P_tot)
+                  {
+                    double c = 0.0;
+                    for(f = 0; f < n_faces; f++)
+                      {
+                        c += SN_wj[f] / wsum_s * pf_heat[f];
+                        if(ur < c)
+                          {
+                            SN_hot_f = f;
+                            SN_hot_E = dU_SN_th / pf_heat[f];
+                            break;
+                          }
+                      }
+                  }
+
+#ifdef STAR_FEEDBACK_DIAGNOSTIC
+                SNDiag[D_EEXP] += dU_SN_th;
+                if(SN_hot_f >= 0)
+                  {
+                    SNDiag[D_NHEAT] += 1;
+                    SNDiag[D_EREAL] += SN_hot_E;
+                    SNDiag[D_DTHEAT] += GAMMA_MINUS1 * 0.6 * PROTONMASS * (SN_hot_E / SN_mfj[SN_hot_f]) *
+                                        (All.cf_UnitEnergy_in_cgs / (All.cf_UnitMass_in_Msun * SOLAR_MASS)) / BOLTZMANN;
+                  }
+#endif
+              }
+#endif
+
+#ifdef STAR_FEEDBACK_DIAGNOSTIC
+              {
+                /* kinetic energy delivered by the coupling: alpha p^2 + beta p (dissipated and advected terms excluded) */
+                double ekin = alpha * p_SN * p_SN + beta * p_SN;
+                /* mean thermal energy per unit mass added to a neighbour (|w_j|-weighted), as a temperature */
+                double u_th = 0.0, wsum = 0.0;
+                for(f = 0; f < n_faces; f++)
+                  {
+                    u_th += SN_wj[f] * (SN_wj[f] * dU_SN_th / SN_mfj[f]);
+                    wsum += SN_wj[f];
+                  }
+                u_th = (wsum > 0.0) ? u_th / wsum : 0.0;
+                u_th *= All.cf_UnitEnergy_in_cgs / (All.cf_UnitMass_in_Msun * SOLAR_MASS);
+                SNDiag[D_DTTH] += GAMMA_MINUS1 * 0.6 * PROTONMASS * u_th / BOLTZMANN;
+                SNDiag[D_MNB] += 1;
+                SNDiag[D_NMESH] += 1;
+                SNDiag[D_NSN] += E51;
+                SNDiag[D_NCAPPED] += (p_energy > p_terminal) ? 1 : 0;
+                SNDiag[D_PSN] += p_SN * All.cf_UnitMomentum_in_cgs / (SOLAR_MASS * 1.0e5);
+                SNDiag[D_PE] += p_energy * All.cf_UnitMomentum_in_cgs / (SOLAR_MASS * 1.0e5);
+                SNDiag[D_EKIN] += ekin;
+                SNDiag[D_ESN] += E_SN;
+                SNDiag[D_DMH] += dm_h * All.cf_UnitMass_in_Msun;
+                SNDiag[D_MHOST] += m_h * All.cf_UnitMass_in_Msun;
+              }
+#endif
             }
 #endif
       
@@ -784,7 +932,11 @@ void star_feedback(void)
                   double sq_pf = pf[0]*pf[0] + pf[1]*pf[1] + pf[2]*pf[2];
 
                   double DKE = sq_pf / (2.0 * SN_mfj[f]) - SN_KEj[f];
+#ifdef SN_STOCHASTIC_THERMAL
+                  double dU = (U_ej + dU_h) * sqrtsq_wbar + ((f == SN_hot_f) ? SN_hot_E : 0.0) + SN_Dj[f];
+#else
                   double dU = (U_ej + dU_h + dU_SN_th) * sqrtsq_wbar + SN_Dj[f];
+#endif
 
                   Kick.SN_DeltaE = DKE + dU;
                 }
@@ -910,6 +1062,12 @@ void star_feedback(void)
   myfree(RecvDisp); myfree(SendDisp); myfree(RecvCount); myfree(SendCount);
 
   myfree(ExportBuf); myfree(ExportTask);
+
+#ifdef STAR_FEEDBACK_IMMEDIATE_DEPOSIT
+  /* All kicks (local and received) are in the pending fields: put them into the conserved variables now, for active and inactive
+   * cells alike, instead of waiting until each cell is next active */
+  star_flush_pending_feed(NTouched, TouchedCells);
+#endif
  
   TIMER_STOP(CPU_STARS_FEEDBACK);
 }

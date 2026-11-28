@@ -103,3 +103,4 @@ Table of contents
   sf_threshold_halo_mass.md
   sidm.md
   examples.md
+  cosmological_units.md

@@ -1888,7 +1888,11 @@ extern struct sph_particle_data
   MyDouble RT_Timestep;
 #endif 
 
-/* Blackholes */    
+#ifdef JEANS_ENERGY_FLOOR
+  int JeansFloored; /*!< 1 if the Jeans energy floor raised this cell's internal energy at its last update (see sfr_AGORA.c) */
+#endif
+
+/* Blackholes */
 #ifdef BH_ACCRETION_ACTIVE
   MyDouble BhMassDrain;
 #endif
@@ -2196,6 +2200,8 @@ enum iofields
 #if defined(STAR_PARTICLES) && defined(POPIII_SF)
   IO_STAR_POPTYPE,
 #endif
+  IO_STAR_FORMATION_TIME,
+  IO_STAR_FORMATION_DENSITY,
 #endif
 #ifdef STAR_FEEDBACK_ACTIVE
   IO_STARHSML,

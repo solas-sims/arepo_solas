@@ -413,6 +413,11 @@ void convert_cell_into_star(int i, double birthtime)
 
   TimeBinSfr[P[i].TimeBinHydro] -= SphP[i].Sfr;
 
+#ifdef STARS
+  /* Density of the parent cell at formation (comoving, code units); the cell is removed from the mesh below */
+  double formation_density = (SphP[i].Volume > 0.0) ? P[i].Mass / SphP[i].Volume : 0.0;
+#endif
+
   voronoi_remove_connection(i);
 
 #ifdef STARS
@@ -421,6 +426,8 @@ void convert_cell_into_star(int i, double birthtime)
   /* Assign star_ids */
   P[i].SID = NumStars;
   SP[NumStars].PID = i;
+  SP[NumStars].FormationTime = birthtime;
+  SP[NumStars].FormationDensity = formation_density;
 #ifdef METALS 
   SP[NumStars].Metallicity = SphP[i].GasMetals / P[i].Mass;
 #endif 
@@ -489,6 +496,11 @@ void spawn_star_from_cell(int igas, double birthtime, int istar, MyDouble mass_o
 
   timebin_add_particle(&TimeBinsGravity, istar, igas, P[istar].TimeBinGrav, TimeBinSynchronized[P[istar].TimeBinGrav]);
 
+#ifdef STARS
+  /* Density of the parent cell at formation (comoving, code units), before its mass is reduced */
+  double formation_density = (SphP[igas].Volume > 0.0) ? P[igas].Mass / SphP[igas].Volume : 0.0;
+#endif
+
   /* now change the conserved quantities in the cell in proportion */
   double fac = (P[igas].Mass - P[istar].Mass) / P[igas].Mass;
 
@@ -519,6 +531,8 @@ void spawn_star_from_cell(int igas, double birthtime, int istar, MyDouble mass_o
   /* Assign star_ids */
   P[istar].SID = NumStars;
   SP[NumStars].PID = istar;
+  SP[NumStars].FormationTime = birthtime;
+  SP[NumStars].FormationDensity = formation_density;
 #ifdef METALS 
   SP[NumStars].Metallicity = SphP[igas].GasMetals / P[igas].Mass;
 #endif

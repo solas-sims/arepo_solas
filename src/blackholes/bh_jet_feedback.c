@@ -191,6 +191,11 @@ static int bh_feedback_evaluate(int target, int mode, int threadid)
   hinv4 = hinv3 * hinv;
 
   massloading = All.Mload * accretion; 
+  /* NOTE (comoving runs): this jet path has not been made cosmology-aware. energyfeed is a physical
+   * energy; when the injection is (re-)enabled in bh_perform_end_of_step_physics() it must be added to
+   * SphP.Energy with a factor All.cf_atime^2, and the kick must be applied to the canonical momentum
+   * (a * p_phys), using the peculiar velocity (Vel / cf_atime) when forming kinetic energies. See
+   * documentation/source/cosmological_units.md. */
   energyfeed = All.Epsilon_f * All.Epsilon_r * accretion * (CLIGHT * CLIGHT / (All.UnitVelocity_in_cm_per_s * All.UnitVelocity_in_cm_per_s));
 
   /* jet axis and opening angle */    

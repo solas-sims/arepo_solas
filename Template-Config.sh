@@ -49,6 +49,13 @@
 #STARS                  # General stars framework flag
 
 #STAR_PARTICLES=1       # Star particles model flag: set to 0, 1 for massive star particles, set to 2 for resolved individual stars
+#STAR_MAX_TIMESTEP_MYR=0.01  # Requires STAR_FEEDBACK_ACTIVE (STARS). Upper limit on a star particle's timestep in Myr (default 0.01, as for resolved galaxy runs). In cosmological boxes this sets the global step count: raise it (e.g. 1.0), and check SFR and stellar mass against a default run.
+#SN_TERMINAL_MOMENTUM_BOOST=1.0  # Requires SUPERNOVAE. Multiplier on the terminal momentum cap of unresolved (mesh-coupled) SNe, default 1 (Kimm & Cen fit). Values above 1 strengthen SN feedback when the cell mass is too large to resolve the remnant; for tests of feedback strength.
+#STAR_FEEDBACK_DIAGNOSTIC  # Requires SUPERNOVAE. Print one SN_DIAG: line per step with SN events: events, SNe per event, how often the momentum cap binds, momentum per SN, kinetic energy delivered / E_SN, thermal temperature rise per neighbour, swept/host mass.
+#SN_STOCHASTIC_THERMAL  # Requires SUPERNOVAE. Unresolved (mesh-coupled) SNe: instead of spreading the thermal share (72% of E_SN) over all face neighbours, give it to ONE neighbour, chosen by face weight, which is heated by SN_STOCHASTIC_DT with probability E_th/(m_j du). Expected energy is unchanged; momentum, ejecta and swept mass are unchanged. For cells too massive for a thermal dump to survive cooling.
+#SN_STOCHASTIC_DT=10.0e6  # Requires SN_STOCHASTIC_THERMAL. Temperature rise [K] of a heated neighbour (default 1e7). 10^7-10^7.5 K is above the cooling peak; larger means rarer, stronger heating events. Reported by STAR_FEEDBACK_DIAGNOSTIC as SN_DIAG_STOCH.
+#GRACKLE_GUARD_RATIO=1.0e3  # Requires USE_GRACKLE. A cell is flagged when the batched Grackle solve returns a thermal energy that is not finite, is negative, or exceeds this factor times the pre-cooling value (default 1e3). Flagged cells are printed (GRACKLE_GUARD: lines) and re-integrated alone in substeps; if that also fails the run stops with the cell state printed. The guard is always active; this only changes the threshold.
+#GRACKLE_GUARD_SUBSTEPS=64  # Requires USE_GRACKLE. Number of substeps for the single-cell re-integration of a flagged cell (default 64).
 
 #STAR_FEEDBACK          # Include full star feedback (winds + full radiation + supernovae)
 
@@ -63,6 +70,11 @@
 #PHOTOIONIZATION        # Only photoionization
 
 #SUPERNOVAE             # Only supernovae
+#STAR_FEEDBACK_IMMEDIATE_DEPOSIT  # Requires WINDS and/or SUPERNOVAE. Apply the wind/SN mass, momentum, energy, metals and species
+                                  # to the conserved variables of every receiving cell at the end of star_feedback(), instead of when each
+                                  # cell is next active. With hierarchical time steps a long-step cell otherwise exchanges fluxes with
+                                  # its neighbours between the event and the application, so SN host-cell removals can exceed the cell
+                                  # content (negative mass/energy). Default (off) keeps the previous behaviour.
 
 #TREECOLUMN             # Column density estimate through the gravity tree (src/gravity/forcetree.c)
 #RAD_OPENING_ANGLE      # Alternate tree-opening criterion for radiation transport neighbour walks (src/ngbtree/ngbtree.c)
@@ -180,6 +192,15 @@
 #COOLING                       # Simple primordial cooling
 #LOW_TEMP_COOLING              # Maschenko et al. 2008 # Don't use while USE_GRACKLE
 #ENFORCE_JEANS_STABILITY_OF_CELLS  # this imposes an adaptive floor for the temperature
+#JEANS_ENERGY_FLOOR            # Requires AGORA_SF. Floors the specific internal energy of each active gas cell so that its Jeans mass is resolved: JEANS_FLOOR_NCELLS cell masses (Robertson & Kravtsov 2008, eqs 7-10; Truelove et al. 1997) or, in mode 2, a fixed EAGLE-style equation of state (Schaye & Dalla Vecchia 2008). The mass-based floor scales as T ~ M_cell^(2/3) rho^(1/3), so at higher resolution with the same NCELLS it falls below the physical gas temperatures and removes itself. Prints a JEANS_FLOOR: line every 200 steps. Distinct from ENFORCE_JEANS_STABILITY_OF_CELLS, which floors the pressure only and not with density. Recommended for a 9e6 Msun cosmological box: JEANS_FLOOR_MODE=1, JEANS_FLOOR_NH_MIN=0.1, JEANS_FLOOR_SF_GATE=2 (without NH_MIN the floor heats cold intergalactic gas at high redshift).
+#JEANS_FLOOR_NCELLS=33.0       # Requires JEANS_ENERGY_FLOOR (modes 0, 1). Required Jeans mass in cell masses. 33 = Truelove (lambda_J >= 4 dx). The SPH criterion of Robertson & Kravtsov (30 kernel masses) is roughly 420 if a kernel is the cell plus ~13 neighbours. For 9e6 Msun cells the floor is about 1.2e4 K at n_H = 0.1 and 1.2e5 K at 100 cm^-3 (33), or 6.7e4 and 6.7e5 K (420).
+#JEANS_FLOOR_MODE=1           # Requires JEANS_ENERGY_FLOOR. 0: raise the energy after the cooling step. 1 (default): as 0, and cells already at the floor are not passed to the cooling solver, so cooling never removes energy from gas on the floor. 2: fixed EAGLE-style EOS, T = JEANS_FLOOR_EOS_T0 (n_H/JEANS_FLOOR_EOS_NH0)^(JEANS_FLOOR_EOS_GAMMA-1) above NH0 (defaults 8000 K, 0.1 cm^-3, 4/3), independent of cell mass; applied as in mode 1.
+#JEANS_FLOOR_NH_MIN=0.1        # Requires JEANS_ENERGY_FLOOR. [cm^-3] no floor below this hydrogen number density (default 0: none).
+#JEANS_FLOOR_EOS_GAMMA=1.3333333  # Requires JEANS_FLOOR_MODE=2. Polytropic index of the EAGLE-style floor, T = T0 (n_H/NH0)^(gamma-1). Default 4/3.
+#JEANS_FLOOR_EOS_NH0=0.1       # Requires JEANS_FLOOR_MODE=2. [cm^-3] density above which the EAGLE-style floor applies. Default 0.1.
+#JEANS_FLOOR_EOS_T0=8000.0     # Requires JEANS_FLOOR_MODE=2. [K] floor temperature at NH0. Default 8000.
+#JEANS_FLOOR_SF_DEX=0.5        # Requires JEANS_FLOOR_SF_GATE=2. Gas with energy within this many dex of the floor may form stars. Default 0.5.
+#JEANS_FLOOR_SF_GATE=2         # Requires JEANS_ENERGY_FLOOR. 0 (default): the star formation temperature gate (TemperatureThreshold) sees the floored energy, so floored gas hotter than the threshold cannot form stars. 1: cells at the floor pass the gate. 2: gas whose energy is within JEANS_FLOOR_SF_DEX (default 0.5) dex of the floor passes the gate (EAGLE-like).
 #USE_SFR                       # Star formation model, turning dense gas into collisionless partices
 #SFR_KEEP_CELLS                # Do not distroy cell out of which a star has formed
 
